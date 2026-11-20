@@ -17,7 +17,7 @@ pub mod website;
 pub use app::{AppKind, RUNS_BRIEF};
 pub use game::{CreditsCheck, GameKind};
 pub use mechanics::MechanicsCheck;
-pub use redesign::RedesignKind;
+pub use redesign::{RedesignKind, RedesignReadyCheck};
 pub use runs::RunsCheck;
 pub use screenshot::ScreenshotCheck;
 pub use self_test::SelfTestCheck;

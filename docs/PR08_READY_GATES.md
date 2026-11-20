@@ -1,8 +1,9 @@
 # PR-08 — Native Redesign Checks + Ready Gates
 
-## Tool
+## Tool + kind check
 
-`redesign_checks_run` — fail-closed native Rust checks written to `redesign/check_results.json`.
+- `redesign_checks_run` — fail-closed native Rust checks written to `redesign/check_results.json`
+- `RedesignReadyCheck` (`redesign-ready`) — registered on `RedesignKind` next to `BuildCheck` (no `WebVisualCheck` / no `similarity`)
 
 ## Gates
 
