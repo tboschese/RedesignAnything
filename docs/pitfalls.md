@@ -1337,3 +1337,10 @@ exclusive-creation checks after selecting a name.
 then a fixed number of frames left the next action outside the settled layout. Wait for the
 background operation to finish and run immediate repaints after scrolling before clicking;
 otherwise a missed click looks like a backend mutation that never completed.
+
+**Oracle import wiped a richer host Study capability.** `redesign_study_map` rewrote the same
+`cap_*` id from a thinner scenario stub (`declared` / short task), so observed criticality and
+unknowns disappeared. Preserve when the existing `knowledge_status` ranks higher (or equal with a
+longer task); merge `source_refs` / `unknowns`. Static oracle hints that only know form keywords
+also fail closed on library/Wayback journeys — extend `then_to_hint`, and treat native `<button>`
+as a valid functional smoke signal, not only DS `<Button>`.

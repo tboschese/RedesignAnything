@@ -185,26 +185,56 @@ pub fn evaluate_oracle(ws: &Workspace, oracle: &Value) -> Result<(QualityCheck, 
 
 fn then_to_hint(then: &str) -> String {
     let t = then.to_ascii_lowercase();
-    // Conservative keyword extraction from oracle "then" clauses — not a full test runner.
-    if t.contains("approve") {
-        return "approve".into();
+    // Prefer an explicit quoted phrase when authors put one in the "then" clause.
+    if let Some(q) = first_quoted_phrase(then) {
+        if q.chars().count() >= 3 {
+            return q;
+        }
     }
-    if t.contains("submit") {
-        return "submit".into();
-    }
-    if t.contains("attachment") {
-        return "attachment".into();
-    }
-    if t.contains("amount") {
-        return "amount".into();
-    }
-    if t.contains("role") {
-        return "role".into();
-    }
-    if t.contains("filter") {
-        return "filter".into();
+    // Conservative keyword extraction — longer / more specific needles first.
+    // Not a full test runner; missing hints stay fail/not_evaluated.
+    const NEEDLES: &[&str] = &[
+        "save page",
+        "wayback",
+        "calendar",
+        "snapshot",
+        "library",
+        "download",
+        "donate",
+        "search",
+        "attachment",
+        "approve",
+        "submit",
+        "amount",
+        "filter",
+        "format",
+        "player",
+        "login",
+        "play",
+        "read",
+        "role",
+    ];
+    for needle in NEEDLES {
+        if t.contains(needle) {
+            return (*needle).into();
+        }
     }
     String::new()
+}
+
+fn first_quoted_phrase(then: &str) -> Option<String> {
+    for (open, close) in [('"', '"'), ('\u{201c}', '\u{201d}'), ('\'', '\'')] {
+        if let Some(start) = then.find(open) {
+            let rest = &then[start + open.len_utf8()..];
+            if let Some(end) = rest.find(close) {
+                let inner = rest[..end].trim();
+                if !inner.is_empty() {
+                    return Some(inner.to_ascii_lowercase());
+                }
+            }
+        }
+    }
+    None
 }
 
 fn read_app_blob(ws: &Workspace) -> String {
@@ -394,6 +424,34 @@ mod tests {
                 "capability_id": "cap_x",
                 "executable": true,
                 "then": ["Approve button is visible"]
+            }]
+        });
+        let (qc, _) = evaluate_oracle(&ws, &oracle).unwrap();
+        assert_eq!(qc.status, "pass", "{qc:?}");
+    }
+
+    #[test]
+    fn oracle_then_matches_library_and_quoted_phrases() {
+        assert_eq!(then_to_hint("Donate control remains available"), "donate");
+        assert_eq!(then_to_hint("Calendar day selection is available"), "calendar");
+        assert_eq!(then_to_hint("Wayback URL field is separate"), "wayback");
+        assert_eq!(then_to_hint("Play/Read is primary"), "play");
+        assert_eq!(then_to_hint("Get actions list formats"), "format");
+        assert_eq!(then_to_hint("Status text equals \"Workspace ready.\""), "workspace ready.");
+        let d = tempfile::tempdir().unwrap();
+        let ws = Workspace::create(d.path(), "Q", "q", TargetRef::None).unwrap();
+        std::fs::create_dir_all(ws.app_dir().join("src")).unwrap();
+        std::fs::write(
+            ws.app_dir().join("src/App.tsx"),
+            "export function App(){ return <button>Donate</button> }\n",
+        )
+        .unwrap();
+        let oracle = json!({
+            "scenarios": [{
+                "id": "donate",
+                "capability_id": "cap_donate",
+                "executable": true,
+                "then": ["Donate control remains available"]
             }]
         });
         let (qc, _) = evaluate_oracle(&ws, &oracle).unwrap();

@@ -179,6 +179,18 @@ pub fn scaffold_app(ws: &Workspace, policy: Option<&ExecutionPolicy>) -> Result<
     fs::create_dir_all(app.join("src/mocks")).map_err(|e| ToolError::io(app.display(), e))?;
     fs::create_dir_all(app.join("src/routes")).map_err(|e| ToolError::io(app.display(), e))?;
 
+    // Prefer a local file: dependency when the registry was ingested from a directory on disk
+    // (fixtures / corporate packages). Published registry versions stay semver.
+    let dep_spec = {
+        let src = Path::new(&reg.source_ref);
+        if src.is_dir() {
+            let abs = src.canonicalize().unwrap_or_else(|_| src.to_path_buf());
+            format!("file:{}", abs.display())
+        } else {
+            reg.package_version.clone()
+        }
+    };
+
     write(
         &app.join("package.json"),
         &format!(
@@ -207,7 +219,7 @@ pub fn scaffold_app(ws: &Workspace, policy: Option<&ExecutionPolicy>) -> Result<
 }}
 "#,
             pkg = reg.package_name,
-            ver = reg.package_version
+            ver = dep_spec
         ),
     )?;
 

@@ -34,6 +34,7 @@ pub fn import_oracle(ws: &Workspace, oracle: &Value) -> Result<Value, ToolError>
     let fixture_id = oracle.get("fixture_id").and_then(|x| x.as_str()).unwrap_or("oracle");
     let mut imported_caps = 0u32;
     let mut imported_ev = 0u32;
+    let mut preserved_caps = 0u32;
     if let Some(scenarios) = oracle.get("scenarios").and_then(|s| s.as_array()) {
         for (i, sc) in scenarios.iter().enumerate() {
             let cap_id = sc
@@ -72,31 +73,31 @@ pub fn import_oracle(ws: &Workspace, oracle: &Value) -> Result<Value, ToolError>
                 },
             )?;
             imported_ev += 1;
-            redesign_store::put_capability(
-                ws,
-                Capability {
-                    id: cap_id,
-                    title: scen_id.into(),
-                    task: then,
-                    actor_roles: vec![sc.get("profile").and_then(|x| x.as_str()).unwrap_or("user").into()],
-                    original_routes: vec!["/".into()],
-                    inputs: sc
-                        .get("given")
-                        .and_then(|g| g.as_array())
-                        .map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect())
-                        .unwrap_or_default(),
-                    actions: sc
-                        .get("when")
-                        .and_then(|g| g.as_array())
-                        .map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect())
-                        .unwrap_or_default(),
-                    outcomes: vec![],
-                    criticality: "normal".into(),
-                    knowledge_status: source.into(),
-                    source_refs: vec![ev_id],
-                    unknowns: vec![],
-                },
-            )?;
+            let incoming = Capability {
+                id: cap_id,
+                title: scen_id.into(),
+                task: then,
+                actor_roles: vec![sc.get("profile").and_then(|x| x.as_str()).unwrap_or("user").into()],
+                original_routes: vec!["/".into()],
+                inputs: sc
+                    .get("given")
+                    .and_then(|g| g.as_array())
+                    .map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect())
+                    .unwrap_or_default(),
+                actions: sc
+                    .get("when")
+                    .and_then(|g| g.as_array())
+                    .map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect())
+                    .unwrap_or_default(),
+                outcomes: vec![],
+                criticality: "normal".into(),
+                knowledge_status: source.into(),
+                source_refs: vec![ev_id],
+                unknowns: vec![],
+            };
+            if put_capability_preserving_richer(ws, incoming)? {
+                preserved_caps += 1;
+            }
             imported_caps += 1;
         }
     }
@@ -105,33 +106,96 @@ pub fn import_oracle(ws: &Workspace, oracle: &Value) -> Result<Value, ToolError>
         .and_then(|u| u.as_array())
         .map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect())
         .unwrap_or_default();
-    // Preserve intentional unknowns as a capability gap record.
+    // Preserve intentional unknowns as a capability gap record (normal criticality:
+    // unknowns are tracked gaps, not blocking destinations by themselves).
     if !unknowns.is_empty() {
-        redesign_store::put_capability(
-            ws,
-            Capability {
-                id: format!("cap_{fixture_id}_unknowns"),
-                title: "Declared unknowns".into(),
-                task: "Items not observed or not determined".into(),
-                actor_roles: vec![],
-                original_routes: vec![],
-                inputs: vec![],
-                actions: vec![],
-                outcomes: vec![],
-                criticality: "high".into(),
-                knowledge_status: "unknown".into(),
-                source_refs: vec![],
-                unknowns: unknowns.clone(),
-            },
-        )?;
+        let incoming = Capability {
+            id: format!("cap_{fixture_id}_unknowns"),
+            title: "Declared unknowns".into(),
+            task: "Items not observed or not determined".into(),
+            actor_roles: vec![],
+            original_routes: vec![],
+            inputs: vec![],
+            actions: vec![],
+            outcomes: vec![],
+            criticality: "normal".into(),
+            knowledge_status: "unknown".into(),
+            source_refs: vec![],
+            unknowns: unknowns.clone(),
+        };
+        if put_capability_preserving_richer(ws, incoming)? {
+            preserved_caps += 1;
+        }
         imported_caps += 1;
     }
     Ok(json!({
         "imported_evidence": imported_ev,
         "imported_capabilities": imported_caps,
+        "preserved_capabilities": preserved_caps,
         "unknowns": unknowns,
         "coverage": coverage_of(ws)?
     }))
+}
+
+fn knowledge_rank(status: &str) -> u8 {
+    match status {
+        "validated" => 4,
+        "observed" => 3,
+        "declared" => 2,
+        "inferred" => 1,
+        "unknown" => 0,
+        _ => 0,
+    }
+}
+
+fn merge_unique(dst: &mut Vec<String>, extra: &[String]) {
+    for item in extra {
+        if !dst.iter().any(|e| e == item) {
+            dst.push(item.clone());
+        }
+    }
+}
+
+/// Write `incoming` unless a richer host/Study capability already exists for the same id.
+/// Returns `true` when the existing richer record was preserved (merged refs/unknowns only).
+fn put_capability_preserving_richer(ws: &Workspace, incoming: Capability) -> Result<bool, ToolError> {
+    if let Some(existing) = redesign_store::get_capability(ws, &incoming.id)? {
+        let existing_rank = knowledge_rank(&existing.knowledge_status);
+        let incoming_rank = knowledge_rank(&incoming.knowledge_status);
+        if existing_rank > incoming_rank
+            || (existing_rank == incoming_rank && existing.task.len() > incoming.task.len())
+        {
+            let mut merged = existing;
+            merge_unique(&mut merged.source_refs, &incoming.source_refs);
+            merge_unique(&mut merged.unknowns, &incoming.unknowns);
+            // Keep the stronger criticality when the host already marked one higher.
+            if criticality_rank(&incoming.criticality) > criticality_rank(&merged.criticality) {
+                merged.criticality = incoming.criticality;
+            }
+            redesign_store::put_capability(ws, merged)?;
+            return Ok(true);
+        }
+        // Incoming is richer or equal-and-not-shorter: take incoming, but keep prior refs/unknowns.
+        let mut merged = incoming;
+        merge_unique(&mut merged.source_refs, &existing.source_refs);
+        merge_unique(&mut merged.unknowns, &existing.unknowns);
+        if criticality_rank(&existing.criticality) > criticality_rank(&merged.criticality) {
+            merged.criticality = existing.criticality;
+        }
+        redesign_store::put_capability(ws, merged)?;
+        return Ok(false);
+    }
+    redesign_store::put_capability(ws, incoming)?;
+    Ok(false)
+}
+
+fn criticality_rank(c: &str) -> u8 {
+    match c {
+        "critical" => 3,
+        "high" => 2,
+        "normal" => 1,
+        _ => 0,
+    }
 }
 
 /// Map Craft website capture routes into observed route capabilities (partial Study adapter).
@@ -267,6 +331,55 @@ mod tests {
         let caps = redesign_store::list_capabilities(&ws).unwrap();
         assert!(caps.iter().any(|c| c.id == "cap_dense_submit_enablement"));
         assert!(caps.iter().any(|c| c.knowledge_status == "unknown"));
+        let unknown_cap = caps.iter().find(|c| c.id == "cap_dense-form_unknowns").unwrap();
+        assert_eq!(unknown_cap.criticality, "normal");
+    }
+
+    #[test]
+    fn oracle_import_preserves_richer_host_capability() {
+        let d = tempfile::tempdir().unwrap();
+        let ws = Workspace::create(d.path(), "Fix", "kind=redesign", TargetRef::None).unwrap();
+        redesign_store::put_capability(
+            &ws,
+            Capability {
+                id: "cap_ia_home_dual_search".into(),
+                title: "Home dual entry".into(),
+                task: "Visitor reaches either Wayback URL history or library search without conflating the two intents".into(),
+                actor_roles: vec!["visitor".into()],
+                original_routes: vec!["/".into()],
+                inputs: vec!["Public homepage".into()],
+                actions: vec!["Enter Wayback URL".into()],
+                outcomes: vec![],
+                criticality: "high".into(),
+                knowledge_status: "observed".into(),
+                source_refs: vec!["ev_ia_home_observed".into()],
+                unknowns: vec!["Advanced Search parity".into()],
+            },
+        )
+        .unwrap();
+        let oracle = json!({
+            "fixture_id": "archive-org-host-preview",
+            "captured_at": "2026-11-20T00:00:00Z",
+            "scenarios": [{
+                "id": "scenario_ia_home_dual_intent",
+                "capability_id": "cap_ia_home_dual_search",
+                "profile": "visitor",
+                "given": ["Open home"],
+                "when": ["Look at CTA"],
+                "then": ["Wayback URL field is separate"],
+                "assertion_source": "user_approved"
+            }],
+            "unknowns": []
+        });
+        let out = import_oracle(&ws, &oracle).unwrap();
+        assert_eq!(out["preserved_capabilities"], 1);
+        let cap = redesign_store::get_capability(&ws, "cap_ia_home_dual_search").unwrap().unwrap();
+        assert_eq!(cap.knowledge_status, "observed");
+        assert_eq!(cap.title, "Home dual entry");
+        assert_eq!(cap.criticality, "high");
+        assert!(cap.source_refs.iter().any(|r| r == "ev_ia_home_observed"));
+        assert!(cap.source_refs.iter().any(|r| r == "ev_scenario_ia_home_dual_intent"));
+        assert!(cap.unknowns.iter().any(|u| u.contains("Advanced Search")));
     }
 
     #[test]

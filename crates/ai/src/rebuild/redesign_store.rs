@@ -261,6 +261,20 @@ pub fn put_capability(ws: &Workspace, cap: Capability) -> Result<StoreEnvelope, 
     bump(ws)
 }
 
+/// Load one capability by id, if present.
+pub fn get_capability(ws: &Workspace, id: &str) -> Result<Option<Capability>, ToolError> {
+    validate_id("cap_", id)?;
+    let path = safe_child(&capabilities_dir(&redesign_dir(ws)), &format!("{id}.json"))?;
+    if !path.is_file() {
+        return Ok(None);
+    }
+    reject_symlink(&path)?;
+    let bytes = fs::read(&path).map_err(|e| ToolError::io(path.display(), e))?;
+    let cap: Capability =
+        serde_json::from_slice(&bytes).map_err(|e| ToolError::invalid(format!("{}: {e}", path.display())))?;
+    Ok(Some(cap))
+}
+
 pub fn list_evidence(ws: &Workspace) -> Result<Vec<EvidenceRecord>, ToolError> {
     let dir = evidence_dir(&redesign_dir(ws));
     list_json_dir(&dir)

@@ -115,6 +115,18 @@ pub fn engineering_ready(inp: &CheckInputs, unmapped_critical_unapproved: u32, b
     prototype_ready(inp, unmapped_critical_unapproved) && backend_deps_approved && !inp.secrets_exported
 }
 
+/// Host-agent previews often use native `<button>`; scaffolds may use DS `<Button>`.
+/// Either counts; an explicit broken marker still fails closed.
+pub fn primary_action_present(app_tsx: &str) -> bool {
+    if app_tsx.contains("TODO_BROKEN_BUTTON") {
+        return false;
+    }
+    app_tsx.contains("<Button")
+        || app_tsx.contains("<button")
+        || app_tsx.contains("role=\"button\"")
+        || app_tsx.contains("role='button'")
+}
+
 pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
     let mut checks = Vec::new();
 
@@ -239,7 +251,7 @@ pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
 
     // Functional proxy + quality runners (oracle static eval, optional Playwright/axe reports).
     let app_tsx = fs::read_to_string(ws.app_dir().join("src/App.tsx")).unwrap_or_default();
-    let button_works = app_tsx.contains("<Button") && !app_tsx.contains("TODO_BROKEN_BUTTON");
+    let button_works = primary_action_present(&app_tsx);
     let preview = pkg.is_file() && ws.app_dir().join("src/main.tsx").is_file();
 
     checks.push(CheckResult {
@@ -253,7 +265,10 @@ pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
         }
         .into(),
         summary: format!("oracles_proxy={oracle_total} button_works={button_works}"),
-        details: json!({"note":"Complement with functional_scenarios + playwright quality runners."}),
+        details: json!({
+            "note": "Complement with functional_scenarios + playwright quality runners.",
+            "accepts": ["<Button", "<button", "role=\"button\""],
+        }),
     });
 
     let mut a11y_critical_fail = false;
@@ -496,5 +511,14 @@ mod tests {
         let report = run_native_checks(&ws).unwrap();
         assert!(report.checks.iter().any(|c| c.id == "security_secrets" && c.status == "fail"));
         assert!(!report.concept_ready);
+    }
+
+    #[test]
+    fn native_button_counts_for_functional_smoke() {
+        assert!(primary_action_present("export function App(){return <button>Go</button>}"));
+        assert!(primary_action_present("export function App(){return <Button>Go</Button>}"));
+        assert!(primary_action_present("<div role=\"button\">Go</div>"));
+        assert!(!primary_action_present("export function App(){return null}"));
+        assert!(!primary_action_present("<button>TODO_BROKEN_BUTTON</button>"));
     }
 }
