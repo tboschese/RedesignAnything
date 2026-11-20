@@ -1,6 +1,6 @@
 # Redesign Anything — Pacote de especificação (v1.4.0)
 
-**Status:** pacote embutido neste fork (`tboschese/RedesignAnything`); Slice 0 bootstrap em andamento; capacidades Redesign ainda não implementadas no engine. Base: fork do Craft Anything, gratuito/open source, local-first, sem API paga obrigatória. Foco inicial: qualquer aplicação web.
+**Status:** pacote embutido neste fork (`tboschese/RedesignAnything`); PR-01…PR-11 implementados no engine (ver README da raiz e `docs/STATUS.md`); V1 pública ainda não lançada. Base: fork do Craft Anything, gratuito/open source, local-first, sem API paga obrigatória. Foco inicial: qualquer aplicação web.
 
 ## Comece por aqui
 

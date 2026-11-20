@@ -1,6 +1,6 @@
 # Redesign Anything — Agent-first, MCP e CLI
 
-> **Estado:** desenho de interface e bootstrap a implementar no fork. Este documento não representa comandos já disponíveis hoje. O Craft upstream já oferece aplicação, CLI, MCP e extensões; novas operações `redesign_*` são propostas.
+> **Estado:** operações `redesign_*` estão no CLI/MCP deste fork (ver README da raiz). Nomes de binário ainda são `craft-anything-cli`. A seção “CLI — interface-alvo” abaixo descreve um wrapper futuro `redesign-anything-cli`; use os comandos `redesign-*` já listados no README até o rebrand.
 
 ## Objetivo de compatibilidade
 
@@ -13,17 +13,15 @@ O usuário deve conseguir iniciar no Cursor, Claude Code, Codex ou outro agente 
 Prompt previsto para os usuários, após a publicação do fork:
 
 ```text
-Use este repositório Redesign Anything: https://github.com/<owner>/redesign-anything
-Leia README.md, AGENTS.md e docs/AGENT_FIRST.md. Explique os pré-requisitos antes
- de instalar qualquer coisa. Confira a versão do repositório e rode o diagnóstico.
+Use este repositório Redesign Anything: https://github.com/tboschese/RedesignAnything
+Leia README.md, AGENTS.md e REDESIGN_SPEC/AGENT_FIRST.md. Explique os pré-requisitos antes
+de instalar qualquer coisa. Confira a versão do repositório e rode o diagnóstico.
 Configure o CLI/MCP quando permitido, sem substituir minha configuração existente.
 Depois redesenhe https://app.exemplo.com no modo redesign, preservando jornadas
 conhecidas e reportando explicitamente funcionalidades não verificadas.
 Não altere os sistemas originais nem envie dados de aplicações privadas a provedores
 externos sem minha autorização. Mostre onde ficaram os artefatos e testes.
 ```
-
-A URL acima é **placeholder** e não é um repositório criado nesta especificação.
 
 ## Fluxo B — Agente já está no projeto
 
