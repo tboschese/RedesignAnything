@@ -140,6 +140,13 @@
       "type": "string",
       "default": ""
     },
+    "kind": {
+      "description": "When set, this project is that kind (`redesign`, …) instead of detecting from the request. Absent on older craft.json files (read as none).",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "start_files": {
       "description": "The names in the person's folder when the project started there (at most\n[`START_FILES_SHOWN`]), so the builder knows what to start from.",
       "type": "array",

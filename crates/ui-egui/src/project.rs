@@ -1044,9 +1044,10 @@ fn outcome(app: &CraftApp) -> Option<Outcome> {
 }
 
 /// The words for what was made, from its kind, so a game never gets website examples.
+/// Prefer the persisted manifest kind (e.g. redesign) over re-detect, which would otherwise
+/// score a URL target as website and steal redesign labels.
 fn outcome_words(kinds: &KindRegistry, ws: &Workspace) -> KindWords {
-    let m = &ws.manifest;
-    kinds.detect(&m.request, &m.target, &m.stack).map_or_else(|| AppKind.words(), |k| k.words())
+    rebuild::project::resolve_kind(kinds, ws, None).map_or_else(|| AppKind.words(), |k| k.words())
 }
 
 /// The button that shows the result ("Play the game"); a program starts only on this click.
