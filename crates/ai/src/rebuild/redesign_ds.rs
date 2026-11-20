@@ -33,6 +33,9 @@ pub struct DesignSystemRegistry {
     pub approved_overrides: Vec<String>,
     #[serde(default)]
     pub layout_cli: LayoutCliStatus,
+    /// Documentary paths found next to the package (Storybook, docs). Empty is allowed.
+    #[serde(default)]
+    pub documentary_paths: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -219,9 +222,17 @@ pub fn ingest_package(
         json!({})
     };
 
-    let storybook = package_dir.join(".storybook").is_dir() || package_dir.join("storybook").is_dir();
+    let mut documentary_paths: Vec<String> = Vec::new();
+    for candidate in [".storybook", "storybook", "docs", "documentation"] {
+        let p = package_dir.join(candidate);
+        if p.is_dir() {
+            documentary_paths.push(candidate.to_string());
+        }
+    }
+    let storybook = documentary_paths.iter().any(|p| p.contains("storybook"));
     let mut notes_digest = pkg_bytes.clone();
     notes_digest.extend_from_slice(serde_json::to_vec(&tokens).unwrap_or_default().as_slice());
+    notes_digest.extend_from_slice(documentary_paths.join("|").as_bytes());
 
     let reg = DesignSystemRegistry {
         schema_version: SCHEMA_VERSION.into(),
@@ -247,12 +258,13 @@ pub fn ingest_package(
                 available: false,
                 mode: "degraded".into(),
                 note: if storybook {
-                    "Layout CLI unavailable; Storybook present but not required for ingest.".into()
+                    "Layout CLI unavailable; Storybook/docs path recorded in documentary_paths.".into()
                 } else {
-                    "Layout CLI unavailable; Storybook absent — ingest still succeeds from package.json exports.".into()
+                    "Layout CLI unavailable; no Storybook/docs folder — ingest still succeeds from package.json exports.".into()
                 },
             }
         },
+        documentary_paths,
     };
     save_registry(ws, &reg)?;
     Ok(reg)

@@ -109,6 +109,7 @@ pub const TOOLS: &[&str] = &[
     "redesign_rea_request",
     // redesign_rea_run is Deep/consent-gated and intentionally NOT clean-room allowlisted.
     "redesign_benchmark_dry_run",
+    "redesign_benchmark_publish",
     // The builder's own project.
     "build_files_list",
     "build_file_read",

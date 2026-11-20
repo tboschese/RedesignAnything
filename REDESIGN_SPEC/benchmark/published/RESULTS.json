@@ -1,0 +1,107 @@
+{
+  "schema_version": "1.0.0",
+  "upstream_pin": "827be601e781daea91ce2013fa0f64d658abd028",
+  "environment": {
+    "os": "darwin",
+    "arch": "aarch64",
+    "status": "published_partial",
+    "human_blind_eval": "unavailable",
+    "impact_verdict": "unevaluated"
+  },
+  "arms": [
+    {
+      "arm": "A",
+      "label": "Craft base",
+      "fixture_id": "dense-form",
+      "controller": "craft_runner",
+      "model": null,
+      "usage": {
+        "quality": "unavailable",
+        "input_tokens": null,
+        "output_tokens": null,
+        "cache_tokens": null,
+        "tool_calls": null,
+        "wall_ms": null
+      },
+      "quality_notes": ["not executed in this dry-run"],
+      "claims": [],
+      "limitations": [
+        "arm not re-executed in this publish; usage unavailable",
+        "human_blind_score=unavailable"
+      ]
+    },
+    {
+      "arm": "B",
+      "label": "Craft + UX prompt",
+      "fixture_id": "dense-form",
+      "controller": "craft_runner",
+      "model": null,
+      "usage": {
+        "quality": "unavailable",
+        "input_tokens": null,
+        "output_tokens": null,
+        "cache_tokens": null,
+        "tool_calls": null,
+        "wall_ms": null
+      },
+      "quality_notes": ["not executed in this dry-run"],
+      "claims": [],
+      "limitations": [
+        "arm not re-executed in this publish; usage unavailable",
+        "human_blind_score=unavailable"
+      ]
+    },
+    {
+      "arm": "C",
+      "label": "Redesign Anything Lean",
+      "fixture_id": "dense-form",
+      "controller": "host_agent",
+      "model": null,
+      "usage": {
+        "quality": "unavailable",
+        "input_tokens": null,
+        "output_tokens": null,
+        "cache_tokens": null,
+        "tool_calls": null,
+        "wall_ms": null
+      },
+      "quality_notes": [
+        "automated fixture smoke / lean path",
+        "human_blind_eval=unavailable"
+      ],
+      "claims": [],
+      "limitations": [
+        "human_blind_score=unavailable",
+        "no claim of superiority vs B"
+      ]
+    },
+    {
+      "arm": "D",
+      "label": "Optional REA Deep",
+      "fixture_id": "dense-form",
+      "controller": "host_agent",
+      "model": null,
+      "usage": {
+        "quality": "unavailable",
+        "input_tokens": null,
+        "output_tokens": null,
+        "cache_tokens": null,
+        "tool_calls": null,
+        "wall_ms": null
+      },
+      "quality_notes": ["not executed in this dry-run"],
+      "claims": [],
+      "limitations": [
+        "optional REA Deep — fixture adapter available; not required for lean",
+        "human_blind_score=unavailable"
+      ]
+    }
+  ],
+  "notes": [
+    "No KPI values are invented; unavailable telemetry stays unavailable (not zero).",
+    "REA Deep (D) is optional and must not strengthen claims without new tests.",
+    "Blind evaluation protocol: see REDESIGN_SPEC/BENCHMARK_PROTOCOL.md.",
+    "Human A/B/C blind evaluation is unavailable in this publish; do not claim gain vs arm B.",
+    "Arm C may include automated fixture smoke wall time only; tokens remain unavailable without host telemetry."
+  ]
+}

@@ -476,6 +476,17 @@ pub fn specs() -> Vec<ToolSpec> {
             input_schema: schema_of::<BenchmarkDryRunParams>,
             run: redesign_benchmark_dry_run,
         },
+        ToolSpec {
+            id: "redesign_benchmark_publish",
+            title: "Publish benchmark record (honest unavailable fields)",
+            summary: "Write a publishable A/B/C/D record under REDESIGN_SPEC/benchmark/published/. Human blind scores stay unavailable; never invents gain vs B.",
+            beginner: "Publishes an honest benchmark record for the First public release package.",
+            toolset: Toolset::Projects,
+            effects: Effects::WRITES_FILESYSTEM,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<BenchmarkPublishParams>,
+            run: redesign_benchmark_publish,
+        },
     ]
 }
 
@@ -550,6 +561,18 @@ struct FixtureSmokeParams {
 struct BenchmarkDryRunParams {
     #[serde(default)]
     pub fixture_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct BenchmarkPublishParams {
+    #[serde(default)]
+    pub fixture_id: Option<String>,
+    /// Optional measured wall time for arm C only (milliseconds).
+    #[serde(default)]
+    pub arm_c_wall_ms: Option<u64>,
+    #[serde(default)]
+    pub arm_c_notes: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -1481,13 +1504,26 @@ fn redesign_fixture_smoke(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutpu
     let _ = super::redesign_study::import_oracle_file(&ws, &oracle)?;
     let quality = super::redesign_quality::run_quality(&ws, Some(&oracle))?;
     let ready = super::redesign_checks::run_native_checks(&ws)?;
+    let report = super::redesign_report::write_reports(
+        &ws,
+        Some(fixture_id),
+        &ready,
+        &quality,
+        &json!({"nested_builder_started": false}),
+    )?;
     Ok(ToolOutput::Value(json!({
         "fixture_id": fixture_id,
         "project": ws.root,
         "quality": quality,
         "ready": ready,
+        "report": report,
+        "preview": {
+            "app": "app/",
+            "hint": "cd app && npm install && npm run dev",
+            "html_report": report.get("html"),
+        },
         "nested_builder_started": false,
-        "note": "Smoke only; not a published V1 benchmark result.",
+        "note": "Offline fixture smoke with exportable report; not a published impact benchmark.",
     })))
 }
 
@@ -1526,6 +1562,47 @@ fn redesign_benchmark_dry_run(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolO
         super::redesign_benchmark::validate_arm(arm).map_err(ToolError::invalid)?;
     }
     Ok(ToolOutput::Value(serde_json::to_value(run).map_err(|e| ToolError::internal(e.to_string()))?))
+}
+
+fn redesign_benchmark_publish(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: BenchmarkPublishParams = parse_params(params)?;
+    let fixture_id = p.fixture_id.as_deref().unwrap_or("dense-form");
+    let notes = p.arm_c_notes.unwrap_or_else(|| {
+        vec![
+            "automated fixture smoke / lean path".into(),
+            "human_blind_eval=unavailable".into(),
+        ]
+    });
+    let run = super::redesign_benchmark::publish_template(fixture_id, p.arm_c_wall_ms, notes);
+    for arm in &run.arms {
+        super::redesign_benchmark::validate_arm(arm).map_err(ToolError::invalid)?;
+    }
+    let out_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../REDESIGN_SPEC/benchmark/published");
+    std::fs::create_dir_all(&out_dir).map_err(|e| ToolError::io(out_dir.display(), e))?;
+    let json_path = out_dir.join("RESULTS.json");
+    craft_anything_engine::project::write_atomic(
+        &json_path,
+        serde_json::to_vec_pretty(&run).map_err(|e| ToolError::internal(e.to_string()))?.as_slice(),
+    )?;
+    let md = format!(
+        "# Benchmark publish — First public release package\n\n\
+         - Fixture: `{fixture_id}`\n\
+         - Human blind evaluation: **unavailable**\n\
+         - Impact verdict: **unevaluated** (do not claim gain vs arm B)\n\
+         - Machine record: `REDESIGN_SPEC/benchmark/published/RESULTS.json`\n\n\
+         See `REDESIGN_SPEC/BENCHMARK_PROTOCOL.md`. Tokens stay unavailable without host telemetry.\n"
+    );
+    let md_path = out_dir.join("RESULTS.md");
+    craft_anything_engine::project::write_atomic(&md_path, md.as_bytes())?;
+    Ok(ToolOutput::Value(json!({
+        "run": run,
+        "paths": {
+            "json": json_path.display().to_string(),
+            "markdown": md_path.display().to_string(),
+        },
+        "impact_verdict": "unevaluated",
+    })))
 }
 
 fn redesign_rea_discover(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
@@ -1788,6 +1865,7 @@ mod tests {
             "redesign_rea_request",
             "redesign_rea_run",
             "redesign_benchmark_dry_run",
+            "redesign_benchmark_publish",
         ] {
             assert!(e.registry().get(id).is_some(), "{id}");
         }

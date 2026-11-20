@@ -133,6 +133,69 @@ pub fn dry_run_template(fixture_id: &str) -> BenchmarkRun {
     )
 }
 
+/// Publishable run record for First public release packaging.
+/// Human blind scores stay `unavailable` — never invent KPIs or “gain vs B”.
+pub fn publish_template(
+    fixture_id: &str,
+    arm_c_wall_ms: Option<u64>,
+    arm_c_quality_notes: Vec<String>,
+) -> BenchmarkRun {
+    let mut run = dry_run_template(fixture_id);
+    run.environment = json!({
+        "os": std::env::consts::OS,
+        "arch": std::env::consts::ARCH,
+        "status": "published_partial",
+        "human_blind_eval": "unavailable",
+        "impact_verdict": "unevaluated",
+    });
+    run.notes.push(
+        "Human A/B/C blind evaluation is unavailable in this publish; do not claim gain vs arm B."
+            .into(),
+    );
+    run.notes.push(
+        "Arm C may include automated fixture smoke wall time only; tokens remain unavailable without host telemetry."
+            .into(),
+    );
+    for arm in &mut run.arms {
+        match arm.arm.as_str() {
+            "C" => {
+                arm.quality_notes = arm_c_quality_notes.clone();
+                if arm.quality_notes.is_empty() {
+                    arm.quality_notes
+                        .push("automated fixture path executed or scheduled".into());
+                }
+                arm.limitations = vec![
+                    "human_blind_score=unavailable".into(),
+                    "no claim of superiority vs B".into(),
+                ];
+                if let Some(ms) = arm_c_wall_ms {
+                    arm.usage = UsageAccounting {
+                        quality: "estimated".into(),
+                        input_tokens: None,
+                        output_tokens: None,
+                        cache_tokens: None,
+                        tool_calls: None,
+                        wall_ms: Some(ms),
+                    };
+                }
+            }
+            "D" => {
+                arm.limitations = vec![
+                    "optional REA Deep — fixture adapter available; not required for lean".into(),
+                    "human_blind_score=unavailable".into(),
+                ];
+            }
+            _ => {
+                arm.limitations = vec![
+                    "arm not re-executed in this publish; usage unavailable".into(),
+                    "human_blind_score=unavailable".into(),
+                ];
+            }
+        }
+    }
+    run
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -182,5 +245,19 @@ mod tests {
             limitations: vec![],
         };
         assert!(validate_arm(&arm).is_err());
+    }
+
+    #[test]
+    fn publish_template_keeps_impact_unevaluated() {
+        let run = publish_template("dense-form", Some(1200), vec!["fixture smoke".into()]);
+        assert_eq!(run.environment["impact_verdict"], "unevaluated");
+        assert_eq!(run.environment["human_blind_eval"], "unavailable");
+        let c = run.arms.iter().find(|a| a.arm == "C").unwrap();
+        assert_eq!(c.usage.wall_ms, Some(1200));
+        assert!(c.usage.input_tokens.is_none());
+        assert!(c.limitations.iter().any(|l| l.contains("no claim of superiority")));
+        for a in &run.arms {
+            validate_arm(a).unwrap();
+        }
     }
 }

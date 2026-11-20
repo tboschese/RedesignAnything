@@ -9,7 +9,7 @@ Independent fork of [Craft Anything](https://github.com/storytold/craft-anything
 | **Repo** | https://github.com/tboschese/RedesignAnything |
 | **License** | MIT OR Apache-2.0 — see [`LICENSE-MIT`](LICENSE-MIT), [`LICENSE-APACHE`](LICENSE-APACHE), [`NOTICE`](NOTICE), [`ATTRIBUTION.md`](ATTRIBUTION.md) |
 | **Upstream pin** | `827be601e781…` — [`docs/UPSTREAM.md`](docs/UPSTREAM.md) |
-| **Status** | PR-01…PR-11 on `main`; **First public release** not shipped yet — [`docs/STATUS.md`](docs/STATUS.md), [`REDESIGN_SPEC/V1_FIRST_RELEASE.md`](REDESIGN_SPEC/V1_FIRST_RELEASE.md) |
+| **Status** | **First public release (capability)** on `main` — [`docs/FIRST_PUBLIC_RELEASE_NOTES.md`](docs/FIRST_PUBLIC_RELEASE_NOTES.md); impact gate unevaluated — [`docs/STATUS.md`](docs/STATUS.md) |
 | **Spec** | [`REDESIGN_SPEC/`](REDESIGN_SPEC/README.md) |
 
 > **Not a visual clone.** Pixel likeness is not a gate. Focus is known capability, justified UX (including `keep_as_is`), real design systems, and fail-closed checks.
@@ -200,6 +200,8 @@ Code under **MIT OR Apache-2.0**, same as Craft Anything. Preserve notices in `N
 
 ---
 
-## What the First public release still requires
+## First public release
 
-Before calling this the First public release, still missing (among others): installers, full `cargo about` licence HTML, published measured benchmarks, optional real REA CLI wiring, and the full matrix in [`REDESIGN_SPEC/V1_FIRST_RELEASE.md`](REDESIGN_SPEC/V1_FIRST_RELEASE.md). Internal checkpoints ≠ launch. Gap tracking: [`docs/V1_GAP.md`](docs/V1_GAP.md).
+Capability release notes: [`docs/FIRST_PUBLIC_RELEASE_NOTES.md`](docs/FIRST_PUBLIC_RELEASE_NOTES.md).
+
+Still open after the capability ship: **signed** installers, full `cargo about` HTML texts, blind human impact eval (gain vs arm B), binary rename. See [`docs/V1_GAP.md`](docs/V1_GAP.md) and [`REDESIGN_SPEC/V1_FIRST_RELEASE.md`](REDESIGN_SPEC/V1_FIRST_RELEASE.md). Do not invent KPIs.
