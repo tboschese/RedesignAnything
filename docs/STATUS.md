@@ -2,7 +2,7 @@
 
 ## Redesign Anything — fork status (2026-11-20)
 
-**PR-01..PR-07 on main.** Upstream pin `827be601e781daea91ce2013fa0f64d658abd028`. Baseline: [`BASELINE.md`](BASELINE.md). See PR01–PR07 docs under `docs/`. Spec kit under `REDESIGN_SPEC/`. Ready gates, REA, Application MCP, and V1 release are **not** done.
+**PR-01..PR-08 on main (core lean path).** Upstream pin `827be601e781daea91ce2013fa0f64d658abd028`. Baseline: [`BASELINE.md`](BASELINE.md). See PR01–PR08 docs under `docs/`. Spec kit under `REDESIGN_SPEC/`. Application MCP, REA Deep, benchmark publication, and V1 packaging are **not** done.
 
 ---
 

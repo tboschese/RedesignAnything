@@ -366,6 +366,17 @@ pub fn specs() -> Vec<ToolSpec> {
             input_schema: schema_of::<ProjectParams>,
             run: redesign_scaffold_app,
         },
+        ToolSpec {
+            id: "redesign_checks_run",
+            title: "Run native redesign Ready checks",
+            summary: "Fail-closed native Rust checks and concept/prototype/engineering Ready gates. Errors/timeouts never pass; Critic alone never promotes Ready; no WCAG certification claim.",
+            beginner: "Runs redesign ready checks.",
+            toolset: Toolset::Projects,
+            effects: Effects::WRITES_FILESYSTEM,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<ProjectParams>,
+            run: redesign_checks_run,
+        },
     ]
 }
 
@@ -1198,6 +1209,13 @@ fn redesign_scaffold_app(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput,
     Ok(ToolOutput::Value(super::redesign_build::scaffold_app(&ws, policy.as_ref())?))
 }
 
+fn redesign_checks_run(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: ProjectParams = parse_params(params)?;
+    let ws = open(&p.project)?;
+    let report = super::redesign_checks::run_native_checks(&ws)?;
+    Ok(ToolOutput::Value(serde_json::to_value(report).map_err(|e| ToolError::internal(e.to_string()))?))
+}
+
 fn redesign_ds_ingest(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
     let p: DsIngestParams = parse_params(params)?;
     let ws = open(&p.project)?;
@@ -1387,6 +1405,7 @@ mod tests {
             "redesign_plan_show",
             "redesign_traceability_check",
             "redesign_scaffold_app",
+            "redesign_checks_run",
         ] {
             assert!(e.registry().get(id).is_some(), "{id}");
         }
