@@ -424,7 +424,7 @@ pub fn specs() -> Vec<ToolSpec> {
         ToolSpec {
             id: "redesign_rea_discover",
             title: "Discover REA Deep availability",
-            summary: "Probe Node/REA availability. Missing REA falls back to lean redesign. Does not start REA.",
+            summary: "Probe Node + live adapter (fixture or REDESIGN_REA_ADAPTER). Missing adapter falls back to lean redesign. Does not start analysis.",
             beginner: "Checks whether REA Deep can be used.",
             toolset: Toolset::Projects,
             effects: Effects::READ_ONLY,
@@ -435,13 +435,24 @@ pub fn specs() -> Vec<ToolSpec> {
         ToolSpec {
             id: "redesign_rea_request",
             title: "Request a gated REA Deep call",
-            summary: "Consent + deep profile + budget required; Clean Room always blocks. Records reason and evidence-gain intent for first-batch ops only.",
+            summary: "Consent + deep profile + budget required; Clean Room always blocks. Records reason and evidence-gain intent for first-batch ops only. Does not invoke the adapter — use redesign_rea_run.",
             beginner: "Asks to run one REA Deep operation under budget.",
             toolset: Toolset::Projects,
             effects: Effects::READ_ONLY,
             requires: Requires::Nothing,
             input_schema: schema_of::<ReaRequestParams>,
             run: redesign_rea_request,
+        },
+        ToolSpec {
+            id: "redesign_rea_run",
+            title: "Run gated REA Deep live analysis",
+            summary: "After consent + deep + budget, invoke the Node live adapter on a local input file. Writes redesign/rea evidence. Clean Room blocked. No network from the fixture adapter.",
+            beginner: "Runs one opt-in REA Deep analysis on a local file.",
+            toolset: Toolset::Projects,
+            effects: Effects::WRITES_FILESYSTEM.union(Effects::LAUNCHES_PROCESS),
+            requires: Requires::Nothing,
+            input_schema: schema_of::<ReaRunParams>,
+            run: redesign_rea_run,
         },
         ToolSpec {
             id: "redesign_benchmark_dry_run",
@@ -533,12 +544,17 @@ struct BenchmarkDryRunParams {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct ReaDiscoverParams {
+    /// When set, skip host probe and use this Node flag (tests).
     #[serde(default)]
     pub node_ok: Option<bool>,
+    /// When set with node_ok, skip host probe (tests).
     #[serde(default)]
     pub rea_present: Option<bool>,
     #[serde(default)]
     pub rea_version: Option<String>,
+    /// Force host probe even if overrides are present.
+    #[serde(default)]
+    pub probe_host: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -560,6 +576,28 @@ struct ReaRequestParams {
     pub rea_present: Option<bool>,
     #[serde(default)]
     pub rea_version: Option<String>,
+    #[serde(default)]
+    pub calls_already_used: Option<u32>,
+    #[serde(default)]
+    pub probe_host: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct ReaRunParams {
+    pub project: PathBuf,
+    pub operation: String,
+    pub reason: String,
+    /// Local file to analyse (JS bundle, HAR, etc.). Never a remote URL fetch.
+    pub input: PathBuf,
+    #[serde(default)]
+    pub consent_granted: Option<bool>,
+    #[serde(default)]
+    pub clean_room: Option<bool>,
+    #[serde(default)]
+    pub deep_profile: Option<bool>,
+    #[serde(default)]
+    pub budget_calls: Option<u32>,
     #[serde(default)]
     pub calls_already_used: Option<u32>,
 }
@@ -1476,11 +1514,15 @@ fn redesign_benchmark_dry_run(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolO
 
 fn redesign_rea_discover(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
     let p: ReaDiscoverParams = parse_params(params)?;
-    let d = super::redesign_rea::discover(
-        p.node_ok.unwrap_or(false),
-        p.rea_present.unwrap_or(false),
-        p.rea_version,
-    );
+    let d = if p.probe_host.unwrap_or(false) || (p.node_ok.is_none() && p.rea_present.is_none()) {
+        super::redesign_rea::discover_host()
+    } else {
+        super::redesign_rea::discover(
+            p.node_ok.unwrap_or(false),
+            p.rea_present.unwrap_or(false),
+            p.rea_version,
+        )
+    };
     Ok(ToolOutput::Value(json!({
         "discovery": d,
         "allowed_operations": super::redesign_rea::allowed_operations(),
@@ -1489,11 +1531,15 @@ fn redesign_rea_discover(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput
 
 fn redesign_rea_request(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
     let p: ReaRequestParams = parse_params(params)?;
-    let discovery = super::redesign_rea::discover(
-        p.node_ok.unwrap_or(false),
-        p.rea_present.unwrap_or(false),
-        p.rea_version.clone(),
-    );
+    let discovery = if p.probe_host.unwrap_or(false) || (p.node_ok.is_none() && p.rea_present.is_none()) {
+        super::redesign_rea::discover_host()
+    } else {
+        super::redesign_rea::discover(
+            p.node_ok.unwrap_or(false),
+            p.rea_present.unwrap_or(false),
+            p.rea_version.clone(),
+        )
+    };
     let mut session = super::redesign_rea::ReaSession::new(
         p.consent_granted.unwrap_or(false),
         p.clean_room.unwrap_or(false),
@@ -1503,6 +1549,28 @@ fn redesign_rea_request(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput,
     session.calls_used = p.calls_already_used.unwrap_or(0);
     let rec = super::redesign_rea::request_call(&mut session, &discovery, &p.operation, &p.reason)?;
     Ok(ToolOutput::Value(json!({"record": rec, "session": session, "discovery": discovery})))
+}
+
+fn redesign_rea_run(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: ReaRunParams = parse_params(params)?;
+    let ws = open(&p.project)?;
+    let discovery = super::redesign_rea::discover_host();
+    let mut session = super::redesign_rea::ReaSession::new(
+        p.consent_granted.unwrap_or(false),
+        p.clean_room.unwrap_or(true), // fail closed: require explicit clean_room=false
+        p.deep_profile.unwrap_or(false),
+        p.budget_calls.unwrap_or(3),
+    );
+    session.calls_used = p.calls_already_used.unwrap_or(0);
+    let result = super::redesign_rea::run_live(
+        &ws,
+        &mut session,
+        &discovery,
+        &p.operation,
+        &p.reason,
+        &p.input,
+    )?;
+    Ok(ToolOutput::Value(serde_json::to_value(result).map_err(|e| ToolError::internal(e.to_string()))?))
 }
 
 fn redesign_ds_ingest(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
@@ -1701,6 +1769,7 @@ mod tests {
             "redesign_mcp_gate",
             "redesign_rea_discover",
             "redesign_rea_request",
+            "redesign_rea_run",
             "redesign_benchmark_dry_run",
         ] {
             assert!(e.registry().get(id).is_some(), "{id}");

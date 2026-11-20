@@ -1,0 +1,30 @@
+{
+  "log": {
+    "version": "1.2",
+    "creator": { "name": "redesign-fixture", "version": "0.1.0" },
+    "entries": [
+      {
+        "request": {
+          "method": "GET",
+          "url": "https://example.test/api/items",
+          "headers": []
+        },
+        "response": {
+          "status": 200,
+          "headers": []
+        }
+      },
+      {
+        "request": {
+          "method": "POST",
+          "url": "https://example.test/api/items",
+          "headers": []
+        },
+        "response": {
+          "status": 201,
+          "headers": []
+        }
+      }
+    ]
+  }
+}

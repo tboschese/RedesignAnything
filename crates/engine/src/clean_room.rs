@@ -106,6 +106,7 @@ pub const TOOLS: &[&str] = &[
     "redesign_mcp_gate",
     "redesign_rea_discover",
     "redesign_rea_request",
+    // redesign_rea_run is Deep/consent-gated and intentionally NOT clean-room allowlisted.
     "redesign_benchmark_dry_run",
     // The builder's own project.
     "build_files_list",
@@ -202,7 +203,7 @@ mod tests {
     #[test]
     fn every_engine_tool_in_the_table_exists_and_none_is_listed_twice() {
         let r = crate::Registry::with_all_tools();
-        let higher_layers = ["rebuild_", "assets_key_", "ai_", "setup_", "project_builder_"];
+        let higher_layers = ["rebuild_", "redesign_", "assets_key_", "ai_", "setup_", "project_builder_"];
         for id in TOOLS {
             assert!(r.get(id).is_some() || higher_layers.iter().any(|p| id.starts_with(p)), "{id} isn't a tool");
             assert_eq!(TOOLS.iter().filter(|t| *t == id).count(), 1, "{id} is listed twice");

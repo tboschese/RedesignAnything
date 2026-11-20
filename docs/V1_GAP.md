@@ -12,7 +12,7 @@ PR-01…11 checkpoints do **not** authorize a public release.
 | Multi-screen journeys | Study/plan/traceability; scaffold emits **multiple hash routes + UI states** from plan/capabilities | Full corporate demo; richer page bodies beyond simulated states |
 | Corporate DS | Ingest package.json + DTCG + strict check | Storybook/docs path; optional real typecheck; richer “corporate” DS fixture |
 | Functional preservation | Fixture oracles + proxy smoke | **Playwright** (or equivalent) wired to oracles; executable positive/negative scenarios |
-| Advanced investigation | MCP trust + REA **contracts**/fallback | **Live REA** with Node; Application MCP connected to a real fixture server |
+| Advanced investigation | MCP trust + REA contracts/fallback + **fixture live** Node adapter (`redesign_rea_run`) | Wire env adapter to real upstream REA when available; Application MCP connected to a real fixture server |
 | Quality Engine | Native Ready, secrets, DS | **axe-core** (or similar); documented manual a11y sample; unified exportable report |
 | Agent-first / DX | README + CLI/MCP | Cursor/Claude/Codex matrix executed and published; redesign-aware `doctor` |
 | Experience | CLI/report | Before/after preview/comparison in the fixture flow; optional redesign UI |
@@ -26,7 +26,7 @@ PR-01…11 checkpoints do **not** authorize a public release.
 3. Multi-route scaffold from the transformation plan
 4. Richer UX packs + “corporate” DS fixture
 5. Fixture E2E smoke → `check_results.json`
-6. Live REA (opt-in)
+6. ~~Live REA (opt-in)~~ fixture path landed; optional real REA CLI via `REDESIGN_REA_ADAPTER`
 7. Published benchmark + packaging (PR-12)
 
 ## Explicitly out of scope right now
