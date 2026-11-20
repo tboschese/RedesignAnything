@@ -77,6 +77,9 @@ pub const TOOLS: &[&str] = &[
     "rebuild_question_ask",
     "rebuild_questions_list",
     "rebuild_stop",
+    "redesign_project_init",
+    "redesign_project_show",
+    "redesign_kinds_list",
     // The builder's own project.
     "build_files_list",
     "build_file_read",

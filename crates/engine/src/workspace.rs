@@ -402,6 +402,10 @@ pub struct Manifest {
     /// The stack chosen for the build ("React + TypeScript (Vite)", "Rust + Bevy"…).
     #[serde(default)]
     pub stack: String,
+    /// When set, this project is that kind (`redesign`, …) instead of detecting from the request.
+    /// Absent on older craft.json files (read as none).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
     #[serde(default)]
     pub status: Status,
     /// One line on what's happening or what went wrong.
@@ -496,6 +500,7 @@ impl Manifest {
             request: request.trim().to_string(),
             target,
             stack: String::new(),
+            kind: None,
             status: Status::New,
             note: String::new(),
             created_ms: now,

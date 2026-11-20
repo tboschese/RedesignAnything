@@ -509,7 +509,7 @@ fn a_new_project_keeps_the_persons_asset_choice() {
     let d = tempfile::tempdir().unwrap();
     let settings = craft_anything_engine::Settings::default();
     for allow in [false, true] {
-        let ws = project::new_project(&settings, "-", "A snake game", project::Place::In(d.path()), Some("unity"), allow, None).unwrap();
+        let ws = project::new_project(&settings, "-", "A snake game", project::Place::In(d.path()), Some("unity"), None, allow, None).unwrap();
         assert_eq!(Workspace::open(&ws.root).unwrap().manifest.generate_assets, allow);
     }
 }
@@ -1349,7 +1349,7 @@ impl TargetKind for SlidesKind {
 #[test]
 fn a_registered_kind_is_chosen_from_its_words_and_brings_its_checks() {
     let mut kinds = KindRegistry::built_in();
-    assert_eq!(kinds.ids(), ["website", "game", "app"]);
+    assert_eq!(kinds.ids(), ["website", "game", "redesign", "app"]);
     kinds.register(Arc::new(SlidesKind));
     let (k, stack) = kinds.choose("Make slides about our product", &TargetRef::None, true).unwrap();
     assert_eq!((k.id(), stack), ("slides", "Markdown slides"));
@@ -1357,7 +1357,7 @@ fn a_registered_kind_is_chosen_from_its_words_and_brings_its_checks() {
     assert_eq!(kinds.choose("A notes tool", &TargetRef::None, true).unwrap().0.id(), "app", "app is still the fallback");
     // Registering the same id again replaces it.
     kinds.register(Arc::new(SlidesKind));
-    assert_eq!(kinds.ids(), ["website", "game", "app", "slides"]);
+    assert_eq!(kinds.ids(), ["website", "game", "redesign", "app", "slides"]);
 
     let d = tempfile::tempdir().unwrap();
     let ws = Workspace::create(d.path(), "Deck", "Make slides", TargetRef::None).unwrap();
@@ -4012,18 +4012,18 @@ fn a_project_in_a_picked_folder_tells_the_builder_what_its_files_are() {
         std::fs::write(f.join("index.html"), "<p>hi</p>").unwrap();
         f
     };
-    let usual = project::new_project(&settings, "-", "A notes app", project::Place::In(d.path()), None, false, None).unwrap();
+    let usual = project::new_project(&settings, "-", "A notes app", project::Place::In(d.path()), None, None, false, None).unwrap();
     assert!(!brief(&usual, "app", false, false, None, false, None).contains("folder of their own"), "a usual project says nothing about it");
 
     let mine = folder("mine");
-    let refused = project::new_project(&settings, "-", "Add a contact form", project::Place::At(&mine, None), None, false, None);
+    let refused = project::new_project(&settings, "-", "Add a contact form", project::Place::At(&mine, None), None, None, false, None);
     assert!(refused.is_err(), "a folder with files needs to know what they are");
-    let ws = project::new_project(&settings, "-", "Add a contact form", project::Place::At(&mine, Some(ExistingFiles::Edit)), None, false, None).unwrap();
+    let ws = project::new_project(&settings, "-", "Add a contact form", project::Place::At(&mine, Some(ExistingFiles::Edit)), None, None, false, None).unwrap();
     let b = brief(&ws, "website", false, false, None, false, None);
     assert!(b.contains("already has their files (index.html)") && b.contains("use the workspace folder itself (./)") && b.contains("craft.json"), "{b}");
 
     let start = folder("start");
-    let ws = project::new_project(&settings, "-", "A site like this", project::Place::At(&start, Some(ExistingFiles::StartFrom)), None, false, None).unwrap();
+    let ws = project::new_project(&settings, "-", "A site like this", project::Place::At(&start, Some(ExistingFiles::StartFrom)), None, None, false, None).unwrap();
     let b = brief(&ws, "website", false, false, None, false, None);
     assert!(b.contains("which already had these files: index.html") && b.contains("bring into app/"), "{b}");
     assert!(!b.contains("use the workspace folder itself"));
@@ -4033,7 +4033,7 @@ fn a_project_in_a_picked_folder_tells_the_builder_what_its_files_are() {
 fn a_project_started_in_a_picked_folder_stays_in_the_list() {
     let mut session = craft_anything_engine::testing::session();
     let d = tempfile::tempdir().unwrap();
-    let ws = project::new_project(&session.settings, "-", "A notes app", project::Place::At(&d.path().join("mine"), None), None, false, None).unwrap();
+    let ws = project::new_project(&session.settings, "-", "A notes app", project::Place::At(&d.path().join("mine"), None), None, None, false, None).unwrap();
     session.remember_project(&ws.root).unwrap();
     assert_eq!(session.settings.project_folders, std::slice::from_ref(&ws.root));
     let saved = craft_anything_engine::Settings::load_from(&session.config_dir().join("config.toml"));
@@ -4047,10 +4047,10 @@ fn starting_a_project_at_existing_project_folder_attaches_to_it() {
     let session = craft_anything_engine::testing::session();
     let d = tempfile::tempdir().unwrap();
     let folder = d.path().join("mine");
-    let ws = project::new_project(&session.settings, "-", "Initial app", project::Place::At(&folder, None), None, false, None).unwrap();
+    let ws = project::new_project(&session.settings, "-", "Initial app", project::Place::At(&folder, None), None, None, false, None).unwrap();
     assert_eq!(ws.root, folder);
     // Starting again at the same folder attaches to the existing project rather than failing or duplicating
-    let reattached = project::new_project(&session.settings, "-", "Follow up", project::Place::At(&folder, None), None, false, None).unwrap();
+    let reattached = project::new_project(&session.settings, "-", "Follow up", project::Place::At(&folder, None), None, None, false, None).unwrap();
     assert_eq!(reattached.root, folder);
     assert_eq!(reattached.manifest.name, ws.manifest.name);
 }
@@ -4063,7 +4063,7 @@ fn reattaching_keeps_the_projects_saved_settings() {
     let session = craft_anything_engine::testing::session();
     let d = tempfile::tempdir().unwrap();
     let folder = d.path().join("mine");
-    let mut ws = project::new_project(&session.settings, "-", "Initial app", project::Place::At(&folder, None), None, false, Some("Claude")).unwrap();
+    let mut ws = project::new_project(&session.settings, "-", "Initial app", project::Place::At(&folder, None), None, None, false, Some("Claude")).unwrap();
     ws.set_person(|m| {
         m.asset_budget_usd = 42.0;
         m.generate_assets = true;
@@ -4073,7 +4073,7 @@ fn reattaching_keeps_the_projects_saved_settings() {
     ws.manifest.stack = "Godot".into();
     ws.save().unwrap();
 
-    let reattached = project::new_project(&session.settings, "-", "Add a jump", project::Place::At(&folder, None), Some("unity"), false, None).unwrap();
+    let reattached = project::new_project(&session.settings, "-", "Add a jump", project::Place::At(&folder, None), Some("unity"), None, false, None).unwrap();
     assert_eq!(reattached.manifest.builder.as_deref(), Some("Claude"), "the saved builder is kept");
     assert_eq!(reattached.manifest.asset_budget_usd, 42.0, "the saved asset budget is kept");
     assert!(reattached.manifest.generate_assets, "the saved asset setting is kept");
@@ -4095,7 +4095,7 @@ fn a_new_project_gets_the_settings_it_started_with() {
     let session = craft_anything_engine::testing::session();
     let d = tempfile::tempdir().unwrap();
     let folder = d.path().join("new");
-    let ws = project::new_project(&session.settings, "-", "A game", project::Place::At(&folder, None), Some("godot"), true, Some("Claude")).unwrap();
+    let ws = project::new_project(&session.settings, "-", "A game", project::Place::At(&folder, None), Some("godot"), None, true, Some("Claude")).unwrap();
     assert_eq!(ws.manifest.stack, "Godot", "the picked stack is written");
     assert_eq!(ws.manifest.builder.as_deref(), Some("Claude"), "the picked builder is written");
     assert!(ws.manifest.generate_assets, "the asset choice is written");

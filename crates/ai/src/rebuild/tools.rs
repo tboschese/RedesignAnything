@@ -124,7 +124,63 @@ pub fn specs() -> Vec<ToolSpec> {
             input_schema: schema_of::<CheckParams>,
             run: rebuild_check,
         },
+        ToolSpec {
+            id: "redesign_project_init",
+            title: "Init a redesign project",
+            summary: "Create a Redesign Anything project (kind=redesign) for a URL or -, with React+TypeScript (Vite) by default, without starting the Craft builder. Use this from a host agent (Cursor/Claude/Codex). Does not call rebuild_start.",
+            beginner: "Starts a redesign project folder without building yet.",
+            toolset: Toolset::Projects,
+            effects: Effects::WRITES_FILESYSTEM,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<RedesignInitParams>,
+            run: redesign_project_init,
+        },
+        ToolSpec {
+            id: "redesign_project_show",
+            title: "Show a redesign project",
+            summary: "Show a project's kind, stack, status, note, checks and planned steps for Redesign Anything. Read-only; does not start a builder.",
+            beginner: "Shows where a redesign project stands.",
+            toolset: Toolset::Projects,
+            effects: Effects::READ_ONLY,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<ProjectParams>,
+            run: redesign_project_show,
+        },
+        ToolSpec {
+            id: "redesign_kinds_list",
+            title: "List project kinds",
+            summary: "List TargetKind ids this build knows (website, game, redesign, app) and the redesign default stack.",
+            beginner: "Lists what kinds of project can be made.",
+            toolset: Toolset::Projects,
+            effects: Effects::READ_ONLY,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<EmptyParams>,
+            run: redesign_kinds_list,
+        },
     ]
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct EmptyParams {}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct RedesignInitParams {
+    /// What to redesign, in your words.
+    pub request: String,
+    /// A web address, or `-` for none.
+    #[serde(default)]
+    pub target: Option<String>,
+    /// Where the new project's folder goes.
+    #[serde(default)]
+    pub projects_dir: Option<PathBuf>,
+    /// Create the project in this folder itself.
+    #[serde(default)]
+    pub project_folder: Option<PathBuf>,
+    /// Optional stack override; default is React + TypeScript (Vite).
+    #[serde(default)]
+    pub build_with: Option<String>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -160,6 +216,14 @@ pub struct StartParams {
     /// What to build with: an engine (unity, unreal, godot, rust) or a stack's full name.
     #[serde(default)]
     pub build_with: Option<String>,
+    /// Explicit project kind (`redesign`, `website`, `app`, `game`). Required for redesign;
+    /// without it, the kind is detected from the request and target.
+    #[serde(default)]
+    pub kind: Option<String>,
+    /// With `controller=host_agent`, allow this call to hand the builder to Craft's runner.
+    /// Default false: nested rebuild_start is refused (`controller_conflict`).
+    #[serde(default)]
+    pub handoff_to_craft_runner: bool,
     /// For a new game: the builder may generate pictures and 3D models (paid from the person's
     /// asset provider key, within the project's budget). Default false; change it later with
     /// project_assets_allow.
@@ -364,6 +428,9 @@ fn rebuild_questions_list(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutpu
 /// Start a build: a new project, or a follow-up on an existing one, through the run queue.
 fn rebuild_start(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
     let p: StartParams = parse_params(params)?;
+    // MCP / host-agent default: refuse nested Craft builder without explicit handoff.
+    let policy = ctx.session.ext.get::<super::ExecutionPolicy>().as_deref().cloned().unwrap_or_default();
+    policy.guard_rebuild_start(p.handoff_to_craft_runner)?;
     let engine = engine(ctx).ok_or_else(|| {
         ToolError::new(ErrorCode::FeatureMissing, "Building isn't available in this engine.").with_remediation("Use the app or `craft-anything-cli rebuild`.")
     })?;
@@ -409,7 +476,7 @@ fn rebuild_start(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolErr
                 (None, Some(d)) => project::Place::In(d),
                 (None, None) => project::Place::Projects,
             };
-            let ws = project::new_project(&ctx.session.settings, target, &p.request, place, p.build_with.as_deref(), p.generate_assets, p.backend.as_deref())?;
+            let ws = project::new_project(&ctx.session.settings, target, &p.request, place, p.build_with.as_deref(), p.kind.as_deref(), p.generate_assets, p.backend.as_deref())?;
             if p.project_folder.is_some() || matches!(place, project::Place::At(..)) {
                 ctx.session.remember_project(&ws.root)?;
             }
@@ -436,6 +503,7 @@ fn rebuild_start(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolErr
         continuing: p.resume,
         max_rounds: p.rounds.unwrap_or(2),
         beginner: false,
+        force_kind: p.kind.or_else(|| ws.manifest.kind.clone()),
         clean_room: Some(ctx.session.clean_room()),
         ..RunOptions::default()
     };
@@ -565,6 +633,85 @@ fn rebuild_check(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolErr
     }
 }
 
+fn redesign_project_init(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: RedesignInitParams = parse_params(params)?;
+    let target = p.target.as_deref().unwrap_or("-");
+    let place = match (&p.project_folder, &p.projects_dir) {
+        (Some(_), Some(_)) => return Err(ToolError::invalid("Pass projects_dir or project_folder, not both.")),
+        (Some(f), None) => project::Place::At(f, None),
+        (None, Some(d)) => project::Place::In(d),
+        (None, None) => project::Place::Projects,
+    };
+    let ws = project::new_project(
+        &ctx.session.settings,
+        target,
+        &p.request,
+        place,
+        p.build_with.as_deref(),
+        Some(super::RedesignKind::ID),
+        false,
+        None,
+    )?;
+    if p.project_folder.is_some() {
+        ctx.session.remember_project(&ws.root)?;
+    }
+    let kind = ws.manifest.kind.clone().unwrap_or_else(|| super::RedesignKind::ID.into());
+    Ok(ToolOutput::Value(json!({
+        "project": ws.root.display().to_string(),
+        "kind": kind,
+        "stack": ws.manifest.stack,
+        "status": ws.manifest.status,
+        "request": ws.manifest.request,
+        "steps": [
+            "study (reuse Craft web capture when target is a URL)",
+            "diagnose / keep_as_is options",
+            "build React+TypeScript in app/",
+            "check (build; no pixel-similarity gate)",
+            "ready report"
+        ],
+        "builder_started": false
+    })))
+}
+
+fn redesign_project_show(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let _ = ctx;
+    let p: ProjectParams = parse_params(params)?;
+    let ws = open(&p.project)?;
+    let kinds = KindRegistry::built_in();
+    let kind = project::resolve_kind(&kinds, &ws, None);
+    let kind_id = kind.as_ref().map(|k| k.id()).unwrap_or("unknown");
+    let check_ids: Vec<&str> = kind.as_ref().map(|k| k.checks(&ws).iter().map(|c| c.id()).collect()).unwrap_or_default();
+    Ok(ToolOutput::Value(json!({
+        "project": ws.root.display().to_string(),
+        "name": ws.manifest.name,
+        "kind": kind_id,
+        "manifest_kind": ws.manifest.kind,
+        "stack": ws.manifest.stack,
+        "status": ws.manifest.status,
+        "note": ws.manifest.note,
+        "request": ws.manifest.request,
+        "checks": ws.manifest.checks,
+        "kind_checks": check_ids,
+        "steps": [
+            "study",
+            "diagnose",
+            "build",
+            "check",
+            "ready"
+        ]
+    })))
+}
+
+fn redesign_kinds_list(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let _: EmptyParams = parse_params(params)?;
+    let kinds = KindRegistry::built_in();
+    Ok(ToolOutput::Value(json!({
+        "kinds": kinds.ids(),
+        "redesign_default_stack": super::RedesignKind::DEFAULT_STACK,
+        "explicit_selection": "pass kind=redesign to redesign_project_init, rebuild_start, or craft-anything-cli rebuild --kind redesign"
+    })))
+}
+
 /// Why `rebuild_check` got no report: a run took the check and it is still going (a step may be
 /// stuck), or no run took it at all.
 fn unanswered(taken: bool, minutes: u64) -> ToolError {
@@ -634,7 +781,17 @@ mod tests {
         let d = tempfile::tempdir().unwrap();
         let e = Engine::shared(craft_anything_engine::testing::session(), specs());
         let ok = || CallOptions::new(Caller::Cli).with_consent(Consent::Granted);
-        for id in ["rebuild_start", "rebuild_status", "rebuild_note", "rebuild_note_withdraw", "rebuild_stop", "rebuild_check"] {
+        for id in [
+            "rebuild_start",
+            "rebuild_status",
+            "rebuild_note",
+            "rebuild_note_withdraw",
+            "rebuild_stop",
+            "rebuild_check",
+            "redesign_project_init",
+            "redesign_project_show",
+            "redesign_kinds_list",
+        ] {
             assert!(e.registry().get(id).is_some(), "{id}");
         }
         // Starting runs a coding agent: refused without consent, before anything is created.
@@ -658,6 +815,30 @@ mod tests {
         assert!(e.call("rebuild_note", json!({"project": ws.root, "text": "blue"}), ok()).is_err());
         assert!(e.call("rebuild_note_withdraw", json!({"project": ws.root, "id": 1}), ok()).is_err());
         assert!(e.call("rebuild_stop", json!({"project": ws.root}), ok()).is_err());
+        // Redesign init creates a project without starting a builder.
+        let init = e
+            .call(
+                "redesign_project_init",
+                json!({"request": "Redesign the expense form", "target": "https://example.test/expenses", "projects_dir": d.path()}),
+                ok(),
+            )
+            .unwrap()
+            .to_json();
+        assert_eq!(init["result"]["kind"], "redesign", "{init}");
+        assert_eq!(init["result"]["stack"], super::super::RedesignKind::DEFAULT_STACK, "{init}");
+        assert_eq!(init["result"]["builder_started"], false, "{init}");
+        let root = init["result"]["project"].as_str().unwrap();
+        let shown = e.call("redesign_project_show", json!({"project": root}), ok()).unwrap().to_json();
+        assert_eq!(shown["result"]["kind"], "redesign", "{shown}");
+        assert!(shown["result"]["kind_checks"].as_array().unwrap().iter().all(|c| c != "web_visual"), "{shown}");
+        let kinds = e.call("redesign_kinds_list", json!({}), ok()).unwrap().to_json();
+        assert!(kinds["result"]["kinds"].as_array().unwrap().iter().any(|k| k == "redesign"), "{kinds}");
+        // host_agent refuses nested rebuild_start without handoff.
+        e.session().ext.insert(std::sync::Arc::new(super::super::ExecutionPolicy::host_agent()));
+        let conflict = e
+            .call("rebuild_start", json!({"request": "x", "target": "-", "projects_dir": d.path()}), ok())
+            .unwrap_err();
+        assert!(conflict.message.contains("controller_conflict"), "{}", conflict.message);
     }
 
     /// An existing project is attached, not treated as new: its saved settings stay,

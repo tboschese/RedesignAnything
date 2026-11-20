@@ -41,6 +41,7 @@ use std::time::{Duration, Instant};
 pub mod activity;
 mod brief;
 mod check;
+pub mod execution;
 pub mod feed;
 mod kept_check;
 pub mod kinds;
@@ -59,9 +60,10 @@ mod tests;
 pub mod tools;
 
 use brief::*;
+pub use execution::{Controller, ExecutionPolicy, Profile as ExecutionProfile};
 pub use kinds::{
-    AppKind, BriefCx, BuildCheck, Check, CheckCx, CheckStop, DetectCx, GameKind, KindRegistry, KindWords, MechanicsCheck, TargetKind, WebVisualCheck,
-    WebsiteKind,
+    AppKind, BriefCx, BuildCheck, Check, CheckCx, CheckStop, DetectCx, GameKind, KindRegistry, KindWords, MechanicsCheck, RedesignKind, TargetKind,
+    WebVisualCheck, WebsiteKind,
 };
 pub use locate::game_folder;
 use locate::*;
@@ -142,8 +144,10 @@ pub struct RunOptions {
     /// Stop refining once the build looks at least this alike (percent).
     pub good_enough: f64,
     pub beginner: bool,
-    /// The kinds of thing this run can make (website, app, game, and any a fork registers).
+    /// The kinds of thing this run can make (website, app, game, redesign, and any a fork registers).
     pub kinds: KindRegistry,
+    /// When set, use this kind id instead of detecting from the request (e.g. `"redesign"`).
+    pub force_kind: Option<String>,
     /// How each coding agent is driven (Claude Code, Codex, Gemini CLI, and any a fork registers).
     pub adapters: crate::cli_agents::AgentAdapters,
     /// Told after each event (the app repaints).
@@ -166,6 +170,7 @@ impl Default for RunOptions {
             good_enough: 90.0,
             beginner: true,
             kinds: KindRegistry::built_in(),
+            force_kind: None,
             adapters: Default::default(),
             wake: Wake::default(),
             clean_room: None,
@@ -852,7 +857,7 @@ impl Worker {
             ws.manifest.stack = project::first_stack(&opts.kinds, ws, run_deep).ok_or_else(no_kind)?.to_string();
             ws.save()?;
         }
-        let kind = opts.kinds.detect(&ws.manifest.request, &ws.manifest.target, &ws.manifest.stack).ok_or_else(no_kind)?;
+        let kind = project::resolve_kind(&opts.kinds, ws, opts.force_kind.as_deref()).ok_or_else(no_kind)?;
         self.self_check = Some((kind.clone(), opts.good_enough));
         let kind = kind.as_ref();
         self.editor = self.find_editor(&ws.manifest.stack)?;

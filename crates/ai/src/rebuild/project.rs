@@ -29,9 +29,32 @@ pub fn build_with(name: &str) -> Result<&'static stacks::Stack, ToolError> {
 /// unless its request names another; any other goes by its request and target.
 pub(super) fn first_stack(kinds: &KindRegistry, ws: &Workspace, deep: bool) -> Option<&'static str> {
     let m = &ws.manifest;
+    if let Some(id) = m.kind.as_deref()
+        && let Some(kind) = kinds.get(id)
+    {
+        let cx = DetectCx { deep, ..DetectCx::new(&m.request, &m.target, "") };
+        return Some(kind.named_stack(&cx).unwrap_or_else(|| kind.default_stack(&cx)));
+    }
     let own = m.app_in_root && kinds.named(&m.request, &m.target).is_none();
     let found = own.then(|| stacks::found_in(&ws.app_dir())).flatten();
     found.map(|s| s.name.as_str()).or_else(|| kinds.choose(&m.request, &m.target, deep).map(|(_, stack)| stack))
+}
+
+/// Resolve the TargetKind for a project: forced run option, saved manifest kind, then detection.
+pub fn resolve_kind(kinds: &KindRegistry, ws: &Workspace, force_kind: Option<&str>) -> Option<std::sync::Arc<dyn TargetKind>> {
+    if let Some(id) = force_kind.or(ws.manifest.kind.as_deref()) {
+        return kinds.get(id);
+    }
+    kinds.detect(&ws.manifest.request, &ws.manifest.target, &ws.manifest.stack)
+}
+
+/// Validate and normalise an explicit kind id (`redesign`, `website`, …).
+pub fn parse_kind(kinds: &KindRegistry, kind: &str) -> Result<&'static str, ToolError> {
+    let id = kind.trim();
+    kinds.get(id).map(|k| k.id()).ok_or_else(|| {
+        let known = kinds.ids().join(", ");
+        ToolError::invalid(format!("Unknown kind {id:?}.")).with_remediation(format!("Use one of: {known}."))
+    })
 }
 
 /// Whether `folder` already holds a project (its `craft.json` is there).
@@ -52,6 +75,7 @@ pub fn apply_new_project_fields(
     ws: &mut Workspace,
     attached: bool,
     stack: Option<&str>,
+    kind: Option<&str>,
     budget: f64,
     generate_assets: bool,
     builder: Option<&str>,
@@ -61,6 +85,9 @@ pub fn apply_new_project_fields(
     }
     if let Some(name) = stack {
         ws.manifest.stack = name.to_string();
+    }
+    if let Some(id) = kind {
+        ws.manifest.kind = Some(id.to_string());
     }
     ws.set_person(|m| {
         m.asset_budget_usd = budget;
@@ -79,10 +106,17 @@ pub fn new_project(
     request: &str,
     place: Place,
     build_with: Option<&str>,
+    kind: Option<&str>,
     generate_assets: bool,
     builder: Option<&str>,
 ) -> Result<Workspace, ToolError> {
-    let stack = build_with.map(self::build_with).transpose()?;
+    let kinds = KindRegistry::built_in();
+    let kind_id = kind.map(|k| parse_kind(&kinds, k)).transpose()?;
+    let stack = match build_with {
+        Some(name) => Some(self::build_with(name)?),
+        None if kind_id == Some(crate::rebuild::RedesignKind::ID) => stacks::get(crate::rebuild::RedesignKind::DEFAULT_STACK),
+        None => None,
+    };
     let target_ref = if target.trim() == "-" { TargetRef::None } else { TargetRef::parse(target) };
     if target_ref == TargetRef::None && target.trim() != "-" {
         return Err(ToolError::invalid(format!("{target:?} is neither a web address nor an existing absolute path"))
@@ -103,6 +137,14 @@ pub fn new_project(
             }
         }
     };
-    apply_new_project_fields(&mut ws, attached, stack.map(|s| s.name.as_str()), settings.assets.budget(), generate_assets, builder)?;
+    apply_new_project_fields(
+        &mut ws,
+        attached,
+        stack.map(|s| s.name.as_str()),
+        kind_id,
+        settings.assets.budget(),
+        generate_assets,
+        builder,
+    )?;
     Ok(ws)
 }

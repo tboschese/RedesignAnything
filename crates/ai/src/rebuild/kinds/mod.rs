@@ -11,11 +11,13 @@ pub mod plugin_check;
 pub mod runs;
 pub mod screenshot;
 pub mod self_test;
+pub mod redesign;
 pub mod website;
 
 pub use app::{AppKind, RUNS_BRIEF};
 pub use game::{CreditsCheck, GameKind};
 pub use mechanics::MechanicsCheck;
+pub use redesign::RedesignKind;
 pub use runs::RunsCheck;
 pub use screenshot::ScreenshotCheck;
 pub use self_test::SelfTestCheck;
@@ -389,9 +391,11 @@ impl Default for KindRegistry {
 }
 
 impl KindRegistry {
-    /// Website, game and app.
+    /// Website, game, redesign and app (app is the low-score fallback).
     pub fn built_in() -> KindRegistry {
-        KindRegistry { kinds: vec![Arc::new(WebsiteKind), Arc::new(GameKind), Arc::new(AppKind)] }
+        KindRegistry {
+            kinds: vec![Arc::new(WebsiteKind), Arc::new(GameKind), Arc::new(RedesignKind), Arc::new(AppKind)],
+        }
     }
 
     /// Add a kind, or replace the one with the same id.

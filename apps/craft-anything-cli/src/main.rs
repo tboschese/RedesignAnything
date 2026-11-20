@@ -270,6 +270,9 @@ fn run(cli: Cli) -> u8 {
                     return 1;
                 }
             };
+            // Agent-first MCP: the host (Cursor/Claude/Codex) owns the builder; nested rebuild_start
+            // needs an explicit handoff (see REDESIGN_SPEC/COST_AND_EXECUTION.md).
+            engine.session().ext.insert(Arc::new(craft_anything_ai::rebuild::ExecutionPolicy::host_agent()));
             if let Some(dir) = inbox {
                 engine.session().ext.insert(Arc::new(craft_anything_engine::inbox::InboxDir(dir.clone())));
                 // A builder can generate game assets with the person's keys (one per asset

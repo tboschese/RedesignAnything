@@ -55,6 +55,10 @@ pub struct RebuildArgs {
     /// New projects only; otherwise it's chosen from the request and target.
     #[arg(long)]
     pub build_with: Option<String>,
+    /// Explicit project kind (`redesign`, `website`, `app`, `game`). Use `redesign` for
+    /// Redesign Anything projects; without it, the kind is detected from the request and target.
+    #[arg(long)]
+    pub kind: Option<String>,
     /// Let the builder generate pictures and 3D models for a new game (needs a fal.ai key; paid
     /// within the project's asset budget). Change it later with `project-assets-allow`.
     #[arg(long)]
@@ -145,7 +149,7 @@ fn run(cli: &Cli, a: &RebuildArgs) -> Result<bool, ToolError> {
                 (None, Some(d)) => Place::In(d),
                 (None, None) => Place::Projects,
             };
-            let ws = rebuild::project::new_project(&settings, &a.target, &a.request, place, a.build_with.as_deref(), a.generate_assets, a.backend.as_deref())?;
+            let ws = rebuild::project::new_project(&settings, &a.target, &a.request, place, a.build_with.as_deref(), a.kind.as_deref(), a.generate_assets, a.backend.as_deref())?;
             if folder.is_some() {
                 engine.session().remember_project(&ws.root)?;
             }
@@ -167,6 +171,7 @@ fn run(cli: &Cli, a: &RebuildArgs) -> Result<bool, ToolError> {
         max_rounds: a.rounds,
         good_enough,
         beginner: !cli.json,
+        force_kind: a.kind.clone().or_else(|| ws.manifest.kind.clone()),
         clean_room: Some(engine.session().clean_room()),
         ..RunOptions::default()
     };

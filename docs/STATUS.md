@@ -2,7 +2,7 @@
 
 ## Redesign Anything — fork status (2026-11-20)
 
-**Slice 0 / PR-00 bootstrap.** This tree is Craft Anything at upstream SHA `827be601e781daea91ce2013fa0f64d658abd028`, plus the specification kit under `REDESIGN_SPEC/`. No Redesign engine features (`RedesignKind`, DS registry, REA integration) are implemented yet. Local baseline was run and recorded in [`BASELINE.md`](BASELINE.md) (4986 passed, 2 failed, 38 ignored on this host; failures documented). Fixtures and pre-registered benchmark plan live under `REDESIGN_SPEC/fixtures/` and `REDESIGN_SPEC/benchmark/`. See [`UPSTREAM.md`](UPSTREAM.md) and [`REDESIGN_SPEC/EXECUTION_V12.md`](../REDESIGN_SPEC/EXECUTION_V12.md).
+**Slice 0 done; PR-01 RedesignKind landed.** Upstream pin `827be601e781daea91ce2013fa0f64d658abd028`. Baseline: [`BASELINE.md`](BASELINE.md). Redesign kind + headless tools + `controller_conflict`: [`PR01_REDESIGN_KIND.md`](PR01_REDESIGN_KIND.md). Spec kit under `REDESIGN_SPEC/`. DS registry, REA, and full V1 gates are **not** done.
 
 ---
 

@@ -112,7 +112,7 @@ impl CraftApp {
             let mut ws = created.map_err(|e| e.for_people())?;
             // A new project starts with the stack, asset budget and builder from Make; a folder
             // that already held one keeps what the person set there.
-            rebuild::project::apply_new_project_fields(&mut ws, attached, engine.map(|b| b.stack()), budget, generate, draft.ai.as_deref())
+            rebuild::project::apply_new_project_fields(&mut ws, attached, engine.map(|b| b.stack()), None, budget, generate, draft.ai.as_deref())
                 .map_err(|e| e.for_people())?;
             let pictures = ws.add_references(&draft.pictures).err().map(|e| e.message);
             Ok(Done::Created { ws: Box::new(ws), request, backend, pictures, attached })
