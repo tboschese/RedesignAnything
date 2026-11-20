@@ -4,14 +4,17 @@
 //! Without an Application MCP, redesign tools still work.
 
 use craft_anything_evidence::{ErrorCode, ToolError};
+use craft_anything_platform::process::{Process, StdinMode};
+use craft_anything_platform::sync::Mutex;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, VecDeque};
 use std::fs;
-use std::io::{BufRead, BufReader, Write};
+use std::io::Write;
 use std::path::PathBuf;
-use std::process::{ChildStdin, ChildStdout, Command, Stdio};
+use std::sync::{Arc, PoisonError};
+use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct McpToolCatalogEntry {
@@ -273,36 +276,52 @@ pub fn smoke_fixture_server() -> Result<Value, ToolError> {
     let (file_tools, allowlist) = load_fixture_catalogue_file()?;
     let profile = catalogue_tools(&file_tools, &allowlist);
 
-    let mut child = Command::new("node")
+    let lines: Arc<Mutex<VecDeque<String>>> = Arc::new(Mutex::new(VecDeque::new()));
+    let push = {
+        let lines = lines.clone();
+        move |l: &str| {
+            lines.lock().unwrap_or_else(PoisonError::into_inner).push_back(l.to_string());
+        }
+    };
+    let mut proc = Process::new("node")
         .arg(&server)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stdin(StdinMode::Piped)
+        .timeout(Duration::from_secs(30))
+        .stdout_cap(256 * 1024)
+        .stderr_cap(64 * 1024)
+        .on_stdout_line(push)
+        .label("fixture-mcp")
         .spawn()
-        .map_err(|e| ToolError::new(ErrorCode::ProgramFailed, format!("spawn fixture MCP: {e}")))?;
+        .map_err(|e| ToolError::new(ErrorCode::ProgramFailed, format!("spawn fixture MCP: {}", e.message)))?;
 
-    let mut stdin = child.stdin.take().ok_or_else(|| ToolError::internal("no stdin"))?;
-    let stdout = child.stdout.take().ok_or_else(|| ToolError::internal("no stdout"))?;
-    let mut reader = BufReader::new(stdout);
+    let mut stdin = proc
+        .take_stdin()
+        .ok_or_else(|| ToolError::internal("fixture MCP started without a stdin pipe"))?;
 
-    let send = |stdin: &mut ChildStdin, msg: Value| -> Result<(), ToolError> {
+    let send = |stdin: &mut std::process::ChildStdin, msg: Value| -> Result<(), ToolError> {
         let line = format!("{}\n", msg);
         stdin
             .write_all(line.as_bytes())
+            .and_then(|_| stdin.flush())
             .map_err(|e| ToolError::new(ErrorCode::ProgramFailed, format!("write fixture MCP: {e}")))
     };
-    let recv = |reader: &mut BufReader<ChildStdout>| -> Result<Value, ToolError> {
-        let mut line = String::new();
-        reader
-            .read_line(&mut line)
-            .map_err(|e| ToolError::new(ErrorCode::ProgramFailed, format!("read fixture MCP: {e}")))?;
-        serde_json::from_str(line.trim()).map_err(|e| ToolError::invalid(format!("fixture MCP json: {e}")))
+    let recv = |lines: &Arc<Mutex<VecDeque<String>>>, deadline: Instant| -> Result<Value, ToolError> {
+        loop {
+            if let Some(line) = lines.lock().unwrap_or_else(PoisonError::into_inner).pop_front() {
+                return serde_json::from_str(line.trim()).map_err(|e| ToolError::invalid(format!("fixture MCP json: {e}")));
+            }
+            if Instant::now() >= deadline {
+                return Err(ToolError::new(ErrorCode::TimedOut, "fixture MCP read timed out"));
+            }
+            std::thread::sleep(Duration::from_millis(15));
+        }
     };
 
+    let deadline = Instant::now() + Duration::from_secs(10);
     send(&mut stdin, json!({"id":1,"method":"list_tools"}))?;
-    let listed = recv(&mut reader)?;
+    let listed = recv(&lines, deadline)?;
     if listed.get("ok") != Some(&json!(true)) {
-        let _ = child.kill();
+        let _ = proc.kill_and_wait(Duration::from_secs(2));
         return Err(ToolError::new(ErrorCode::ProgramFailed, "fixture list_tools failed"));
     }
     let live_count = listed
@@ -319,9 +338,9 @@ pub fn smoke_fixture_server() -> Result<Value, ToolError> {
         &mut stdin,
         json!({"id":2,"method":"call","tool":"app_context_get","args":{}}),
     )?;
-    let call = recv(&mut reader)?;
-    let _ = child.kill();
-    let _ = child.wait();
+    let call = recv(&lines, Instant::now() + Duration::from_secs(10))?;
+    drop(stdin);
+    let _ = proc.kill_and_wait(Duration::from_secs(2));
 
     if call.get("network_egress") == Some(&json!(true)) {
         return Err(ToolError::new(ErrorCode::NoPermission, "fixture claimed network_egress"));

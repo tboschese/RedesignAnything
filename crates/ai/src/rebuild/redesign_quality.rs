@@ -3,11 +3,11 @@
 
 use craft_anything_engine::workspace::Workspace;
 use craft_anything_evidence::ToolError;
+use craft_anything_platform::process::Process;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::time::Duration;
 
 use super::redesign_store;
@@ -63,23 +63,21 @@ pub fn probe_command(program: &str, args: &[&str], timeout: Duration) -> Result<
     if !which_exists(program) {
         return Ok(false);
     }
-    let mut child = Command::new(program)
+    match Process::new(program)
         .args(args)
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .spawn()
-        .map_err(|e| e.to_string())?;
-    let start = std::time::Instant::now();
-    loop {
-        match child.try_wait() {
-            Ok(Some(status)) => return Ok(status.success()),
-            Ok(None) if start.elapsed() > timeout => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return Err("timeout".into());
+        .timeout(timeout)
+        .stdout_cap(4 * 1024)
+        .stderr_cap(4 * 1024)
+        .run()
+    {
+        Ok(out) => Ok(out.success),
+        Err(e) => {
+            let msg = e.message.to_ascii_lowercase();
+            if msg.contains("timeout") || msg.contains("timed out") || msg.contains("was stopped") {
+                Err("timeout".into())
+            } else {
+                Err(e.message)
             }
-            Ok(None) => std::thread::sleep(Duration::from_millis(50)),
-            Err(e) => return Err(e.to_string()),
         }
     }
 }
