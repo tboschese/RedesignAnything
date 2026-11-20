@@ -86,6 +86,8 @@ pub const TOOLS: &[&str] = &[
     "redesign_capabilities_list",
     "redesign_coverage_show",
     "redesign_study_map",
+    "redesign_identity_record",
+    "redesign_identity_show",
     "redesign_knowledge_retrieve",
     "redesign_critic_recommend",
     "redesign_ds_ingest",

@@ -6,6 +6,7 @@
 //!   store.json          envelope (schema_version, project_id, revision, execution)
 //!   evidence/<id>.json  EvidenceRecord
 //!   capabilities/<id>.json
+//!   identity.json       IdentityProfile (see redesign_identity)
 //! ```
 //! Writes are atomic. Paths must stay inside `redesign/`; symlinks out are refused.
 
@@ -160,7 +161,7 @@ fn save_envelope(path: &Path, env: &StoreEnvelope) -> Result<(), ToolError> {
     write_atomic(path, &bytes)
 }
 
-fn bump(ws: &Workspace) -> Result<StoreEnvelope, ToolError> {
+pub(super) fn bump(ws: &Workspace) -> Result<StoreEnvelope, ToolError> {
     let mut env = ensure(ws)?;
     env.revision = env.revision.saturating_add(1);
     env.generated_at = now_iso();
@@ -168,13 +169,13 @@ fn bump(ws: &Workspace) -> Result<StoreEnvelope, ToolError> {
     Ok(env)
 }
 
-fn validate_id(prefix: &str, id: &str) -> Result<(), ToolError> {
+pub(super) fn validate_id(prefix: &str, id: &str) -> Result<(), ToolError> {
     let ok = id.starts_with(prefix) && id.len() > prefix.len() && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-');
     if ok { Ok(()) } else { Err(ToolError::invalid(format!("id {id:?} must match {prefix}<alnum/_/->"))) }
 }
 
 /// Resolve `name` under `dir` without leaving it (no `..`, no absolute, no symlink escape).
-fn safe_child(dir: &Path, name: &str) -> Result<PathBuf, ToolError> {
+pub(super) fn safe_child(dir: &Path, name: &str) -> Result<PathBuf, ToolError> {
     if name.is_empty() || name.contains('/') || name.contains('\\') || name.contains("..") {
         return Err(ToolError::invalid("path components are not allowed in record ids"));
     }
@@ -189,7 +190,7 @@ fn safe_child(dir: &Path, name: &str) -> Result<PathBuf, ToolError> {
     Ok(path)
 }
 
-fn reject_symlink(path: &Path) -> Result<(), ToolError> {
+pub(super) fn reject_symlink(path: &Path) -> Result<(), ToolError> {
     let meta = match fs::symlink_metadata(path) {
         Ok(m) => m,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
@@ -201,7 +202,7 @@ fn reject_symlink(path: &Path) -> Result<(), ToolError> {
     Ok(())
 }
 
-fn write_record(path: &Path, value: &impl Serialize) -> Result<(), ToolError> {
+pub(super) fn write_record(path: &Path, value: &impl Serialize) -> Result<(), ToolError> {
     reject_symlink(path)?;
     let bytes = serde_json::to_vec_pretty(value).map_err(|e| ToolError::internal(e.to_string()))?;
     if bytes.len() as u64 > MAX_RECORD_BYTES {
@@ -213,17 +214,23 @@ fn write_record(path: &Path, value: &impl Serialize) -> Result<(), ToolError> {
     write_atomic(path, &bytes)
 }
 
+/// Never persist obvious secrets in free text.
+pub(super) fn refuse_secretish(field: &str, text: &str) -> Result<(), ToolError> {
+    let lower = text.to_ascii_lowercase();
+    for needle in ["password=", "api_key=", "secret=", "Authorization:", "Bearer "] {
+        if lower.contains(&needle.to_ascii_lowercase()) {
+            return Err(ToolError::invalid(format!("{field} looks like it contains a secret")));
+        }
+    }
+    Ok(())
+}
+
 pub fn put_evidence(ws: &Workspace, record: EvidenceRecord) -> Result<StoreEnvelope, ToolError> {
     validate_id("ev_", &record.id)?;
     if record.summary.chars().count() == 0 {
         return Err(ToolError::invalid("evidence summary must not be empty"));
     }
-    // Never persist obvious secrets in the summary.
-    for needle in ["password=", "api_key=", "secret=", "Authorization:", "Bearer "] {
-        if record.summary.to_ascii_lowercase().contains(&needle.to_ascii_lowercase()) {
-            return Err(ToolError::invalid("evidence summary looks like it contains a secret"));
-        }
-    }
+    refuse_secretish("evidence summary", &record.summary)?;
     let root = redesign_dir(ws);
     ensure(ws)?;
     let path = safe_child(&evidence_dir(&root), &format!("{}.json", record.id))?;

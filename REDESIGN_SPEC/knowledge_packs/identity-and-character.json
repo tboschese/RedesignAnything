@@ -1,0 +1,63 @@
+{
+  "schema_version": "1.0.0",
+  "id": "identity-and-character",
+  "version": "0.2.0",
+  "license": "MIT",
+  "source_url": "https://github.com/tboschese/RedesignAnything",
+  "source_revision": "bundled",
+  "domain_tags": ["identity", "brand"],
+  "task_tags": ["identity", "character", "brand", "legacy-look"],
+  "applicability": [
+    "Redesigns of products whose look and feel is part of what users recognise and trust"
+  ],
+  "contraindications": [
+    "Operator approved a rebrand or marked the look for replacement"
+  ],
+  "rules": [
+    {
+      "id": "evolve-structure-within-character",
+      "kind": "heuristic",
+      "recommendation": "Always propose structural evolution (simpler navigation, clearer journeys, visible active states, a stronger hierarchy) and express it in the existing character: the same fonts, colours and chrome, used by context. Keeping the look is never a reason to keep the structure as it is.",
+      "tags": ["identity", "brand", "character", "structure", "navigation", "journey"],
+      "evidence_requirements": ["identity_trait", "task_context"],
+      "test_methods": ["identity_evolution", "identity_drift", "task_success"],
+      "contraindications": ["Operator approved a rebrand or marked the look for replacement", "Swap typography and palette as the first step of every redesign"]
+    },
+    {
+      "id": "preserve-intentional-character",
+      "kind": "heuristic",
+      "recommendation": "Carry intentional look-and-feel traits (period chrome, archival typography, a signature colour) into the redesign so it stays recognisable, and rebuild the layout and flows around them; character decides how new elements look, not whether they improve.",
+      "tags": ["identity", "brand", "character", "legacy-look", "retro"],
+      "evidence_requirements": ["identity_trait", "task_context"],
+      "test_methods": ["identity_drift", "identity_evolution", "review"],
+      "contraindications": ["Operator approved a rebrand or marked the look for replacement"]
+    },
+    {
+      "id": "density-can-be-identity",
+      "kind": "heuristic",
+      "recommendation": "In catalog, archive and library products, dense listings and visible metadata are often part of the character and of the task; make them easier to use with grouping, sorting, filters and wayfinding instead of trading density for whitespace without task evidence.",
+      "tags": ["identity", "density", "catalog", "archive", "library"],
+      "evidence_requirements": ["identity_trait", "task_context"],
+      "test_methods": ["task_success", "review"],
+      "contraindications": ["Pad every listing into spacious tiles for a modern look"]
+    },
+    {
+      "id": "modernise-in-own-visual-language",
+      "kind": "heuristic",
+      "recommendation": "Modernise in the product's own visual language, drawn from the recorded identity and the audience, rather than falling back to a generic SaaS template (large rounded panels, soft shadows, a stock sans-serif, a gradient hero).",
+      "tags": ["identity", "brand", "character", "template"],
+      "evidence_requirements": ["identity_trait"],
+      "test_methods": ["identity_drift", "review"],
+      "contraindications": ["Operator approved a rebrand or marked the look for replacement", "Apply the same rounded-panel template to every product"]
+    },
+    {
+      "id": "record-identity-with-a-way-forward",
+      "kind": "heuristic",
+      "recommendation": "Before restyling, record which traits are intentional, incidental or unknown, with evidence, and for each kept trait write how it gets easier to use without losing its style; an intentional trait nobody has decided on keeps its style and still evolves.",
+      "tags": ["identity", "evidence", "study", "character"],
+      "evidence_requirements": ["identity_trait"],
+      "test_methods": ["identity_evolution", "review"],
+      "contraindications": []
+    }
+  ]
+}

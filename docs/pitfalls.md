@@ -1362,3 +1362,11 @@ mostly custom elements; the blueprint script only walked light-DOM `querySelecto
 It now walks open shadow roots too (`capture.json` `shadow.open_roots`). Closed roots still
 can't be read: they're counted in `shadow.closed_hosts` and reported as the
 `closed_shadow_roots` limitation, so trust the screenshots for those components.
+
+**A redesign that only modernises erases intentional character.** archive.org's black chrome,
+temple, Wayback plaque and dense grid are the product, not leftover chrome. Record them as
+identity traits (`redesign_identity_record`): kept traits constrain style and must say
+`evolve_within` how navigation still gets easier. `identity_drift` warns when the app leaves
+that look; `identity_evolution` warns when nothing evolves. Neither changes Ready. A single
+max-radius check cannot tell a pill search field from a square card, so don't encode a radius
+cap the original itself breaks.

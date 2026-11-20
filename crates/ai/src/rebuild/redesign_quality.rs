@@ -212,7 +212,7 @@ fn first_quoted_phrase(then: &str) -> Option<String> {
     None
 }
 
-fn read_app_blob(ws: &Workspace) -> String {
+pub(super) fn read_app_blob(ws: &Workspace) -> String {
     let mut out = String::new();
     let app = ws.app_dir();
     for rel in ["src/App.tsx", "src/main.tsx", "src/mocks/data.ts", "index.html"] {
