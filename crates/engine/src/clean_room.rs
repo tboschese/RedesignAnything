@@ -91,6 +91,13 @@ pub const TOOLS: &[&str] = &[
     "redesign_ds_ingest",
     "redesign_ds_show",
     "redesign_ds_check",
+    "redesign_diagnose",
+    "redesign_decision_propose",
+    "redesign_decision_choose",
+    "redesign_decision_approve",
+    "redesign_plan_build",
+    "redesign_plan_show",
+    "redesign_traceability_check",
     // The builder's own project.
     "build_files_list",
     "build_file_read",

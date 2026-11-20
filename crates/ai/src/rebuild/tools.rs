@@ -278,6 +278,83 @@ pub fn specs() -> Vec<ToolSpec> {
             input_schema: schema_of::<DsCheckParams>,
             run: redesign_ds_check,
         },
+        ToolSpec {
+            id: "redesign_diagnose",
+            title: "Diagnose redesign feasibility",
+            summary: "diagnose → retrieve → alternatives: feasibility class, critic options including keep_as_is, without inventing backend contracts.",
+            beginner: "Diagnoses what kind of change a screen needs.",
+            toolset: Toolset::Projects,
+            effects: Effects::READ_ONLY,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<DiagnoseParams>,
+            run: redesign_diagnose,
+        },
+        ToolSpec {
+            id: "redesign_decision_propose",
+            title: "Propose a design decision",
+            summary: "Persist a proposed DesignDecision (default chosen option keep_as_is) under redesign/decisions/.",
+            beginner: "Saves a proposed redesign decision.",
+            toolset: Toolset::Projects,
+            effects: Effects::WRITES_FILESYSTEM,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<DecisionProposeParams>,
+            run: redesign_decision_propose,
+        },
+        ToolSpec {
+            id: "redesign_decision_choose",
+            title: "Choose a decision option",
+            summary: "Select an option on a proposed decision. Divergent choices (not keep_as_is) require later approval.",
+            beginner: "Picks one redesign option.",
+            toolset: Toolset::Projects,
+            effects: Effects::WRITES_FILESYSTEM,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<DecisionChooseParams>,
+            run: redesign_decision_choose,
+        },
+        ToolSpec {
+            id: "redesign_decision_approve",
+            title: "Approve a design decision",
+            summary: "Mark a decision approved with an evidence id (required for divergent choices). Maps to human confirmation / inbox approval.",
+            beginner: "Approves a redesign decision.",
+            toolset: Toolset::Projects,
+            effects: Effects::WRITES_FILESYSTEM,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<DecisionApproveParams>,
+            run: redesign_decision_approve,
+        },
+        ToolSpec {
+            id: "redesign_plan_build",
+            title: "Build transformation plan",
+            summary: "Write a typed transformation plan with capability mappings. Does not invent routes or endpoints.",
+            beginner: "Builds the redesign transformation plan.",
+            toolset: Toolset::Projects,
+            effects: Effects::WRITES_FILESYSTEM,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<PlanBuildParams>,
+            run: redesign_plan_build,
+        },
+        ToolSpec {
+            id: "redesign_plan_show",
+            title: "Show transformation plan",
+            summary: "Show redesign/transformation_plan.json.",
+            beginner: "Shows the current transformation plan.",
+            toolset: Toolset::Projects,
+            effects: Effects::READ_ONLY,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<ProjectParams>,
+            run: redesign_plan_show,
+        },
+        ToolSpec {
+            id: "redesign_traceability_check",
+            title: "Check plan traceability",
+            summary: "Block critical capabilities without destination/exception; require approval for divergent decisions and backend_change_required.",
+            beginner: "Checks that every important capability has a destination.",
+            toolset: Toolset::Projects,
+            effects: Effects::READ_ONLY,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<ProjectParams>,
+            run: redesign_traceability_check,
+        },
     ]
 }
 
@@ -326,6 +403,68 @@ struct ListParams {
     pub limit: Option<usize>,
     #[serde(default)]
     pub offset: Option<usize>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct DiagnoseParams {
+    pub problem: String,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default)]
+    pub capability_ids: Vec<String>,
+    #[serde(default)]
+    pub needs_atomic_backend: Option<bool>,
+    #[serde(default)]
+    pub has_known_backend_contract: Option<bool>,
+    #[serde(default)]
+    pub orchestration_possible: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct DecisionProposeParams {
+    pub project: PathBuf,
+    pub problem: String,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default)]
+    pub capability_ids: Vec<String>,
+    #[serde(default)]
+    pub needs_atomic_backend: Option<bool>,
+    #[serde(default)]
+    pub has_known_backend_contract: Option<bool>,
+    #[serde(default)]
+    pub orchestration_possible: Option<bool>,
+    #[serde(default)]
+    pub evidence_ids: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct DecisionChooseParams {
+    pub project: PathBuf,
+    pub decision_id: String,
+    pub option_id: String,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct DecisionApproveParams {
+    pub project: PathBuf,
+    pub decision_id: String,
+    pub approval_evidence_id: String,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct PlanBuildParams {
+    pub project: PathBuf,
+    #[serde(default)]
+    pub mode: Option<String>,
+    pub mappings: Vec<super::redesign_plan::PlanMapping>,
+    #[serde(default)]
+    pub unknowns: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -976,6 +1115,71 @@ fn redesign_coverage_show(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutpu
     Ok(ToolOutput::Value(serde_json::to_value(super::redesign_study::coverage_of(&ws)?).map_err(|e| ToolError::internal(e.to_string()))?))
 }
 
+fn redesign_diagnose(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: DiagnoseParams = parse_params(params)?;
+    Ok(ToolOutput::Value(super::redesign_plan::diagnose(
+        &p.problem,
+        &p.tags,
+        &p.capability_ids,
+        p.needs_atomic_backend.unwrap_or(false),
+        p.has_known_backend_contract.unwrap_or(false),
+        p.orchestration_possible.unwrap_or(false),
+    )?))
+}
+
+fn redesign_decision_propose(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: DecisionProposeParams = parse_params(params)?;
+    let ws = open(&p.project)?;
+    let (feasibility, deps) = super::redesign_plan::classify_feasibility(
+        p.needs_atomic_backend.unwrap_or(false),
+        p.has_known_backend_contract.unwrap_or(false),
+        p.orchestration_possible.unwrap_or(false),
+    );
+    let packs = super::redesign_knowledge::bundled_catalog();
+    let rules = super::redesign_knowledge::retrieve(&p.problem, &p.tags, &packs, super::redesign_knowledge::RETRIEVE_MAX)?;
+    let critic = super::redesign_knowledge::critic(&p.problem, &rules);
+    let dec = super::redesign_plan::propose_decision(&p.problem, &p.capability_ids, &critic, feasibility, &deps, &p.evidence_ids);
+    super::redesign_plan::save_decision(&ws, &dec)?;
+    Ok(ToolOutput::Value(serde_json::to_value(dec).map_err(|e| ToolError::internal(e.to_string()))?))
+}
+
+fn redesign_decision_choose(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: DecisionChooseParams = parse_params(params)?;
+    let ws = open(&p.project)?;
+    let dec = super::redesign_plan::choose_option(&ws, &p.decision_id, &p.option_id)?;
+    Ok(ToolOutput::Value(serde_json::to_value(dec).map_err(|e| ToolError::internal(e.to_string()))?))
+}
+
+fn redesign_decision_approve(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: DecisionApproveParams = parse_params(params)?;
+    let ws = open(&p.project)?;
+    let dec = super::redesign_plan::approve_decision(&ws, &p.decision_id, &p.approval_evidence_id)?;
+    Ok(ToolOutput::Value(serde_json::to_value(dec).map_err(|e| ToolError::internal(e.to_string()))?))
+}
+
+fn redesign_plan_build(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: PlanBuildParams = parse_params(params)?;
+    let ws = open(&p.project)?;
+    let plan = super::redesign_plan::build_plan(&ws, p.mode.as_deref().unwrap_or("redesign"), p.mappings, p.unknowns)?;
+    Ok(ToolOutput::Value(serde_json::to_value(plan).map_err(|e| ToolError::internal(e.to_string()))?))
+}
+
+fn redesign_plan_show(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: ProjectParams = parse_params(params)?;
+    let ws = open(&p.project)?;
+    let plan = super::redesign_plan::load_plan(&ws)?;
+    Ok(ToolOutput::Value(serde_json::to_value(plan).map_err(|e| ToolError::internal(e.to_string()))?))
+}
+
+fn redesign_traceability_check(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: ProjectParams = parse_params(params)?;
+    let ws = open(&p.project)?;
+    let caps = super::redesign_store::list_capabilities(&ws)?;
+    let plan = super::redesign_plan::load_plan(&ws)?;
+    let report = super::redesign_plan::traceability_check(&ws, &caps, &plan)?;
+    Ok(ToolOutput::Value(serde_json::to_value(report).map_err(|e| ToolError::internal(e.to_string()))?))
+}
+
 fn redesign_ds_ingest(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
     let p: DsIngestParams = parse_params(params)?;
     let ws = open(&p.project)?;
@@ -1157,6 +1361,13 @@ mod tests {
             "redesign_ds_ingest",
             "redesign_ds_show",
             "redesign_ds_check",
+            "redesign_diagnose",
+            "redesign_decision_propose",
+            "redesign_decision_choose",
+            "redesign_decision_approve",
+            "redesign_plan_build",
+            "redesign_plan_show",
+            "redesign_traceability_check",
         ] {
             assert!(e.registry().get(id).is_some(), "{id}");
         }
