@@ -232,6 +232,7 @@ pub fn approve_decision(ws: &Workspace, decision_id: &str, approval_evidence_id:
 
 /// Build a transformation plan from capabilities + decisions. Does not invent routes.
 pub fn build_plan(ws: &Workspace, mode: &str, mappings: Vec<PlanMapping>, unknowns: Vec<String>) -> Result<TransformationPlan, ToolError> {
+    let mode = super::redesign_mode::RedesignMode::parse(mode)?;
     redesign_store::ensure(ws)?;
     let decisions = list_decisions(ws)?;
     let plan = TransformationPlan {
@@ -239,7 +240,7 @@ pub fn build_plan(ws: &Workspace, mode: &str, mappings: Vec<PlanMapping>, unknow
         project_id: ws.manifest.name.clone(),
         revision: 1,
         generated_at: now_iso(),
-        mode: mode.into(),
+        mode: mode.as_str().into(),
         snapshot_id: format!("snap_{}", now_iso()),
         mappings,
         unknowns,

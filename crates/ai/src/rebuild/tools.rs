@@ -246,6 +246,17 @@ pub fn specs() -> Vec<ToolSpec> {
             run: redesign_identity_show,
         },
         ToolSpec {
+            id: "redesign_modes_list",
+            title: "List redesign modes",
+            summary: "List the three redesign scopes a plan can use: refresh (tidy each screen; keep routes, journeys, navigation and identity), redesign (reorganise journeys with traceability; the default) and reimagine (rethink flows and pages; backend needs flagged, never invented). mode_scope in redesign_checks_run compares the plan with its mode.",
+            beginner: "Shows how far a redesign can go, from tidying up to rethinking.",
+            toolset: Toolset::Projects,
+            effects: Effects::READ_ONLY,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<EmptyParams>,
+            run: redesign_modes_list,
+        },
+        ToolSpec {
             id: "redesign_knowledge_retrieve",
             title: "Retrieve UX knowledge rules",
             summary: "Local tag+text retrieval over licensed UX knowledge packs. Returns 3–8 rules with source ids; never injects a whole pack. No embeddings required.",
@@ -757,8 +768,9 @@ struct DecisionApproveParams {
 #[serde(deny_unknown_fields)]
 struct PlanBuildParams {
     pub project: PathBuf,
+    /// How far the redesign may go; `redesign` when omitted. See redesign_modes_list.
     #[serde(default)]
-    pub mode: Option<String>,
+    pub mode: Option<super::redesign_mode::RedesignMode>,
     pub mappings: Vec<super::redesign_plan::PlanMapping>,
     #[serde(default)]
     pub unknowns: Vec<String>,
@@ -1427,6 +1439,11 @@ fn redesign_identity_show(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutpu
     Ok(ToolOutput::Value(super::redesign_identity::show(&ws)?))
 }
 
+fn redesign_modes_list(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let _: EmptyParams = parse_params(params)?;
+    Ok(ToolOutput::Value(super::redesign_mode::list()))
+}
+
 fn redesign_diagnose(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
     let p: DiagnoseParams = parse_params(params)?;
     Ok(ToolOutput::Value(super::redesign_plan::diagnose(
@@ -1472,7 +1489,7 @@ fn redesign_decision_approve(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOu
 fn redesign_plan_build(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
     let p: PlanBuildParams = parse_params(params)?;
     let ws = open(&p.project)?;
-    let plan = super::redesign_plan::build_plan(&ws, p.mode.as_deref().unwrap_or("redesign"), p.mappings, p.unknowns)?;
+    let plan = super::redesign_plan::build_plan(&ws, p.mode.unwrap_or_default().as_str(), p.mappings, p.unknowns)?;
     Ok(ToolOutput::Value(serde_json::to_value(plan).map_err(|e| ToolError::internal(e.to_string()))?))
 }
 
@@ -1840,6 +1857,7 @@ mod tests {
             "redesign_study_map",
             "redesign_identity_record",
             "redesign_identity_show",
+            "redesign_modes_list",
             "redesign_knowledge_retrieve",
             "redesign_critic_recommend",
             "redesign_ds_ingest",

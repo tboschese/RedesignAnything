@@ -73,6 +73,11 @@ impl TargetKind for RedesignKind {
             Ok(_) => {}
             Err(e) => out.push(format!("redesign/identity.json could not be read ({}); ask before changing the original's look.", e.message)),
         }
+        if let Ok(plan) = crate::rebuild::redesign_plan::load_plan(cx.ws)
+            && let Ok(mode) = crate::rebuild::redesign_mode::RedesignMode::parse(&plan.mode)
+        {
+            out.push(format!("{} mode_scope checks the plan against this.", mode.builder_guidance()));
+        }
         // Reuse website capture notes when Study photographed the target.
         let routes = website::routes(cx.ws);
         if !routes.is_empty() {

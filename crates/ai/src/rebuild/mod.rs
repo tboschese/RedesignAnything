@@ -57,6 +57,7 @@ pub mod redesign_ds;
 pub mod redesign_identity;
 pub mod redesign_knowledge;
 pub mod redesign_mcp_trust;
+pub mod redesign_mode;
 pub mod redesign_plan;
 pub mod redesign_quality;
 pub mod redesign_rea;
