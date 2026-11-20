@@ -1,24 +1,24 @@
-# Redesign Anything — Plano executável de implementação (backlog detalhado v1.1; ordem substituída em v1.2)
+# Redesign Anything — Executable implementation plan (detailed backlog v1.1; order superseded in v1.2)
 
-> **DECISÃO v1.4:** `V1_IMPACTANTE.md` define o escopo obrigatório da primeira entrega pública. `EXECUTION_V12.md` organiza checkpoints internos; PRs não são releases. Checks essenciais continuam antecipados, mas todas as frentes devem convergir antes da publicação. Leia `BENCHMARK_PROTOCOL.md`.
+> **DECISION v1.4:** `V1_FIRST_RELEASE.md` defines the mandatory scope of the first public release. `EXECUTION_V12.md` organizes internal checkpoints; PRs are not releases. Essential checks remain brought forward, but all fronts must converge before publication. Read `BENCHMARK_PROTOCOL.md`.
 
-> **Leia primeiro:** `SPEC.md`, `CONTRACTS.md`, `AGENTS_REDESIGN.md`. Este plano descreve PRs para um **fork independente** do Craft, não é uma solicitação de upstream. Nenhum PR/branch foi criado nesta análise. **Os caminhos de arquivos existentes foram conferidos na documentação/código; os novos são propostas e exigem inspeção do checkout.**
+> **Read first:** `SPEC.md`, `CONTRACTS.md`, `AGENTS_REDESIGN.md`. This plan describes PRs for an **independent fork** of Craft; it is not an upstream request. No PR/branch was created in this analysis. **Existing file paths were checked against the documentation/code; new ones are proposals and require inspection of the checkout.**
 
-## 0. Estratégia e sequência
+## 0. Strategy and sequence
 
-**Objetivo do primeiro ciclo:** em uma URL fixture, demonstrar `Study → Plan → Build → Check → Ready` do Craft com redesign React/TS e DS real; cobertura de jornada conhecida e relatórios de limites. **Não** começar com REA ou múltiplos MCPs antes de provar esse núcleo.
+**Goal of the first cycle:** on a fixture URL, demonstrate Craft's `Study → Plan → Build → Check → Ready` with a React/TS redesign and a real DS; coverage of a known journey and limit reports. **Do not** start with REA or multiple MCPs before proving this core.
 
-**Controle de consumo P0:** desde PR-00 estabelecer `host_agent` versus `craft_runner`, `lean` default e nenhuma invocação aninhada de builder. PR-02 incorpora campos de `execution` no contrato; PR-03/04 aplicam recuperação seletiva; PR-08 cria gates e medidas. Referência obrigatória: `COST_AND_EXECUTION.md`.
+**P0 consumption control:** from PR-00 establish `host_agent` versus `craft_runner`, `lean` as default and no nested builder invocation. PR-02 incorporates `execution` fields into the contract; PR-03/04 apply selective retrieval; PR-08 creates gates and measurements. Mandatory reference: `COST_AND_EXECUTION.md`.
 
-**Ordem para chegar a valor:** PR-00 → PR-01 → PR-02 → PR-03 → PR-04 → PR-05 → PR-06 → PR-07 → PR-08. Integrações avançadas vêm depois. Cada PR pequeno com teste, docs, mudanças de schema versionadas e regressão do Craft.
+**Order to reach value:** PR-00 → PR-01 → PR-02 → PR-03 → PR-04 → PR-05 → PR-06 → PR-07 → PR-08. Advanced integrations come later. Each PR is small, with tests, docs, versioned schema changes and Craft regression.
 
-### Preparação local (comandos de referência, validar no checkout)
+### Local preparation (reference commands, validate in the checkout)
 
 ```bash
 git clone https://github.com/storytold/craft-anything redesign-anything
 cd redesign-anything
 git remote rename origin upstream
-# Criar seu fork remoto pelo GitHub e adicioná-lo; NÃO fazer push para upstream.
+# Create your remote fork on GitHub and add it; do NOT push to upstream.
 git checkout -b feature/redesign-bootstrap
 rustc --version
 cargo --version
@@ -27,150 +27,150 @@ cargo xtask layers
 cargo xtask secrets
 ```
 
-O README consultado exige Rust 1.97+ e dependências específicas por SO. **Não considerar baseline verde até executar esses comandos e registrar plataforma/commit.** Leia `AGENTS.md`, `docs/pitfalls.md`, `docs/extending.md` e `docs/ROADMAP.md` antes de editar. O `AGENTS.md` original afirma que apenas itens do roadmap podem ser desenvolvidos e que não se deve nomear outros produtos de engenharia reversa em código; em um fork independente, **atualizar conscientemente essas regras e o roadmap** para o novo produto, respeitando créditos, licenças e princípios de segurança. Não usar o fork como contribuição upstream sem seguir as políticas upstream.
+The README consulted requires Rust 1.97+ and OS-specific dependencies. **Do not consider the baseline green until these commands are executed and the platform/commit recorded.** Read `AGENTS.md`, `docs/pitfalls.md`, `docs/extending.md` and `docs/ROADMAP.md` before editing. The original `AGENTS.md` states that only roadmap items may be developed and that other reverse-engineered products must not be named in code; in an independent fork, **consciously update those rules and the roadmap** for the new product, respecting credits, licenses and security principles. Do not use the fork as an upstream contribution without following upstream policies.
 
-## PR-00 — Fundação, baseline e uso agent-first por URL do repo
+## PR-00 — Foundation, baseline and agent-first use from the repo URL
 
-**Arquivos:** `AGENTS.md`, `docs/ROADMAP.md`, `docs/STATUS.md`, `README.md`, `THIRD_PARTY_NOTICES.md`, documentação de arquitetura; CI existente. Sem modificar engine.
+**Files:** `AGENTS.md`, `docs/ROADMAP.md`, `docs/STATUS.md`, `README.md`, `THIRD_PARTY_NOTICES.md`, architecture documentation; existing CI. No engine changes.
 
-**Tarefas:** definir teste baseline de tokens/rodadas no mesmo agente (ou `unavailable` se não mensurável), explicitar dois modos de controlador, padrão `lean` e regras anti-loop; criar fork, marcar commit upstream, definir nomenclatura/finalidade independente e attribution; registrar versão Rust/OS, passar testes; criar fixtures originais; definir código de conduta e distribuição; preservar legados de Craft. Instalar hook de secrets conforme AGENTS do Craft. **Documentar fluxo agent-first desde a URL de GitHub**, quickstart sem UI, AGENTS.md próprio, `doctor`/pré-requisitos e segurança de setup; README com prompts para agentes. O repositório deve funcionar como entrada para Cursor/Claude/Codex sem exigir a aplicação desktop.
+**Tasks:** define a baseline test of tokens/rounds in the same agent (or `unavailable` if not measurable), make the two controller modes explicit, `lean` default and anti-loop rules; create the fork, mark the upstream commit, define independent naming/purpose and attribution; record the Rust/OS version, pass the tests; create original fixtures; define a code of conduct and distribution; preserve Craft legacies. Install the secrets hook per Craft's AGENTS. **Document the agent-first flow starting from the GitHub URL**, a quickstart without UI, its own AGENTS.md, `doctor`/prerequisites and setup security; README with prompts for agents. The repository must work as an entry point for Cursor/Claude/Codex without requiring the desktop application.
 
-**Aceite:** baseline compila; suíte upstream verde ou falhas documentadas; nenhuma mudança silenciosa no Craft original; permissões/licenças e origem documentadas. Guia agent-first permite a um agente descobrir dependências sem executar installs silenciosamente. **Não rebrandear tudo neste PR**.
+**Acceptance:** baseline compiles; upstream suite green or failures documented; no silent change to the original Craft; permissions/licenses and origin documented. The agent-first guide lets an agent discover dependencies without silently running installs. **Do not rebrand everything in this PR**.
 
-## PR-01 — `RedesignKind` no mecanismo real de Build
+## PR-01 — `RedesignKind` in the real Build mechanism
 
-**Inspecionar:** `crates/ai/src/rebuild/kinds/mod.rs`, `website.rs`, `crates/ai/src/rebuild/mod.rs`, `crates/ai/src/rebuild/brief.rs`, `apps/craft-anything-cli` e registries.
+**Inspect:** `crates/ai/src/rebuild/kinds/mod.rs`, `website.rs`, `crates/ai/src/rebuild/mod.rs`, `crates/ai/src/rebuild/brief.rs`, `apps/craft-anything-cli` and registries.
 
-**Implementar:** dispatcher `host_agent`/`craft_runner` e bloqueio `controller_conflict` para `rebuild_start` implícito; novo `TargetKind` com id `redesign`, seleção **explícita** por configuração (não apenas palavras ambíguas), default React/TS, semelhança de pixels não é gate de redesign. Integrar no `KindRegistry`; criar `RedesignBrief` mínimo que instrua preservação de capacidades conhecidas e exiba `unknowns`. Criar comando headless mínimo que crie projeto e liste etapas.
+**Implement:** `host_agent`/`craft_runner` dispatcher and `controller_conflict` blocking for implicit `rebuild_start`; a new `TargetKind` with id `redesign`, **explicit** selection by configuration (not just ambiguous words), React/TS default, pixel similarity is not a redesign gate. Integrate into `KindRegistry`; create a minimal `RedesignBrief` that instructs preservation of known capabilities and displays `unknowns`. Create a minimal headless command that creates a project and lists the steps.
 
-**Testes:** detecção explícita, projeto antigo continua `website`/`app`, `Study` continua igual, `kind=redesign` selecionado explicitamente, sem clone-visual checker no gate. Cobertura de erros da configuração.
+**Tests:** explicit detection, an old project remains `website`/`app`, `Study` remains the same, `kind=redesign` explicitly selected, no visual-clone checker in the gate. Coverage of configuration errors.
 
-**Aceite:** novo projeto chega a Study e Build com o runner do Craft sem alterar o comportamento do kind `website` existente. **Sem UI desktop:** comando CLI/fluxo MCP pode criar, inspecionar, continuar e listar status do projeto. Teste smoke no agente com checkout limpo.
+**Acceptance:** a new project reaches Study and Build with Craft's runner without changing the behavior of the existing `website` kind. **Without desktop UI:** a CLI command/MCP flow can create, inspect, continue and list project status. Smoke test in the agent with a clean checkout.
 
-## PR-02 — Workspace versionado e contratos
+## PR-02 — Versioned workspace and contracts
 
-**Arquivos propostos:** `crates/engine/src/tools/redesign_*` ou módulo equivalente, owner de persistência na camada apropriada, `schemas/*.json` do kit (sincronizados ao schema Rust), testes de migração e I/O.
+**Proposed files:** `crates/engine/src/tools/redesign_*` or an equivalent module, persistence owner in the appropriate layer, the kit's `schemas/*.json` (synchronized with the Rust schema), migration and I/O tests.
 
-**Tarefas:** incorporar `execution`/`budgets` ao schema, contadores duráveis de chamadas no gateway, relatórios de tokens `reported/estimated/unavailable`, migração; criar diretório `redesign/`, arquivos versionados, `EvidenceRecord`, `Capability`, `Coverage`, `Decision`, `TransformationPlan`, `CheckResult`. IDs estáveis, migrações, backup e escrita atômica. Validar inputs hostis, links simbólicos, diretórios transversais e arquivos grandes.
+**Tasks:** incorporate `execution`/`budgets` into the schema, durable call counters at the gateway, `reported/estimated/unavailable` token reports, migration; create the `redesign/` directory, versioned files, `EvidenceRecord`, `Capability`, `Coverage`, `Decision`, `TransformationPlan`, `CheckResult`. Stable IDs, migrations, backup and atomic writes. Validate hostile inputs, symbolic links, directory traversal and large files.
 
-**Testes:** roundtrip, schema inválido, v0 ausente, migração, unknowns preservados, ausência de segredos, symlink traversal recusado, restart mantém estado.
+**Tests:** roundtrip, invalid schema, missing v0, migration, preserved unknowns, absence of secrets, symlink traversal refused, restart keeps state.
 
-**Aceite:** criar/abrir projeto Redesign com dados tipados sem quebrar projeto Craft pré-existente; checks de camadas/wasm quando aplicável.
+**Acceptance:** create/open a Redesign project with typed data without breaking a pre-existing Craft project; layer/wasm checks when applicable.
 
 ## PR-03 — Study adapter / capability mapper / coverage
 
-**Reusar:** `web_site_capture`, `web_page_states_capture`, `web_walkthrough_record/check`, `core_evidence_*` e `investigation.cany`. Não criar novo browser crawler sem comprovar lacuna.
+**Reuse:** `web_site_capture`, `web_page_states_capture`, `web_walkthrough_record/check`, `core_evidence_*` and `investigation.cany`. Do not create a new browser crawler without proving a gap.
 
-**Tarefas:** limitar payload de evidências e paginar antes da resposta ao agente, registrar custo marginal do Study; converter evidências Craft para modelo semântico; mapear rotas, ações, campos, estados e regras observáveis; mostrar ausência de perfis e lacunas de cobertura. Adicionar `redesign_capabilities_list` e `redesign_coverage_show` com paginação. Rastrear `sourceRefs` por capacidade.
+**Tasks:** limit the evidence payload and paginate before responding to the agent, record the marginal cost of Study; convert Craft evidence to a semantic model; map routes, actions, fields, states and observable rules; show absence of profiles and coverage gaps. Add `redesign_capabilities_list` and `redesign_coverage_show` with pagination. Track `sourceRefs` per capability.
 
-**Testes:** fixture com regra visível e outra propositalmente oculta; regra oculta permanece `unknown`, capacidade conhecida preserva origem; sem `100%` quando denominador desconhecido. Login manual se necessário, sem cookies exportados.
+**Tests:** a fixture with a visible rule and another purposely hidden; the hidden rule stays `unknown`, the known capability preserves its origin; no `100%` when the denominator is unknown. Manual login if necessary, without exported cookies.
 
-**Aceite:** relatório Study reproduzível de uma jornada, incluindo gaps, sem alegar descoberta completa.
+**Acceptance:** a reproducible Study report of a journey, including gaps, without claiming complete discovery.
 
-## PR-04 — UX Knowledge Packs + recuperação + Critic
+## PR-04 — UX Knowledge Packs + retrieval + Critic
 
-**Tarefas:** formato de pack versionado e licenciado, retrieval local orientado a tarefa (tags + texto; 3–8 regras iniciais como heurística), sem injetar pack completo; catálogo mínimo inicial de tabelas, filtros, formulários, navegação, acessibilidade e densidade; aplicar contraindicações. Design Critic gera recomendações referenciadas; `keep_as_is` obrigatório.
+**Tasks:** versioned and licensed pack format, local task-oriented retrieval (tags + text; 3–8 initial rules as a heuristic), without injecting the full pack; an initial minimal catalog for tables, filters, forms, navigation, accessibility and density; apply contraindications. The Design Critic produces referenced recommendations; `keep_as_is` mandatory.
 
-**Testes:** pack sem licença/versão rejeitado; regra incompatível não aplicada; tendência a wizard/card não é invariável; prompt injection textual em pack não modifica ferramentas/autorização; fallback sem embeddings.
+**Tests:** a pack without license/version rejected; an incompatible rule not applied; a tendency toward wizard/card is not invariable; textual prompt injection in a pack does not modify tools/authorization; fallback without embeddings.
 
-**Aceite:** relatório explica 3 opções (incluindo preservar) para uma tela densa, com trade-offs e fontes; sem requisitos inventados.
+**Acceptance:** the report explains 3 options (including preserving) for a dense screen, with trade-offs and sources; no invented requirements.
 
-## PR-05 — Design System Registry strict + Layout CLI opcional
+## PR-05 — Strict Design System Registry + optional Layout CLI
 
-**Dependências:** modelos/schemas PR-02; critérios PR-08 podem começar como testes unitários de provider.
+**Dependencies:** PR-02 models/schemas; PR-08 criteria can start as provider unit tests.
 
-**Tarefas:** ingestão package.json/exports de pacote React/TS fixture; tokens DTCG; Registry com paths, versão, props, variantes e restrições; integração Layout CLI MCP por adapter; compliance próprio usando imports/tokens e typecheck, nunca confiar somente no MCP. Configurar `strict/advisory` e overrides aprovados.
+**Tasks:** ingestion of package.json/exports of a fixture React/TS package; DTCG tokens; Registry with paths, version, props, variants and constraints; Layout CLI MCP integration via adapter; own compliance using imports/tokens and typecheck, never trusting the MCP alone. Configure `strict/advisory` and approved overrides.
 
-**Testes:** import de componente real passa; import falso falha; prop inexistente falha; hardcoded proibido em strict falha; versão de pacote incompatível falha; Storybook ausente não bloqueia repo import válido; provider Layout fora do ar degrada sem mascarar requisito strict.
+**Tests:** import of a real component passes; a fake import fails; a nonexistent prop fails; hardcoded values prohibited in strict fail; an incompatible package version fails; missing Storybook does not block a valid repo import; Layout provider down degrades without masking a strict requirement.
 
-**Aceite:** gerar com DS fixture sem componentes duplicados e passar checagem de contrato real.
+**Acceptance:** generate with the fixture DS without duplicated components and pass a real contract check.
 
 ## PR-06 — Design Decision + Feasibility + Traceability
 
-**Tarefas:** `diagnose/retrieve/alternatives/choose/plan`; classificação `ui_only`, `frontend_orchestration`, `backend_change_required`, `not_determined`; impacto e preservação; decisões aprováveis no Inbox nativo do Craft. Exportar plano de transformação tipado.
+**Tasks:** `diagnose/retrieve/alternatives/choose/plan`; classification `ui_only`, `frontend_orchestration`, `backend_change_required`, `not_determined`; impact and preservation; decisions approvable in Craft's native Inbox. Export a typed transformation plan.
 
-**Testes:** combinação de 3 telas sem endpoint atômico gera dependência de backend; cenário com backend existente admite orchestration com riscos; decisão divergente exige aprovação; capacidade crítica sem destino bloqueia check.
+**Tests:** combining 3 screens without an atomic endpoint produces a backend dependency; a scenario with an existing backend admits orchestration with risks; a divergent decision requires approval; a critical capability without a destination blocks the check.
 
-**Aceite:** relatório planeja nova jornada sem inventar endpoint/atomicidade e com traceability completa do escopo conhecido.
+**Acceptance:** the report plans a new journey without inventing an endpoint/atomicity and with complete traceability of the known scope.
 
-## PR-07 — Builder funcional com mock seguro
+## PR-07 — Functional builder with safe mock
 
-**Tarefas:** não iniciar runner aninhado no modo `host_agent`; criar brief compacto em `brief_sections` de `RedesignKind`, passar decisões/DS/capacidades por referência; construir React/TS+Vite com mocks sintéticos; preservar route/action traceability e estados. Reusar builder de Craft; não copiar design system nem logotipo privado.
+**Tasks:** do not start a nested runner in `host_agent` mode; create a compact brief in `RedesignKind`'s `brief_sections`, pass decisions/DS/capabilities by reference; build React/TS+Vite with synthetic mocks; preserve route/action traceability and states. Reuse Craft's builder; do not copy a private design system or logo.
 
-**Testes:** build React/TS, eventos UI, modal, form validation, tabela, estados; CSP, secrets, rotas; projeto de origem intacto; recusa se strict DS não existe; agente sem capacidade suficiente para concluir retorna falha clara.
+**Tests:** React/TS build, UI events, modal, form validation, table, states; CSP, secrets, routes; source project intact; refusal if strict DS does not exist; an agent without enough capability to finish returns a clear failure.
 
-**Aceite:** protótipo funcional no `app/`, com dados marcados como simulados e sem chamadas de escrita à origem.
+**Acceptance:** a functional prototype in `app/`, with data marked as simulated and no write calls to the origin.
 
 ## PR-08 — Native Redesign Checks + Ready Gates
 
-**Crítico:** não depender de `PluginJudge` WASM upstream para checks bloqueantes, pois falha do plugin pode ser `passed=true`. Criar checks Rust nativos registrados no `TargetKind` ou corrigir semântica sob teste.
+**Critical:** do not depend on the upstream WASM `PluginJudge` for blocking checks, since a plugin failure can be `passed=true`. Create native Rust checks registered in the `TargetKind` or fix the semantics under test.
 
-**Tarefas:** build/typecheck, DS, Playwright scenarios, axe-core, traceability, segurança, impact e Criticality. Adicionar gates hard para chamadas/REA/critic e relatórios que não equiparem `unavailable` a zero tokens. Estados `pass/fail/warn/not_evaluated/blocked`; gates dos três Ready levels. Paginador de resultados; UX Critic separado.
+**Tasks:** build/typecheck, DS, Playwright scenarios, axe-core, traceability, security, impact and Criticality. Add hard gates for calls/REA/critic and reports that do not equate `unavailable` with zero tokens. States `pass/fail/warn/not_evaluated/blocked`; gates for the three Ready levels. Result paginator; UX Critic separate.
 
-**Testes:** check que retorna erro/timeout **não passa**; screenshot bonito mas botão não funciona → falha; caso com zero oráculos não vira `prototype_ready`; failing accessibility critical impede qualificação, mas não declarar certificação WCAG após aprovação.
+**Tests:** a check that returns an error/timeout **does not pass**; a beautiful screenshot but a non-working button → fail; a case with zero oracles does not become `prototype_ready`; a failing critical accessibility check prevents qualification, but do not declare WCAG certification after approval.
 
-**Aceite:** fixture com regressão detecta, corrige e revalida; código com fonte secreta não é exportado; relator explica o que não foi testado.
+**Acceptance:** a fixture with a regression detects, fixes and revalidates; code with a secret source is not exported; the reporter explains what was not tested.
 
 ## PR-09 — Application MCP Bridge + Trust Gateway
 
-**Reusar:** plugin MCP do Craft (stdio/HTTP, consentimento e Evidence). **Não** criar segundo cliente MCP indiscriminadamente.
+**Reuse:** Craft's MCP plugin (stdio/HTTP, consent and Evidence). **Do not** create a second MCP client indiscriminately.
 
-**Tarefas:** perfil `application_mcp`, catalogue/hash de tool schemas, allowlist, classificação de efeitos, query `read-only`, versão e permissões; AKC opcional; confronto de informações e conflitos; aprovação para tool alterado; limites de saída/egress.
+**Tasks:** `application_mcp` profile, catalog/hash of tool schemas, allowlist, effect classification, `read-only` query, version and permissions; optional AKC; reconciliation of information and conflicts; approval for a changed tool; output/egress limits.
 
-**Testes:** server com tool mentindo readOnly, tool description maliciosa, mudança de schema e token no body; todos bloqueados/sanitizados; `get_rule` seguro vira `declared`, não `observed`; sem MCP a experiência funciona.
+**Tests:** a server with a tool lying about readOnly, a malicious tool description, schema change and a token in the body; all blocked/sanitized; a safe `get_rule` becomes `declared`, not `observed`; the experience works without MCP.
 
-**Aceite:** usuário conecta um MCP fixture e recebe explicação funcional contextualizada sem permissões adicionais implícitas.
+**Acceptance:** the user connects a fixture MCP and receives a contextualized functional explanation without additional implicit permissions.
 
-## PR-10 — REA Deep Adapter + medição de valor
+## PR-10 — REA Deep Adapter + value measurement
 
-**Tarefas:** discovery/versão do Node/REA, iniciar apenas com consentimento, gatilho e orçamento; registrar razão de cada chamada e ganho de evidência incremental; converter Evidence, limitações e cobertura; `analyze_web_bundle`, `trace_javascript_semantics`, `inspect_web_network_capture` em primeiro lote; gated Deep. `environment-build`/stateful mock só com prova incremental e sanitização.
+**Tasks:** Node/REA discovery/version, start only with consent, trigger and budget; record the reason for each call and the incremental evidence gain; convert Evidence, limitations and coverage; `analyze_web_bundle`, `trace_javascript_semantics`, `inspect_web_network_capture` in the first batch; Deep-gated. `environment-build`/stateful mock only with incremental proof and sanitization.
 
-**Testes:** Deep permitido, Clean Room bloqueado, browser perfil dedicado, REA ausente fallback, timeout parcial, fonte incompatível, egress e token-canário; compare Craft vs Craft+REA no benchmark.
+**Tests:** Deep allowed, Clean Room blocked, dedicated browser profile, REA absent fallback, partial timeout, incompatible source, egress and canary token; compare Craft vs Craft+REA in the benchmark.
 
-**Aceite:** integração adiciona pelo menos um fato correto e testado num fixture onde Craft-alone não o obtinha nas mesmas condições, ou continua experimental/opt-in sem impedir o checkpoint interno; porém a capacidade de investigação avançada precisa estar disponível e testada antes do release V1.
+**Acceptance:** the integration adds at least one correct, tested fact on a fixture where Craft alone did not obtain it under the same conditions, or remains experimental/opt-in without blocking the internal checkpoint; however, the advanced investigation capability must be available and tested before the V1 release.
 
-## PR-11 — Benchmark, segurança e grandes fluxos
+## PR-11 — Benchmark, security and large flows
 
-**Tarefas:** benchmark controlado Craft base vs Redesign Lean vs Redesign Deep, medindo modelos/controladores, tokens input/output/cache (se reportados), chamadas e tamanho de payload, tempo e qualidade, inclusive caso sem telemetria; fixtures 2 perfis, múltiplas rotas, estados, docs incongruentes, API assíncrona, DS quebrado, prompt injection, locale e mobile. Suíte antes/depois, medidas de cobertura/precisão/tempo/custo.
+**Tasks:** controlled benchmark of base Craft vs Redesign Lean vs Redesign Deep, measuring models/controllers, input/output/cache tokens (if reported), calls and payload size, time and quality, including the no-telemetry case; fixtures with 2 profiles, multiple routes, states, inconsistent docs, async API, broken DS, prompt injection, locale and mobile. Before/after suite, coverage/precision/time/cost measurements.
 
-**Testes:** `VALIDATION_MATRIX.md`; regressões repetíveis; nem fallback de agente, nem trace de REA podem causar claims mais fortes sem novos testes.
+**Tests:** `VALIDATION_MATRIX.md`; repeatable regressions; neither agent fallback nor REA trace may cause stronger claims without new tests.
 
-**Aceite:** resultados publicados com ambiente, versão, campos sem cobertura e limites; nenhum valor de KPI inventado.
+**Acceptance:** results published with environment, version, fields without coverage and limits; no invented KPI value.
 
-## PR-12 — UX final, empacotamento e release
+## PR-12 — Final UX, packaging and release
 
-**Tarefas:** telas de seleção Redesign, DS e MCP sem novo canvas; relatório no workspace; branding e licenças; instaladores cross-platform com sidecar optional; SBOM; docs PT-BR/EN iniciais; teste de upgrade e rollback.
+**Tasks:** Redesign selection screens, DS and MCP without a new canvas; report in the workspace; branding and licenses; cross-platform installers with optional sidecar; SBOM; initial PT-BR/EN docs; upgrade and rollback test.
 
-**Aceite:** instalação limpa em SO-alvo, first-run útil, uso CLI offline para fixture local, preview e relatório abrindo; licença e segurança documentadas.
+**Acceptance:** clean installation on the target OS, useful first run, offline CLI use for a local fixture, preview and report opening; license and security documented.
 
 ---
 
-## Definição de Done geral
+## General Definition of Done
 
-- Rodar os comandos definidos no `AGENTS.md` real (incluindo `cargo fmt --all -- --check`, `cargo test --workspace`, clippy, `cargo xtask layers`, `cargo xtask locks`, `cargo xtask secrets`, wasm se tocar L0–L2, checks de i18n se pertinente).
-- Evidência de execução real na PR, com versões de SO/toolchain/modelo e artefatos reproduzíveis.
-- Provar fluxo antigo Craft sem regressão; testes unitários, contrato, negativos de segurança e pipeline P0.
-- Não deixar ação/timeout/segredo em `pass`; unknowns não omitidos; arquivos novos versionados/migráveis.
-- Lint/build do React gerado e testes E2E com fixture conhecida.
+- Run the commands defined in the real `AGENTS.md` (including `cargo fmt --all -- --check`, `cargo test --workspace`, clippy, `cargo xtask layers`, `cargo xtask locks`, `cargo xtask secrets`, wasm if touching L0–L2, i18n checks if pertinent).
+- Evidence of real execution in the PR, with OS/toolchain/model versions and reproducible artifacts.
+- Prove the old Craft flow without regression; unit tests, contract tests, security negatives and the P0 pipeline.
+- Do not leave an action/timeout/secret as `pass`; unknowns not omitted; new files versioned/migratable.
+- Lint/build of the generated React and E2E tests with a known fixture.
 
-## Primeiro prompt para o Cursor
+## First prompt for Cursor
 
-Copie este comando **depois de criar o fork e adicionar os arquivos deste pacote ao repositório**:
+Copy this command **after creating the fork and adding this package's files to the repository**:
 
 ```text
-Você está implementando Redesign Anything como fork de Craft Anything. Leia primeiro AGENTS.md, docs/pitfalls.md, docs/extending.md, REDESIGN_SPEC/SPEC.md, REDESIGN_SPEC/CONTRACTS.md, REDESIGN_SPEC/IMPLEMENTATION_PLAN.md, REDESIGN_SPEC/VALIDATION_MATRIX.md e o código real de crates/ai/src/rebuild/kinds. NÃO reescreva o Craft, NÃO integre REA/Studio agora, NÃO mude a UI antes de existir CLI. Defina `host_agent` como controlador desta sessão, `lean` como padrão e proíba builders aninhados. Não use um limite estimado de tokens como se fosse hard cap. Execute somente PR-00 (baseline e regras do fork) e PR-01 (novo RedesignKind mínimo com seleção explícita). Preserve Clean Room, consentimento, camadas, nunca-crash, tool/evidence contracts, código original e todos os testes upstream. Antes de codar, descreva as alterações precisas e o teste de aceite; depois implemente, rode verificações e reporte os resultados reais e limites. Não faça push, não edite repositório remoto e não declare testes não executados.
+You are implementing Redesign Anything as a fork of Craft Anything. First read AGENTS.md, docs/pitfalls.md, docs/extending.md, REDESIGN_SPEC/SPEC.md, REDESIGN_SPEC/CONTRACTS.md, REDESIGN_SPEC/IMPLEMENTATION_PLAN.md, REDESIGN_SPEC/VALIDATION_MATRIX.md and the real code in crates/ai/src/rebuild/kinds. Do NOT rewrite Craft, do NOT integrate REA/Studio now, do NOT change the UI before a CLI exists. Define `host_agent` as this session's controller, `lean` as the default and prohibit nested builders. Do not use an estimated token limit as if it were a hard cap. Execute only PR-00 (baseline and fork rules) and PR-01 (new minimal RedesignKind with explicit selection). Preserve Clean Room, consent, layers, never-crash, tool/evidence contracts, original code and all upstream tests. Before coding, describe the precise changes and the acceptance test; then implement, run verifications and report the real results and limits. Do not push, do not edit the remote repository and do not claim tests that were not executed.
 ```
 
-## Complemento v1.3.0 — tarefas bloqueantes do Council II
+## Addendum v1.3.0 — blocking tasks from Council II
 
-**PR-00:** adicionar `TRUST_BOUNDARIES.md`, `ORACLE_POLICY.md`, `SAFE_WORKSPACE_POLICY.md`, `OSS_DX_AND_UPSTREAM.md`, pin upstream SHA, licença/attribution, matriz de compatibilidade planejada, `doctor` sem side effects.
+**PR-00:** add `TRUST_BOUNDARIES.md`, `ORACLE_POLICY.md`, `SAFE_WORKSPACE_POLICY.md`, `OSS_DX_AND_UPSTREAM.md`, upstream SHA pin, license/attribution, planned compatibility matrix, side-effect-free `doctor`.
 
-**PR-01 / primeiro vertical slice:** saída isolada; aprovação antes de aplicar patch; política de oráculo independente; cenário de fixture com expected observado/contratado; checks falham fechados; sanitização de evidências.
+**PR-01 / first vertical slice:** isolated output; approval before applying a patch; independent oracle policy; fixture scenario with observed/contracted expected result; checks fail closed; evidence sanitization.
 
-**PR-02:** schema para `oracle_type`, `approval_record`, `project_scope`, `evidence_retention`, `source_hash`, `workspace_output_mode`; implementar migrations e testes negativos. Não declarar campos implementados até integração Rust real.
+**PR-02:** schema for `oracle_type`, `approval_record`, `project_scope`, `evidence_retention`, `source_hash`, `workspace_output_mode`; implement migrations and negative tests. Do not declare fields as implemented until real Rust integration.
 
-**PR-03–08:** Task Model com unknowns, design de conteúdo, benchmark pré-registrado e avaliação cega, DS pinado, accessibility manual em amostra.
+**PR-03–08:** Task Model with unknowns, content design, pre-registered benchmark and blind evaluation, pinned DS, manual accessibility on a sample.
 
-**PR-09–12:** REA/MCP somente opt-in e com controles; CI upstream, multiagente e multissistema; política de distribuição de ativos corporativos.
+**PR-09–12:** REA/MCP only opt-in and with controls; upstream CI, multi-agent and multi-OS; corporate asset distribution policy.
 
-**Gate de revisão:** PR que altera fontes existentes, executa scripts de terceiros ou cria expected result por inferência não pode passar sem os controles correspondentes.
+**Review gate:** a PR that modifies existing sources, runs third-party scripts or creates an expected result by inference cannot pass without the corresponding controls.

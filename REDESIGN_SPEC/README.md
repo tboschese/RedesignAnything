@@ -1,45 +1,48 @@
-# Redesign Anything — Pacote de especificação (v1.4.0)
+# Redesign Anything — Specification package (v1.4.0)
 
-**Status:** pacote embutido neste fork (`tboschese/RedesignAnything`); PR-01…PR-11 implementados no engine (ver README da raiz e `docs/STATUS.md`); V1 pública ainda não lançada. Base: fork do Craft Anything, gratuito/open source, local-first, sem API paga obrigatória. Foco inicial: qualquer aplicação web.
+**Status:** package embedded in this fork (`tboschese/RedesignAnything`); PR-01…PR-11 implemented in the engine (see root README and `docs/STATUS.md`); First public release not shipped yet. Base: Craft Anything fork, free/open source, local-first, no paid API required. Initial focus: any web application.
 
-## Comece por aqui
+Repository documentation is written in **English**. Chat with maintainers may be in another language; that does not change the canonical docs.
 
-1. `V1_IMPACTANTE.md`: **estratégia vinculante da primeira entrega pública completa**.
-2. `EXECUTION_V12.md`: sequência de checkpoints **internos**, sem release público parcial.
-2. `COUNCIL_DECISIONS.md`: decisões do council, riscos, hipóteses e condições.
-3. `BENCHMARK_PROTOCOL.md`: comparação A/B/C e critérios de avaliação.
-4. `COUNCIL_ROUND_2.md`: **segunda revisão adversarial, com segurança, QA, DX/OSS e domínio empresarial**.
-5. `SPEC.md`: produto, arquitetura, requisitos, limites, segurança, outputs, gates, interfaces propostas.
-5. `IMPLEMENTATION_PLAN.md`: PR-00 a PR-12, dependências, tarefas e critérios de aceite.
-6. `CONTRACTS.md`: modelos semânticos e integrações; complementado por `schemas/`.
-7. `COST_AND_EXECUTION.md`: **controle de agente único, perfis Lean/Deep, orçamento de tokens, mensuração, limites executáveis e benchmark comparativo**.
-8. `AGENT_FIRST.md`: **como passar a URL do futuro repo ao Cursor/Claude/Codex e usar CLI/MCP sem desktop**; os comandos ali são PROPOSTOS.
-9. `AGENTS_REDESIGN.md`: instruções para codificação no fork.
-10. `VALIDATION_MATRIX.md`: testes de unidade, integração, segurança, E2E, benchmark, smoke tests agent-first.
-11. `SOURCES.md`: repositórios e documentos consultados, licenças e riscos de redistribuição.
-12. `CHANGELOG.md`: mudanças e compatibilidade entre versões da documentação.
-13. `examples/` e `schemas/`: configuração Lean reproduzível e nove JSON Schemas versionados (documentação v1.2.0, envelopes de schema v1.0.0).
+## Start here
 
-## Primeira entrega de código
+1. `V1_FIRST_RELEASE.md`: **binding strategy for the first complete public delivery**.
+2. `EXECUTION_V12.md`: sequence of **internal** checkpoints; no partial public release.
+3. `COUNCIL_DECISIONS.md`: council decisions, risks, hypotheses, and conditions.
+4. `BENCHMARK_PROTOCOL.md`: A/B/C comparison and evaluation criteria.
+5. `COUNCIL_ROUND_2.md`: second adversarial review (security, QA, DX/OSS, enterprise domain).
+6. `SPEC.md`: product, architecture, requirements, limits, security, outputs, gates, proposed interfaces.
+7. `IMPLEMENTATION_PLAN.md`: PR-00 through PR-12, dependencies, tasks, and acceptance criteria.
+8. `CONTRACTS.md`: semantic models and integrations; complemented by `schemas/`.
+9. `COST_AND_EXECUTION.md`: single-agent control, Lean/Deep profiles, token budget, measurement, enforceable limits, comparative benchmark.
+10. `AGENT_FIRST.md`: how to point Cursor/Claude/Codex at the repo and use CLI/MCP without the desktop; some commands there are still **proposed**.
+11. `AGENTS_REDESIGN.md`: coding instructions for this fork.
+12. `VALIDATION_MATRIX.md`: unit, integration, security, E2E, benchmark, agent-first smoke tests.
+13. `SOURCES.md`: consulted repositories and documents, licences, redistribution risks.
+14. `CHANGELOG.md`: documentation version changes and compatibility.
+15. `examples/` and `schemas/`: reproducible Lean config and nine versioned JSON Schemas (docs v1.2.0, schema envelopes v1.0.0).
 
-Criar o fork independente, copiar este pacote para `REDESIGN_SPEC/`, ler `AGENTS.md`/`docs/extending.md`/`docs/pitfalls.md` upstream e executar os slices como checkpoints internos. **A V1 pública exige todas as capacidades e gates de `V1_IMPACTANTE.md`; nenhuma entrega parcial será apresentada como lançamento.** O `AGENT_FIRST.md` é obrigatório desde o P0.
+## First code delivery
 
-## Uso após implementação (exemplo de intenção)
+Create the independent fork, keep this package under `REDESIGN_SPEC/`, read upstream `AGENTS.md` / `docs/extending.md` / `docs/pitfalls.md`, and run slices as internal checkpoints. **The First public release requires every capability and gate in `V1_FIRST_RELEASE.md`; no partial delivery may be presented as launch.** `AGENT_FIRST.md` is mandatory from P0.
 
-> “Use o Redesign Anything no GitHub para redesenhar `https://app.exemplo.com`, usando meu design system e preservando os fluxos conhecidos. Leia as instruções do repo, diagnostique dependências e solicite permissão antes de instalar ou acessar ambientes privados.”
+## Intended use after implementation
 
-Passar a URL do repositório no agente é um caminho de bootstrap, **não uma instalação automática garantida**.
+> “Use Redesign Anything on GitHub to redesign `https://app.example.com`, using my design system and preserving known flows. Read the repo instructions, diagnose dependencies, and ask permission before installing or accessing private environments.”
 
-## Adendo normativo v1.3.0
+Passing the repository URL to an agent is a bootstrap path, **not a guaranteed automatic install**.
 
-Leia também, **antes de implementar**:
-- `TRUST_BOUNDARIES.md` — escopo real de controles e segurança do host.
-- `ORACLE_POLICY.md` — expected results independentes, gates e estados inconclusivos.
-- `SAFE_WORKSPACE_POLICY.md` — output isolado, diff e aprovação para patches.
-- `OSS_DX_AND_UPSTREAM.md` — instalação assistida, design systems privados, upstream e acessibilidade.
+## Normative addendum v1.3.0
 
-O adendo v1.3.0 prevalece sobre a ordem e políticas antigas onde houver conflito. `EXECUTION_V12.md` continua sendo a sequência de slices, com condições adicionais v1.3.0. Nenhum requisito foi testado em software real.
+Also read, **before implementing**:
 
-## Estratégia de release v1.4.0
+- `TRUST_BOUNDARIES.md` — real scope of host controls and security.
+- `ORACLE_POLICY.md` — independent expected results, gates, inconclusive states.
+- `SAFE_WORKSPACE_POLICY.md` — isolated output, diff, and approval for patches.
+- `OSS_DX_AND_UPSTREAM.md` — assisted install, private design systems, upstream, accessibility.
 
-A primeira versão pública é a **V1 Impactante**, não um MVP. Leia `V1_IMPACTANTE.md` primeiro. A arquitetura avançada (REA, Application MCP, DS corporativo e jornadas) é requisito de disponibilidade da V1, embora cada integração seja usada seletivamente por tarefa.
+The v1.3.0 addendum prevails over older order and policies on conflict. `EXECUTION_V12.md` remains the slice sequence, with additional v1.3.0 conditions. Requirements were not validated against real software at the time of writing the original kit.
+
+## Release strategy v1.4.0
+
+The first public version is the **First public release**, not an MVP. Read `V1_FIRST_RELEASE.md` first. Advanced architecture (REA, Application MCP, corporate DS, journeys) is a V1 **availability** requirement, even though each integration is used selectively per task.

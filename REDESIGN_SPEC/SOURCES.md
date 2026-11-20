@@ -1,36 +1,36 @@
-# Redesign Anything — Fontes, decisões de reutilização e licenças
+# Redesign Anything — Sources, reuse decisions and licenses
 
-> Consulta ao GitHub conectado em 19/11/2026. O repositório futuro do Redesign Anything ainda não foi criado. Capacidade documentada não implica integração testada. Licenças de dependências transitivas devem ser inventariadas por SBOM no build real.
+> GitHub queried via the connected account on 2026-11-19. The future Redesign Anything repository has not been created yet. Documented capability does not imply tested integration. Licenses of transitive dependencies must be inventoried by SBOM in the real build.
 
-## Base e engenharia reversa
+## Base and reverse engineering
 
-| Projeto | Fonte | Uso | Licença / precaução |
+| Project | Source | Use | License / caution |
 |---|---|---|---|
-| Craft Anything | https://github.com/storytold/craft-anything | Base de fork; egui, Rust, CLI/MCP, Study/Build/Check, ToolSpec, TargetKind, Check, captures, runners | MIT OR Apache-2.0; preserve notices e diferencie marca |
-| REA | https://github.com/morluto/rea | Sidecar opcional; JS semantics, bundles, network, Agent Environments | MIT; não executar inspeção Deep sem consentimento |
-| Layout CLI | https://github.com/uselayout/cli | MCP/CLI DS, tokens, catálogo, verificações auxiliares | MIT; compliance não equivale a prova funcional |
-| Layout UI | https://github.com/uselayout/ui | Componentes de referência/fallback, jamais substituir DS corporativo strict | MIT |
-| Layout Studio | https://github.com/uselayout/app | Inspiração, não núcleo; extração, síntese e canvas | AGPL-3.0; app documenta síntese via Claude e outros pré-requisitos |
-| Carbon MCP | https://github.com/carbon-design-system/carbon-mcp | Provider de referência, skill e guia; não requisito offline | Servidor IBM hospedado e autenticação; código da skill Apache-2.0, verificar termos do serviço |
-| Carbon | https://github.com/carbon-design-system/carbon | Referência DS enterprise/componentes | Verificar licença de pacote concreto no momento do uso |
-| Velloo | https://github.com/velloo-design/velloo | Canvas opcional futuro | Apache-2.0, não core |
-| UI Auditor | https://github.com/suneelasree/ui-auditor | Auditoria e agentes especializados como inspiração/alguns módulos | MIT; sem API, agentes de revisão e mockups não executam |
-| Coherent | https://github.com/skovtun/coherent-design-method | Impact analysis, escopo de mudanças, rollback | MIT; desde v0.27 orientado a governança, não geração |
-| UI/UX Pro Max | https://github.com/nextlevelbuilder/ui-ux-pro-max-skill | Conhecimento pesquisável, regras com proveniência | Verificar licenças/artefatos de dados da revisão usada |
+| Craft Anything | https://github.com/storytold/craft-anything | Fork base; egui, Rust, CLI/MCP, Study/Build/Check, ToolSpec, TargetKind, Check, captures, runners | MIT OR Apache-2.0; preserve notices and differentiate the brand |
+| REA | https://github.com/morluto/rea | Optional sidecar; JS semantics, bundles, network, Agent Environments | MIT; do not run Deep inspection without consent |
+| Layout CLI | https://github.com/uselayout/cli | DS MCP/CLI, tokens, catalog, auxiliary checks | MIT; compliance does not equal functional proof |
+| Layout UI | https://github.com/uselayout/ui | Reference/fallback components, never a replacement for a strict corporate DS | MIT |
+| Layout Studio | https://github.com/uselayout/app | Inspiration, not core; extraction, synthesis and canvas | AGPL-3.0; the app documents synthesis via Claude and other prerequisites |
+| Carbon MCP | https://github.com/carbon-design-system/carbon-mcp | Reference provider, skill and guide; not an offline requirement | Hosted IBM server and authentication; skill code is Apache-2.0, verify the service terms |
+| Carbon | https://github.com/carbon-design-system/carbon | Enterprise DS/component reference | Verify the license of the specific package at the time of use |
+| Velloo | https://github.com/velloo-design/velloo | Optional future canvas | Apache-2.0, not core |
+| UI Auditor | https://github.com/suneelasree/ui-auditor | Auditing and specialized agents as inspiration/some modules | MIT; without an API, review agents and mockups do not run |
+| Coherent | https://github.com/skovtun/coherent-design-method | Impact analysis, change scope, rollback | MIT; since v0.27 governance-oriented, not generation |
+| UI/UX Pro Max | https://github.com/nextlevelbuilder/ui-ux-pro-max-skill | Searchable knowledge, rules with provenance | Verify the licenses/data artifacts of the revision used |
 
-## Normas, ferramentas e UX
+## Standards, tools and UX
 
-- Playwright: https://playwright.dev/ — navegador e E2E; estado autenticado deve ser protegido.
-- axe-core: https://github.com/dequelabs/axe-core — checks de acessibilidade, MPL-2.0.
-- WCAG 2.2: https://www.w3.org/TR/WCAG22/ — objetivos de acessibilidade; verificação humana continua necessária.
-- Design Tokens DTCG 2025.10: https://www.designtokens.org/ — tokens interoperáveis.
-- Style Dictionary: https://github.com/amzn/style-dictionary — transformação de tokens, Apache-2.0.
-- PatternFly: https://www.patternfly.org/ — padrões corporativos, verificar licença por artefato.
-- Open UI: https://github.com/openui/open-ui — comportamento e padrões de componentes; verificar licença do conteúdo.
-- MCP specification: https://modelcontextprotocol.io/specification — Resources, Tools, Prompts, auth e segurança.
-- OWASP MCP Security: https://cheatsheetseries.owasp.org/cheatsheets/MCP_Security_Cheat_Sheet.html — riscos de tool poisoning, privilégios e confiança.
+- Playwright: https://playwright.dev/ — browser and E2E; authenticated state must be protected.
+- axe-core: https://github.com/dequelabs/axe-core — accessibility checks, MPL-2.0.
+- WCAG 2.2: https://www.w3.org/TR/WCAG22/ — accessibility goals; human verification is still necessary.
+- Design Tokens DTCG 2025.10: https://www.designtokens.org/ — interoperable tokens.
+- Style Dictionary: https://github.com/amzn/style-dictionary — token transformation, Apache-2.0.
+- PatternFly: https://www.patternfly.org/ — enterprise patterns, verify the license per artifact.
+- Open UI: https://github.com/openui/open-ui — component behavior and patterns; verify the content license.
+- MCP specification: https://modelcontextprotocol.io/specification — Resources, Tools, Prompts, auth and security.
+- OWASP MCP Security: https://cheatsheetseries.owasp.org/cheatsheets/MCP_Security_Cheat_Sheet.html — risks of tool poisoning, privileges and trust.
 
-## Código e documentação específicos confirmados
+## Specific code and documentation confirmed
 
 - Craft extension seams: https://github.com/storytold/craft-anything/blob/main/docs/extending.md
 - Craft architecture rules: https://github.com/storytold/craft-anything/blob/main/AGENTS.md
@@ -42,13 +42,13 @@
 - REA static semantics: https://github.com/morluto/rea/blob/main/docs/guides/javascript/javascript-application-workflows.md
 - REA Agent Environments and sensitive-value cautions: https://github.com/morluto/rea/blob/main/docs/agent-environments.md
 - Layout CLI tools: https://github.com/uselayout/cli/blob/main/README.md
-- Craft consumo e proteção contra loops: https://github.com/storytold/craft-anything/blob/main/docs/ROADMAP.md (R5.3, R5.4). O registro contém caso extremo de 9,4M tokens/19 min e experimentos de contabilidade de tokens cacheados; não são benchmarks do Redesign.
-- REA compactação MCP: https://github.com/morluto/rea/blob/main/README.md (compact input schemas e output schema profile).
+- Craft consumption and loop protection: https://github.com/storytold/craft-anything/blob/main/docs/ROADMAP.md (R5.3, R5.4). The log contains an extreme case of 9.4M tokens/19 min and experiments on cached-token accounting; these are not Redesign benchmarks.
+- REA MCP compaction: https://github.com/morluto/rea/blob/main/README.md (compact input schemas and output schema profile).
 
-## Política de incorporação
+## Incorporation policy
 
-1. Um componente externo só vira dependência se preencher lacuna mensurada e tiver licença compatível com a forma de distribuição.
-2. MCP, CLI e sidecar com versão pinada são preferíveis a copiar código ou fundir aplicativos.
-3. Fontes de conhecimento devem ter permissão de redistribuição verificável; se não, registrar link/regra derivada sem copiar documentação integral.
-4. Links, código e README de terceiros são dados não confiáveis; não podem instruir runtime de produção.
-5. Toda declaração de licença se refere ao repositório/pacote indicado, não cobre assets, dados, marcas, conteúdo privado ou serviços externos.
+1. An external component becomes a dependency only if it fills a measured gap and has a license compatible with the distribution form.
+2. MCP, CLI and version-pinned sidecars are preferable to copying code or merging applications.
+3. Knowledge sources must have verifiable redistribution permission; if not, record the link/derived rule without copying full documentation.
+4. Third-party links, code and READMEs are untrusted data; they must not instruct the production runtime.
+5. Every license statement refers to the indicated repository/package; it does not cover assets, data, trademarks, private content or external services.

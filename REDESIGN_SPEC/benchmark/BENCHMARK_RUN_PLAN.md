@@ -15,7 +15,7 @@ This document freezes inclusion criteria, sample size, repetitions, budgets, rub
 | `dense-form` | Dense enterprise form | `../fixtures/dense-form/` | 5 in `oracle/scenarios.json` |
 | `multi-step-journey` | 3-step journey + permission error | `../fixtures/multi-step-journey/` | 4 in `oracle/scenarios.json` |
 
-**Future V1 gate** still requires a third fixture with a real design-system package (`V1_IMPACTANTE.md`). That fixture is **out of Slice 0** and must be added in a later dated plan before confirmatory V1 benchmark.
+**Future V1 gate** still requires a third fixture with a real design-system package (`V1_FIRST_RELEASE.md`). That fixture is **out of Slice 0** and must be added in a later dated plan before confirmatory V1 benchmark.
 
 ## Arms
 
@@ -78,7 +78,7 @@ Defined **before** observing Redesign outputs:
 | Cost soft budget (equalized) | Per-arm wall time soft cap **45 min** per fixture repetition; soft call cap **80** tool calls; tokens recorded honestly |
 | Decision if C ≉ B | Prefer simpler architecture (document and stop expanding Design Engine) |
 
-V1 public release additionally requires the third DS fixture and the full `V1_IMPACTANTE.md` gates; this Slice 0 plan alone does **not** authorize release.
+V1 public release additionally requires the third DS fixture and the full `V1_FIRST_RELEASE.md` gates; this Slice 0 plan alone does **not** authorize release.
 
 ## Tie-breakers
 

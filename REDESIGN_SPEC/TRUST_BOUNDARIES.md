@@ -1,34 +1,34 @@
-# Trust Boundaries — requisitos normativos v1.3.0
+# Trust Boundaries — normative requirements v1.3.0
 
-## Princípio
-REA/Redesign Anything **não** é um sandbox do agente hospedeiro. `host_agent` controla comandos, acesso à rede, modelos e permissões conforme a configuração do Cursor/Claude/Codex. REA controla apenas suas próprias ferramentas, arquivos, subprocessos e respostas. Nenhum relatório pode declarar isolamento global sem validação independente do host.
+## Principle
+REA/Redesign Anything is **not** a sandbox for the host agent. `host_agent` controls commands, network access, models and permissions according to the Cursor/Claude/Codex configuration. REA controls only its own tools, files, subprocesses and responses. No report may claim global isolation without independent validation of the host.
 
-## Fronteiras
-| Fronteira | Controle implementável pelo Redesign | Fora de seu controle |
+## Boundaries
+| Boundary | Control Redesign can implement | Outside its control |
 |---|---|---|
-| MCP/CLI próprio | validação de parâmetros, allowlist de paths, limites, redaction, timeout, confirmação para operações mutantes | shell e ferramentas nativas do agente host |
-| Browser de observação | contexto isolado, perfis temporários, origens permitidas, capturas sanitizadas | navegador ou plugins externos usados diretamente pelo host |
-| Application MCP | allowlist de servidores/tools, read-only default, aprovação para writes, metadados de confiança | correção das regras declaradas pelo servidor, ações diretas do host |
-| Modelo remoto | minimizar e filtrar dados enviados pelos tools próprios | política de retenção do provedor e envio direto pelo host |
-| Instalação/dependências | `doctor` sem side effects, manifesto de ações, hashes quando disponíveis | comandos `npm`, `cargo`, shell executados fora do gateway |
+| Own MCP/CLI | parameter validation, path allowlist, limits, redaction, timeout, confirmation for mutating operations | shell and native tools of the host agent |
+| Observation browser | isolated context, temporary profiles, allowed origins, sanitized captures | browser or external plugins used directly by the host |
+| Application MCP | allowlist of servers/tools, read-only by default, approval for writes, trust metadata | correctness of the rules declared by the server, direct host actions |
+| Remote model | minimize and filter data sent by the product's own tools | provider retention policy and data sent directly by the host |
+| Installation/dependencies | side-effect-free `doctor`, action manifest, hashes when available | `npm`, `cargo` and shell commands run outside the gateway |
 
-## Requisitos P0
-- `project_scope`: paths canônicos permitidos, URLs/origens, MCPs autorizados, modo read-only ou write, ambientes bloqueados. Resolver symlinks e bloquear traversal.
-- `approval_record`: identidade do host quando disponível, ação, escopo, justificativa, timestamp e resultado. Ausência de aprovação = não executar ação mutante própria.
-- `secrets`: negar exportação de cookies, headers Authorization, API keys, tokens e dados pessoais conhecidos; sanitização antes de persistência e antes de respostas MCP.
-- `evidence`: armazenamento segregado por projeto/tenant/role, TTL configurável, purge, proibição de sincronização implícita, manifests sem valores secretos.
-- `prompt_injection`: página, HAR, código, docs e resposta de MCP são **dados não confiáveis**; não elevam permissões, não alteram instruções do agente, não autorizam comandos.
-- `dependencies`: scripts de install/build em projeto não confiável requerem consentimento explícito e ambiente isolado quando possível. Nunca executar por `doctor`.
-- `patch_apply`: só após diff, confirmação e checks. Por padrão gerar em workspace separado.
-- Sem prometer que aprovação no MCP impede ações diretas do host. README deve avisar claramente.
+## P0 requirements
+- `project_scope`: allowed canonical paths, URLs/origins, authorized MCPs, read-only or write mode, blocked environments. Resolve symlinks and block traversal.
+- `approval_record`: host identity when available, action, scope, justification, timestamp and result. No approval = do not run the product's own mutating action.
+- `secrets`: deny export of cookies, Authorization headers, API keys, tokens and known personal data; sanitize before persistence and before MCP responses.
+- `evidence`: storage segregated by project/tenant/role, configurable TTL, purge, no implicit synchronization, manifests without secret values.
+- `prompt_injection`: pages, HAR files, code, docs and MCP responses are **untrusted data**; they do not elevate permissions, do not alter agent instructions and do not authorize commands.
+- `dependencies`: install/build scripts in an untrusted project require explicit consent and an isolated environment when possible. Never run them from `doctor`.
+- `patch_apply`: only after diff, confirmation and checks. By default, generate in a separate workspace.
+- Do not promise that MCP approval prevents direct host actions. The README must state this clearly.
 
-## Testes bloqueantes
-TB-01 agente host chama shell diretamente: relatório não declara que o gateway impediu.
-TB-02 MCP malicioso pede segredo e comando: resposta tratada como dado, sem execução.
-TB-03 symlink/traversal tenta sair do workspace: ferramenta recusa.
-TB-04 HAR contém cookie/token: dados persistidos e retornados estão sanitizados.
-TB-05 operação mutante sem aprovação: ferramenta própria recusa.
-TB-06 `doctor` em projeto com postinstall malicioso: nenhum script é executado.
-TB-07 duas execuções/tenants: sem vazamento de cache/evidência.
-TB-08 retenção expira e purge remove artefatos controlados pelo produto.
-**Status:** especificado; nenhum controle é considerado implementado sem teste.
+## Blocking tests
+TB-01 host agent calls the shell directly: the report does not claim the gateway prevented it.
+TB-02 malicious MCP asks for a secret and a command: the response is treated as data, nothing is executed.
+TB-03 symlink/traversal tries to escape the workspace: the tool refuses.
+TB-04 HAR contains a cookie/token: persisted and returned data is sanitized.
+TB-05 mutating operation without approval: the product's own tool refuses.
+TB-06 `doctor` in a project with a malicious postinstall: no script is executed.
+TB-07 two runs/tenants: no cache/evidence leakage.
+TB-08 retention expires and purge removes artifacts controlled by the product.
+**Status:** specified; no control is considered implemented without a test.

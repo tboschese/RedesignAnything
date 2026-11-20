@@ -45,7 +45,127 @@ pub fn preflight(ws: &Workspace, policy: Option<&ExecutionPolicy>) -> Result<(),
     }
 }
 
+#[derive(Debug, Clone)]
+struct ScaffoldRoute {
+    path: String,
+    slug: String,
+    title: String,
+    capability_id: String,
+    component_name: String,
+    states: Vec<String>,
+}
+
+fn slugify_route(path: &str) -> String {
+    let trimmed = path.trim().trim_start_matches('/');
+    if trimmed.is_empty() {
+        return "home".into();
+    }
+    let mut out = String::new();
+    for ch in trimmed.chars() {
+        if ch.is_ascii_alphanumeric() {
+            out.push(ch.to_ascii_lowercase());
+        } else if !out.ends_with('_') {
+            out.push('_');
+        }
+    }
+    let out = out.trim_matches('_').to_string();
+    if out.is_empty() { "route".into() } else { out }
+}
+
+fn pascal_case(slug: &str) -> String {
+    slug.split('_')
+        .filter(|p| !p.is_empty())
+        .map(|p| {
+            let mut c = p.chars();
+            match c.next() {
+                None => String::new(),
+                Some(f) => f.to_ascii_uppercase().to_string() + c.as_str(),
+            }
+        })
+        .collect()
+}
+
+/// Prefer plan `target_route` mappings; fall back to capability `original_routes`.
+fn collect_scaffold_routes(
+    caps: &[redesign_store::Capability],
+    plan: Option<&redesign_plan::TransformationPlan>,
+) -> Vec<ScaffoldRoute> {
+    let mut routes: Vec<ScaffoldRoute> = Vec::new();
+    let mut seen = std::collections::BTreeSet::new();
+
+    if let Some(p) = plan {
+        for m in &p.mappings {
+            let Some(path) = m.target_route.as_deref().filter(|r| !r.is_empty()) else {
+                continue;
+            };
+            if !seen.insert(path.to_string()) {
+                continue;
+            }
+            let cap = caps.iter().find(|c| c.id == m.capability_id);
+            let title = cap.map(|c| c.title.clone()).unwrap_or_else(|| path.to_string());
+            let slug = slugify_route(path);
+            let mut states = vec!["default".into(), "loading".into(), "empty".into(), "error".into()];
+            if let Some(c) = cap {
+                for o in &c.outcomes {
+                    if !states.iter().any(|s| s == o) {
+                        states.push(o.clone());
+                    }
+                }
+            }
+            routes.push(ScaffoldRoute {
+                path: path.to_string(),
+                slug: slug.clone(),
+                title,
+                capability_id: m.capability_id.clone(),
+                component_name: format!("{}Page", pascal_case(&slug)),
+                states,
+            });
+        }
+    }
+
+    if routes.is_empty() {
+        for c in caps {
+            let path = c
+                .original_routes
+                .first()
+                .cloned()
+                .unwrap_or_else(|| format!("/{}", c.id));
+            if !seen.insert(path.clone()) {
+                continue;
+            }
+            let slug = slugify_route(&path);
+            let mut states = vec!["default".into(), "loading".into(), "empty".into(), "error".into()];
+            for o in &c.outcomes {
+                if !states.iter().any(|s| s == o) {
+                    states.push(o.clone());
+                }
+            }
+            routes.push(ScaffoldRoute {
+                path,
+                slug: slug.clone(),
+                title: c.title.clone(),
+                capability_id: c.id.clone(),
+                component_name: format!("{}Page", pascal_case(&slug)),
+                states,
+            });
+        }
+    }
+
+    if routes.is_empty() {
+        routes.push(ScaffoldRoute {
+            path: "/".into(),
+            slug: "home".into(),
+            title: "Home".into(),
+            capability_id: "cap_home".into(),
+            component_name: "HomePage".into(),
+            states: vec!["default".into(), "empty".into()],
+        });
+    }
+    routes
+}
+
 /// Write a minimal React+TS+Vite app with mock data and traceability stubs.
+/// Emits one route module per plan/capability path (hash router, no extra deps).
 /// Never copies private logos or design-system source — only import paths from the registry.
 pub fn scaffold_app(ws: &Workspace, policy: Option<&ExecutionPolicy>) -> Result<Value, ToolError> {
     preflight(ws, policy)?;
@@ -53,6 +173,7 @@ pub fn scaffold_app(ws: &Workspace, policy: Option<&ExecutionPolicy>) -> Result<
     let caps = redesign_store::list_capabilities(ws).unwrap_or_default();
     let decisions = redesign_plan::list_decisions(ws).unwrap_or_default();
     let plan = redesign_plan::load_plan(ws).ok();
+    let routes = collect_scaffold_routes(&caps, plan.as_ref());
 
     let app = ws.app_dir();
     fs::create_dir_all(app.join("src/mocks")).map_err(|e| ToolError::io(app.display(), e))?;
@@ -157,7 +278,24 @@ createRoot(document.getElementById("root")!).render(
         .map(|c| c.import_path.clone())
         .unwrap_or_else(|| reg.package_name.clone());
 
-    let routes_json = serde_json::to_string_pretty(&caps.iter().map(|c| {
+    let routes_json = serde_json::to_string_pretty(
+        &routes
+            .iter()
+            .map(|r| {
+                json!({
+                    "path": r.path,
+                    "slug": r.slug,
+                    "title": r.title,
+                    "capability_id": r.capability_id,
+                    "component": r.component_name,
+                    "states": r.states,
+                })
+            })
+            .collect::<Vec<_>>(),
+    )
+    .unwrap_or_else(|_| "[]".into());
+
+    let caps_json = serde_json::to_string_pretty(&caps.iter().map(|c| {
         json!({
             "capability_id": c.id,
             "title": c.title,
@@ -183,42 +321,168 @@ export const MOCK_ROWS: MockRow[] = [
   {{ id: "m2", label: "Simulated request B", status: "done" }},
 ];
 
-export const CAPABILITY_TRACE = {routes} as const;
+export const CAPABILITY_TRACE = {caps} as const;
+
+export const ROUTES = {routes} as const;
 "#,
             banner = MOCK_BANNER,
+            caps = caps_json,
             routes = routes_json
         ),
     )?;
 
+    // One page module per route (journey states as local UI toggles — simulated).
+    for r in &routes {
+        let states_lit = r
+            .states
+            .iter()
+            .map(|s| format!("\"{s}\""))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let initial = if r.states.iter().any(|s| s == "default") {
+            "default"
+        } else {
+            r.states.first().map(String::as_str).unwrap_or("default")
+        };
+        write(
+            &app.join(format!("src/routes/{}.tsx", r.slug)),
+            &format!(
+                r#"import {{ useState }} from "react";
+import {{ Button }} from "{button_import}";
+import {{ MOCK_META, MOCK_ROWS }} from "../mocks/data";
+
+const STATES = [{states}] as const;
+type UiState = (typeof STATES)[number];
+
+export function {component}() {{
+  const [state, setState] = useState<UiState>("{initial}");
+  return (
+    <section aria-labelledby="route-title">
+      <h2 id="route-title">{title}</h2>
+      <p>Capability: <code>{cap}</code> · path: <code>{path}</code></p>
+      <p role="status">{{MOCK_META.banner}} · UI state: {{state}}</p>
+      <label>
+        Simulated state{{" "}}
+        <select value={{state}} onChange={{(e) => setState(e.target.value as UiState)}}>
+          {{STATES.map((s) => (
+            <option key={{s}} value={{s}}>
+              {{s}}
+            </option>
+          ))}}
+        </select>
+      </label>
+      {{state === "empty" ? (
+        <p>No simulated rows for this state.</p>
+      ) : state === "error" ? (
+        <p role="alert">Simulated error — origin was not contacted.</p>
+      ) : state === "loading" ? (
+        <p>Loading simulated data…</p>
+      ) : (
+        <ul>
+          {{MOCK_ROWS.map((row) => (
+            <li key={{row.id}}>
+              {{row.label}} — {{row.status}}
+            </li>
+          ))}}
+        </ul>
+      )}}
+      <Button variant="primary">Simulated primary action</Button>
+    </section>
+  );
+}}
+"#,
+                button_import = button_import,
+                states = states_lit,
+                component = r.component_name,
+                title = r.title.replace('"', "'"),
+                cap = r.capability_id,
+                path = r.path,
+                initial = initial,
+            ),
+        )?;
+    }
+
+    let imports = routes
+        .iter()
+        .map(|r| format!("import {{ {} }} from \"./routes/{}\";", r.component_name, r.slug))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let cases = routes
+        .iter()
+        .map(|r| {
+            format!(
+                "    case \"{path}\":\n      return <{comp} />;",
+                path = r.path,
+                comp = r.component_name
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    let default_path = routes.first().map(|r| r.path.as_str()).unwrap_or("/");
+
     write(
         &app.join("src/App.tsx"),
         &format!(
-            r#"import {{ Button }} from "{button_import}";
-import {{ CAPABILITY_TRACE, MOCK_META, MOCK_ROWS }} from "./mocks/data";
+            r#"import {{ useEffect, useState, type ReactNode }} from "react";
+import {{ ROUTES, MOCK_META, CAPABILITY_TRACE }} from "./mocks/data";
+{imports}
+
+function currentHashPath(): string {{
+  const raw = window.location.hash.replace(/^#/, "");
+  return raw.length === 0 ? "{default_path}" : raw.startsWith("/") ? raw : `/${{raw}}`;
+}}
 
 export function App() {{
+  const [path, setPath] = useState(currentHashPath);
+
+  useEffect(() => {{
+    const onHash = () => setPath(currentHashPath());
+    window.addEventListener("hashchange", onHash);
+    if (!window.location.hash) {{
+      window.location.hash = "{default_path}";
+    }}
+    return () => window.removeEventListener("hashchange", onHash);
+  }}, []);
+
+  let page: ReactNode;
+  switch (path) {{
+{cases}
+    default:
+      page = (
+        <section>
+          <h2>Unknown route</h2>
+          <p>No page generated for <code>{{path}}</code>. Known routes come from the transformation plan / capabilities.</p>
+        </section>
+      );
+  }}
+
   return (
     <main>
       <p role="status">{{MOCK_META.banner}}</p>
       <h1>Redesign prototype</h1>
-      <p>Capabilities traced: {{CAPABILITY_TRACE.length}}. Origin writes: {{String(MOCK_META.origin_writes)}}.</p>
-      <ul>
-        {{MOCK_ROWS.map((row) => (
-          <li key={{row.id}}>
-            {{row.label}} — {{row.status}}
-          </li>
-        ))}}
-      </ul>
-      <Button variant="primary">Simulated primary action</Button>
-      <section>
-        <h2>Trace</h2>
-        <pre>{{JSON.stringify(CAPABILITY_TRACE, null, 2)}}</pre>
-      </section>
+      <p>
+        Routes: {{ROUTES.length}} · Capabilities traced: {{CAPABILITY_TRACE.length}} · Origin writes:{{" "}}
+        {{String(MOCK_META.origin_writes)}}
+      </p>
+      <nav aria-label="Scaffold routes">
+        <ul>
+          {{ROUTES.map((r) => (
+            <li key={{r.path}}>
+              <a href={{`#${{r.path}}`}} aria-current={{path === r.path ? "page" : undefined}}>
+                {{r.title}}
+              </a>
+            </li>
+          ))}}
+        </ul>
+      </nav>
+      {{page}}
     </main>
   );
 }}
 "#,
-            button_import = button_import
+            imports = imports,
+            default_path = default_path,
+            cases = cases,
         ),
     )?;
 
@@ -230,6 +494,8 @@ export function App() {{
 - Stack: React + TypeScript (Vite)
 - Design system: `{pkg}@{ver}` (import paths only — package sources are not copied)
 - Mock data is marked `{banner}` and never writes to the origin
+- Multi-route: `{route_count}` page(s) under `src/routes/` from the transformation plan (or capability routes)
+- Hash navigation (`#/path`) — no router dependency
 - Decisions/plan live under `../redesign/` and are referenced by id, not inlined wholesale
 
 ## Host agent
@@ -239,7 +505,8 @@ Continue edits in the host agent; do not call `rebuild_start` under `host_agent`
 "#,
             pkg = reg.package_name,
             ver = reg.package_version,
-            banner = MOCK_BANNER
+            banner = MOCK_BANNER,
+            route_count = routes.len()
         ),
     )?;
 
@@ -249,6 +516,12 @@ Continue edits in the host agent; do not call `rebuild_start` under `host_agent`
         "capabilities_count": caps.len(),
         "decisions": decisions.iter().map(|d| d.id.clone()).collect::<Vec<_>>(),
         "plan": plan.as_ref().map(|_| "redesign/transformation_plan.json"),
+        "routes": routes.iter().map(|r| json!({
+            "path": r.path,
+            "slug": r.slug,
+            "capability_id": r.capability_id,
+            "file": format!("app/src/routes/{}.tsx", r.slug),
+        })).collect::<Vec<_>>(),
         "mock_banner": MOCK_BANNER,
         "nested_builder_started": false,
         "origin_intact": true,
@@ -266,6 +539,8 @@ Continue edits in the host agent; do not call `rebuild_start` under `host_agent`
         "package_version": reg.package_version,
         "capabilities_traced": caps.len(),
         "decisions_referenced": decisions.len(),
+        "routes_generated": routes.len(),
+        "routes": routes.iter().map(|r| r.path.clone()).collect::<Vec<_>>(),
         "nested_builder_started": false,
         "mock_banner": MOCK_BANNER,
         "refs": "redesign/scaffold_refs.json",
@@ -337,8 +612,11 @@ mod tests {
         assert!(mocks.contains(MOCK_BANNER));
         assert!(mocks.contains("origin_writes: false") || mocks.contains("origin_writes:false"));
         let app = fs::read_to_string(ws.app_dir().join("src/App.tsx")).unwrap();
-        assert!(app.contains("@fixture/acme-ds"));
+        assert!(app.contains("hashchange"));
         assert!(!app.contains("rebuild_start"));
+        let page = fs::read_to_string(ws.app_dir().join("src/routes/requests.tsx")).unwrap();
+        assert!(page.contains("@fixture/acme-ds"));
+        assert_eq!(out["routes_generated"], 1);
         // Origin (workspace target folder) untouched — we never write outside app/redesign.
         assert!(!ws.root.join("capture").join("MUTATED").exists());
     }
@@ -348,5 +626,145 @@ mod tests {
         let d = tempfile::tempdir().unwrap();
         let ws = Workspace::create(d.path(), "W", "website", TargetRef::None).unwrap();
         assert!(scaffold_app(&ws, None).is_err());
+    }
+
+    #[test]
+    fn multi_route_from_capabilities() {
+        let d = tempfile::tempdir().unwrap();
+        let mut ws = Workspace::create(d.path(), "B", "kind=redesign", TargetRef::None).unwrap();
+        ws.manifest.kind = Some("redesign".into());
+        ws.save().unwrap();
+        redesign_ds::ingest_package(&ws, &fixture_ds(), "strict", false).unwrap();
+        for (id, title, route) in [
+            ("cap_start", "Start", "/start"),
+            ("cap_review", "Review", "/review"),
+            ("cap_done", "Done", "/done"),
+        ] {
+            redesign_store::put_capability(
+                &ws,
+                redesign_store::Capability {
+                    id: id.into(),
+                    title: title.into(),
+                    task: title.to_lowercase(),
+                    actor_roles: vec![],
+                    original_routes: vec![route.into()],
+                    inputs: vec![],
+                    actions: vec!["next".into()],
+                    outcomes: vec!["success".into()],
+                    criticality: "normal".into(),
+                    knowledge_status: "observed".into(),
+                    source_refs: vec![],
+                    unknowns: vec![],
+                },
+            )
+            .unwrap();
+        }
+        let out = scaffold_app(&ws, None).unwrap();
+        assert_eq!(out["routes_generated"], 3);
+        assert!(ws.app_dir().join("src/routes/start.tsx").is_file());
+        assert!(ws.app_dir().join("src/routes/review.tsx").is_file());
+        assert!(ws.app_dir().join("src/routes/done.tsx").is_file());
+        let app = fs::read_to_string(ws.app_dir().join("src/App.tsx")).unwrap();
+        assert!(app.contains("StartPage"));
+        assert!(app.contains("ReviewPage"));
+        assert!(app.contains("hashchange"));
+        let refs: Value = serde_json::from_slice(
+            &fs::read(redesign_store::redesign_dir(&ws).join("scaffold_refs.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(refs["routes"].as_array().unwrap().len(), 3);
+    }
+
+    #[test]
+    fn multi_route_prefers_plan_target_routes() {
+        let d = tempfile::tempdir().unwrap();
+        let mut ws = Workspace::create(d.path(), "B", "kind=redesign", TargetRef::None).unwrap();
+        ws.manifest.kind = Some("redesign".into());
+        ws.save().unwrap();
+        redesign_ds::ingest_package(&ws, &fixture_ds(), "strict", false).unwrap();
+        redesign_store::put_capability(
+            &ws,
+            redesign_store::Capability {
+                id: "cap_a".into(),
+                title: "Approve".into(),
+                task: "approve".into(),
+                actor_roles: vec![],
+                original_routes: vec!["/legacy".into()],
+                inputs: vec![],
+                actions: vec![],
+                outcomes: vec![],
+                criticality: "critical".into(),
+                knowledge_status: "observed".into(),
+                source_refs: vec![],
+                unknowns: vec![],
+            },
+        )
+        .unwrap();
+        redesign_store::put_capability(
+            &ws,
+            redesign_store::Capability {
+                id: "cap_b".into(),
+                title: "Confirm".into(),
+                task: "confirm".into(),
+                actor_roles: vec![],
+                original_routes: vec!["/legacy-b".into()],
+                inputs: vec![],
+                actions: vec![],
+                outcomes: vec![],
+                criticality: "normal".into(),
+                knowledge_status: "observed".into(),
+                source_refs: vec![],
+                unknowns: vec![],
+            },
+        )
+        .unwrap();
+        let plan = redesign_plan::TransformationPlan {
+            schema_version: redesign_plan::SCHEMA_VERSION.into(),
+            project_id: "p".into(),
+            revision: 1,
+            generated_at: "0Z".into(),
+            mode: "redesign".into(),
+            snapshot_id: "s".into(),
+            mappings: vec![
+                redesign_plan::PlanMapping {
+                    capability_id: "cap_a".into(),
+                    target_route: Some("/journey/approve".into()),
+                    target_component: None,
+                    target_action: None,
+                    decision_id: "d1".into(),
+                    scenario_ids: vec![],
+                    exception_approved: false,
+                    feasibility: "frontend_only".into(),
+                },
+                redesign_plan::PlanMapping {
+                    capability_id: "cap_b".into(),
+                    target_route: Some("/journey/confirm".into()),
+                    target_component: None,
+                    target_action: None,
+                    decision_id: "d2".into(),
+                    scenario_ids: vec![],
+                    exception_approved: false,
+                    feasibility: "frontend_only".into(),
+                },
+            ],
+            unknowns: vec![],
+            decisions: vec![],
+            notes: vec![],
+        };
+        redesign_store::ensure(&ws).unwrap();
+        craft_anything_engine::project::write_atomic(
+            &redesign_plan::plan_path(&ws),
+            serde_json::to_vec_pretty(&plan).unwrap().as_slice(),
+        )
+        .unwrap();
+
+        let out = scaffold_app(&ws, None).unwrap();
+        assert_eq!(out["routes_generated"], 2);
+        assert!(ws.app_dir().join("src/routes/journey_approve.tsx").is_file());
+        assert!(ws.app_dir().join("src/routes/journey_confirm.tsx").is_file());
+        assert!(!ws.app_dir().join("src/routes/legacy.tsx").exists());
+        let mocks = fs::read_to_string(ws.app_dir().join("src/mocks/data.ts")).unwrap();
+        assert!(mocks.contains("/journey/approve"));
+        assert!(!mocks.contains("\"/legacy\"") || mocks.contains("CAPABILITY_TRACE"));
     }
 }

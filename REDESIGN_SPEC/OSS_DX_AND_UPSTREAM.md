@@ -1,26 +1,26 @@
-# DX, OSS, dependências e upstream — v1.3.0
+# DX, OSS, dependencies and upstream — v1.3.0
 
 ## Agent-first
-`README` e `AGENTS.md` devem permitir que um agente leia a URL, entenda o projeto e execute `doctor` sem instalações implícitas. Bootstrap é assistido: apresentar plano, dependências, comandos e riscos, solicitar consentimento antes de instalar, compilar ou registrar MCP. Compatibilidade não deve ser anunciada antes de smoke tests reais em Cursor, Claude Code e Codex.
+`README` and `AGENTS.md` must let an agent read the URL, understand the project and run `doctor` without implicit installations. Bootstrap is assisted: present the plan, dependencies, commands and risks, and ask for consent before installing, compiling or registering an MCP. Compatibility must not be announced before real smoke tests in Cursor, Claude Code and Codex.
 
-## Matriz de compatibilidade
-Registrar para cada SO/agente: versão, autenticação, CLI/MCP, bootstrap, permissões, build, check, retomada, uso de tokens reportado ou unavailable, resultado e limitações. Mínimo para release: Linux/macOS/Windows conforme disponibilidade de CI e testes reais; plataformas não testadas devem ser rotuladas não verificadas.
+## Compatibility matrix
+Record for each OS/agent: version, authentication, CLI/MCP, bootstrap, permissions, build, check, resume, token usage (reported or unavailable), result and limitations. Minimum for release: Linux/macOS/Windows depending on CI availability and real tests; untested platforms must be labeled unverified.
 
-## Design systems privados
-Capturar nome, versão exata, lockfile/digest, origem, hashes de tokens e componentes, licença e permissões de redistribuição. Não copiar Storybook, Figma, assets, fontes ou componentes privados para pacote público. Cache segregado, versão pinada; divergência de hash exige revalidação.
+## Private design systems
+Capture name, exact version, lockfile/digest, origin, token and component hashes, license and redistribution permissions. Do not copy private Storybook, Figma, assets, fonts or components into a public package. Segregated cache, pinned version; a hash divergence requires revalidation.
 
 ## Fork/upstream
-Registrar SHA de origem, licença/attribution e patches locais. Atualização upstream em branch dedicada com CI de regressão, migrations e comparação dos seams (`TargetKind`, `Check`, `ToolSpec`, MCP, CLI). Revisão periódica de CVEs/dependências. ADR obrigatório se delta do core crescer ou API de extensão quebrar; comparar manter fork vs skill/CLI/MCP externos.
+Record the origin SHA, license/attribution and local patches. Upstream updates go on a dedicated branch with regression CI, migrations and a comparison of the seams (`TargetKind`, `Check`, `ToolSpec`, MCP, CLI). Periodic review of CVEs/dependencies. An ADR is required if the core delta grows or the extension API breaks; compare keeping the fork against external skill/CLI/MCP alternatives.
 
-## Acessibilidade
-Automação (axe, semântica, contraste) **não substitui** teclado, foco, zoom 200%/400% conforme cenário, leitores de tela em amostra e testes com usuários quando necessário. Resultado deve dizer quais modalidades foram testadas.
+## Accessibility
+Automation (axe, semantics, contrast) **does not replace** keyboard, focus, 200%/400% zoom as applicable to the scenario, screen readers on a sample, and user testing when necessary. The result must state which modalities were tested.
 
-## Testes
-DX-01 doctor não instala nem executa postinstall.
-DX-02 instalação solicita consentimento e oferece rollback.
-DX-03 versão de DS muda: cache invalidado, checks repetidos.
-DX-04 ativo privado não aparece no ZIP/telemetria.
-DX-05 merge upstream preserva testes do Craft e redesign.
-DX-06 docs não afirmam suporte a plataforma não verificada.
-DX-07 teclado, foco e zoom incluídos no plano de verificação.
-**Status:** critérios futuros; não verificados em execução real.
+## Tests
+DX-01 doctor neither installs nor runs postinstall.
+DX-02 installation asks for consent and offers rollback.
+DX-03 DS version changes: cache invalidated, checks repeated.
+DX-04 private asset does not appear in the ZIP/telemetry.
+DX-05 upstream merge preserves the Craft and redesign tests.
+DX-06 docs do not claim support for an unverified platform.
+DX-07 keyboard, focus and zoom are included in the verification plan.
+**Status:** future criteria; not verified in real execution.

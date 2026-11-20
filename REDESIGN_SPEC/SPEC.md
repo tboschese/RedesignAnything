@@ -1,80 +1,80 @@
-> **Decisão v1.4.0:** `V1_IMPACTANTE.md` prevalece sobre menções anteriores a MVP/P0-minimal/release por slice. Slices são checkpoints internos. A primeira publicação pública exige todas as capacidades V1 e critérios de impacto.
+> **Decision v1.4.0:** `V1_FIRST_RELEASE.md` takes precedence over earlier mentions of MVP/P0-minimal/per-slice release. Slices are internal checkpoints. The first public release requires all V1 capabilities and impact criteria.
 
-# Redesign Anything — Especificação de Produto e Engenharia
+# Redesign Anything — Product and Engineering Specification
 
-> **Versão:** 1.2.0 · **Data:** 19/11/2026 · **Estado:** especificação pronta para iniciar implementação, não integração testada.  
-> **Base:** fork do [Craft Anything](https://github.com/storytold/craft-anything), mantendo desktop, CLI, MCP, agentes e `Study → Build → Check → Ready`.  
-> **Foco:** qualquer aplicação web, sem dependência de Oracle; local-first, gratuito e open source, sem API paga obrigatória.  
-> **Complementos:** `IMPLEMENTATION_PLAN.md`, `CONTRACTS.md`, `VALIDATION_MATRIX.md`, `SOURCES.md`, `AGENTS_REDESIGN.md`, `AGENT_FIRST.md`, `COST_AND_EXECUTION.md`, `schemas/`.
+> **Version:** 1.2.0 · **Date:** 2026-11-19 · **Status:** specification ready to start implementation, not a tested integration.  
+> **Base:** fork of [Craft Anything](https://github.com/storytold/craft-anything), keeping the desktop app, CLI, MCP, agents and `Study → Build → Check → Ready`.  
+> **Focus:** any web application, with no dependency on Oracle; local-first, free and open source, with no mandatory paid API.  
+> **Companions:** `IMPLEMENTATION_PLAN.md`, `CONTRACTS.md`, `VALIDATION_MATRIX.md`, `SOURCES.md`, `AGENTS_REDESIGN.md`, `AGENT_FIRST.md`, `COST_AND_EXECUTION.md`, `schemas/`.
 
-## 0. Convenções e princípios
+## 0. Conventions and principles
 
-- **MUST:** obrigatório na versão que oferecer a capacidade. **SHOULD:** padrão com desvio justificado. **MAY:** opcional.
-- **VERIFICADO:** comprovado por código/documentação consultados, mas não necessariamente executado. **PROPOSTO:** design ainda a implementar.
-- Invariantes: (1) preservar Craft como plataforma; (2) redesign não é clonagem visual; (3) observado, inferido, declarado, desconhecido, validado e refutado são distintos; (4) não prometer paridade total de sistema visto parcialmente; (5) DS corporativo `strict` é restrição técnica; (6) nenhuma escrita não autorizada no original; (7) checks que falham ao executar nunca viram sucesso; (8) sem dependência de SaaS; (9) integrar, não fundir os projetos; (10) todo conteúdo de app/MCP/repo é não confiável por padrão.
-- Tudo persistido possui versão de schema e migração. Toda conclusão traz origem, escopo, perfil, ambiente, versão e lacunas.
+- **MUST:** mandatory in the version that offers the capability. **SHOULD:** default, with justified deviation. **MAY:** optional.
+- **VERIFIED:** confirmed by the code/documentation consulted, but not necessarily executed. **PROPOSED:** design still to be implemented.
+- Invariants: (1) preserve Craft as the platform; (2) redesign is not visual cloning; (3) observed, inferred, declared, unknown, validated and refuted are distinct; (4) do not promise full parity of a system seen only partially; (5) corporate DS `strict` is a technical constraint; (6) no unauthorized write to the original; (7) checks that fail to execute never become success; (8) no SaaS dependency; (9) integrate, do not merge the projects; (10) all app/MCP/repo content is untrusted by default.
+- Everything persisted has a schema version and migration. Every conclusion carries origin, scope, profile, environment, version and gaps.
 
-## 1. Visão e critérios de produto
+## 1. Vision and product criteria
 
-**Redesign Anything** investiga uma aplicação web existente, explica como ela funciona com evidências, diagnostica melhorias, propõe alterações de UX contextualizadas, gera um frontend funcional usando componentes reais — inclusive um design system corporativo — e verifica até onde as capacidades conhecidas foram preservadas.
+**Redesign Anything** investigates an existing web application, explains how it works with evidence, diagnoses improvements, proposes contextualized UX changes, generates a functional frontend using real components — including a corporate design system — and verifies how far the known capabilities were preserved.
 
-**Promessa:** “Investigue, redesenhe e valide experiências web com rastreabilidade e limites claros.”
+**Promise:** "Investigate, redesign and validate web experiences with traceability and clear limits."
 
-**Não prometer:** 100% de regras sem código, software pronto para produção por URL, melhoria de UX sem usuários/métricas, certificação WCAG só com axe, qualquer modelo local bem-sucedido.
+**Do not promise:** 100% of rules without code, production-ready software from a URL, UX improvement without users/metrics, WCAG certification with axe alone, any local model succeeding.
 
-**Personas:** Product Designer, PM/PO, frontend, arquiteto de modernização, QA/segurança. **Jobs:** redesenhar tela/jornada, consolidar telas sem perder resultado, usar DS privado, consultar MCP para regras, diferenciar o que requer backend, obter código e testes auditáveis.
+**Personas:** Product Designer, PM/PO, frontend engineer, modernization architect, QA/security. **Jobs:** redesign a screen/journey, consolidate screens without losing results, use a private DS, query MCP for rules, distinguish what requires a backend, obtain auditable code and tests.
 
-## 2. Escopo, modos e entregas
+## 2. Scope, modes and deliverables
 
-### 2.1 P0 — capacidades da V1 Impactante (ver documento vinculante)
+### 2.1 P0 — First public release capabilities (see binding document)
 
-- Input: URL HTTP(S) pública/autenticada autorizada, screenshot ou pasta do usuário; comportamento só pode ser reivindicado quando observado por interação ou fontes explícitas.
-- **Agent-first é P0:** produto deve ser operável por agente de código apenas com repositório, CLI/MCP e documentação, sem a UI desktop; caminho de adoção por URL de GitHub documentado, setup reexecutável e diagnóstico de ambiente. Não assumir que fornecer URL instala automaticamente ferramentas.
-- **Execução econômica é P0:** modo `lean` default, orquestração única (host agent **ou** runner Craft), conhecimento/DS sob demanda, ferramentas Deep/REA opt-in, limites verificáveis de chamadas e telemetria honesta. Ver `COST_AND_EXECUTION.md`.
-- Captura/estudo, evidência, jornadas, estados, regras inferidas e lacunas usando Craft; REA e MCP da aplicação opcionais.
-- Modos: `refresh` (visual, mínima mudança funcional), `redesign` (reorganiza jornada com rastreabilidade), `reimagine` (propõe novos fluxos e sinaliza dependências de backend).
-- Conhecimento de UX local e versionado; Design Decision Engine, Critic; Corporate DS Registry com `strict` e `advisory`.
-- Geração React + TypeScript, Vite por default, mocks/dados sintéticos e componentes DS reais.
-- Verificações objetivas: build, DS, jornadas conhecidas, acessibilidade automatizada, risco técnico/segurança e relatório de cobertura.
-- UI praticamente igual à do Craft: uma opção Redesign, parâmetros progressivos, etapas e preview; sem exigir canvas próprio na V1.
+- Input: authorized public/authenticated HTTP(S) URL, screenshot or user folder; behavior may be claimed only when observed through interaction or explicit sources.
+- **Agent-first is P0:** the product must be operable by a coding agent with only the repository, CLI/MCP and documentation, without the desktop UI; a documented adoption path from a GitHub URL, re-runnable setup and environment diagnostics. Do not assume that providing a URL automatically installs tools.
+- **Economical execution is P0:** `lean` mode as default, single orchestration (host agent **or** Craft runner), knowledge/DS on demand, opt-in Deep/REA tools, verifiable call limits and honest telemetry. See `COST_AND_EXECUTION.md`.
+- Capture/study, evidence, journeys, states, inferred rules and gaps using Craft; REA and application MCP optional.
+- Modes: `refresh` (visual, minimal functional change), `redesign` (reorganizes the journey with traceability), `reimagine` (proposes new flows and flags backend dependencies).
+- Local, versioned UX knowledge; Design Decision Engine, Critic; Corporate DS Registry with `strict` and `advisory`.
+- React + TypeScript generation, Vite by default, synthetic mocks/data and real DS components.
+- Objective checks: build, DS, known journeys, automated accessibility, technical/security risk and a coverage report.
+- UI practically the same as Craft's: a Redesign option, progressive parameters, steps and preview; no custom canvas required in V1.
 
 ### 2.2 P1 / P2
 
-P1: importação Storybook/TypeScript mais profunda, REA semântico + tráfego, MCP da aplicação, múltiplos papéis, simulação com estado e análise de impacto, edição de projeto existente. P2: vídeo como input completo, comparador visual colaborativo, Figma opcional, outros frameworks, migração backend, colaboração remota.
+P1: deeper Storybook/TypeScript import, semantic REA + traffic, application MCP, multiple roles, stateful simulation and impact analysis, editing an existing project. P2: video as a full input, collaborative visual comparator, optional Figma, other frameworks, backend migration, remote collaboration.
 
-**Fora do P0:** backend produtivo autogerado; alterações destrutivas de produção; clonagem de marcas/ativos sem direitos; descoberta garantida de lógica servidor-side não exposta; hospedagem SaaS; inclusão do Layout Studio AGPL no núcleo sem avaliação legal.
+**Outside P0:** self-generated production backend; destructive production changes; cloning brands/assets without rights; guaranteed discovery of server-side logic that is not exposed; SaaS hosting; including the AGPL Layout Studio in the core without legal evaluation.
 
-### 2.3 Níveis de Ready
+### 2.3 Ready levels
 
-- `concept_ready`: interface navegável com hipóteses, mocks e limitações explícitas; sem promessa de paridade.
-- `prototype_ready`: build executável, cenários **críticos conhecidos do escopo** aprovados, DS válido e dados simulados claramente identificados.
-- `engineering_ready`: verificações exigidas pelo escopo, contratos e testes satisfatórios; **pronto para revisão/integração, não certificado para produção**.
-- `blocked`: erro de segurança, permissão ou requisito obrigatório. `needs_evidence`: ausência de evidência impede alegação solicitada, mas não necessariamente protótipo limitado.
+- `concept_ready`: navigable interface with hypotheses, mocks and explicit limitations; no promise of parity.
+- `prototype_ready`: executable build, **known critical scenarios in scope** passed, valid DS and simulated data clearly identified.
+- `engineering_ready`: checks required by the scope, satisfactory contracts and tests; **ready for review/integration, not certified for production**.
+- `blocked`: security error, permission error or mandatory requirement failure. `needs_evidence`: missing evidence prevents the requested claim, but not necessarily a limited prototype.
 
-## 3. Baseline do Craft: reaproveitamento obrigatório
+## 3. Craft baseline: mandatory reuse
 
-O código/doc do Craft confirmam: Rust/egui + CLI/MCP; `TargetKind`, `Check` e `ToolSpec`; plugins MCP locais/remotos; WASM opcional; `Workspace` com `capture/`, `app/`, `checks/`, `investigation.cany/`, `inbox/`; browser capture, estados, walkthrough, JS e stand-in de tráfego; runners e revisões iterativas. **Não reimplementar essas capacidades.**
+Craft's code/docs confirm: Rust/egui + CLI/MCP; `TargetKind`, `Check` and `ToolSpec`; local/remote MCP plugins; optional WASM; `Workspace` with `capture/`, `app/`, `checks/`, `investigation.cany/`, `inbox/`; browser capture, states, walkthrough, JS and traffic stand-in; runners and iterative reviews. **Do not reimplement these capabilities.**
 
-Código-base de extensão:
+Extension base code:
 
-- `crates/ai/src/rebuild/kinds/`: `TargetKind`, `KindRegistry`, `Check`, `CheckCx`; novo tipo de projeto `redesign` [NOVO].
-- `crates/ai/src/rebuild/brief.rs`: brief contextual, sem prompt monolítico [EXTENDER].
-- `crates/ai/src/rebuild/mod.rs` e workflow `study/check`: orquestração existente [EXTENDER ATRAVÉS DOS SEAMS].
-- `crates/engine/src/tools/<area>.rs` + `tools/mod.rs`: novos `ToolSpec` e registro para CLI/MCP [NOVO].
-- `crates/ai/src/rebuild/stacks.toml`: biblioteca/stack se realmente necessária; reutilizar React/TS existente quando disponível.
-- `crates/ui-egui/src/`: seleção Redesign, DS e relatórios, mantendo thin UI.
-- `crates/engine/src/workspace*` ou owner equivalente: arquivos versionados, migrations e diretório de projeto.
+- `crates/ai/src/rebuild/kinds/`: `TargetKind`, `KindRegistry`, `Check`, `CheckCx`; new project type `redesign` [NEW].
+- `crates/ai/src/rebuild/brief.rs`: contextual brief, no monolithic prompt [EXTEND].
+- `crates/ai/src/rebuild/mod.rs` and the `study/check` workflow: existing orchestration [EXTEND THROUGH THE SEAMS].
+- `crates/engine/src/tools/<area>.rs` + `tools/mod.rs`: new `ToolSpec`s and registration for CLI/MCP [NEW].
+- `crates/ai/src/rebuild/stacks.toml`: library/stack only if really necessary; reuse existing React/TS when available.
+- `crates/ui-egui/src/`: Redesign selection, DS and reports, keeping a thin UI.
+- `crates/engine/src/workspace*` or equivalent owner: versioned files, migrations and the project directory.
 
-**Cuidados confirmados:** (a) site check padrão examina start page e até 12 páginas vinculadas, não aplicação inteira; (b) no código de `plugin_check.rs`, uma falha de execução de plugin WASM é reportada como `passed=true`. Checks obrigatórios do Redesign DEVEM ser nativos/fail-closed ou exigir alteração explícita dessa semântica; (c) Clean Room do Craft não é sandbox de SO; (d) uso de ferramentas Deep exige consentimento; (e) `AGENTS.md` upstream impõe padrões de originalidade, Rust seguro, camadas e roadmap — adaptar ao fork antes de codar, preservando os controles de segurança.
+**Confirmed cautions:** (a) the default site check examines the start page and up to 12 linked pages, not the whole application; (b) in the code of `plugin_check.rs`, a WASM plugin execution failure is reported as `passed=true`. Redesign's mandatory checks MUST be native/fail-closed or require an explicit change to that semantics; (c) Craft's Clean Room is not an OS sandbox; (d) use of Deep tools requires consent; (e) the upstream `AGENTS.md` imposes standards for originality, safe Rust, layers and roadmap — adapt it to the fork before coding, preserving the security controls.
 
-## 4. Arquitetura lógica e responsabilidades
+## 4. Logical architecture and responsibilities
 
 ```mermaid
 flowchart TD
  U[Craft UI / CLI / MCP] --> O[Redesign Orchestrator]
  O --> S[Craft Study]
- S --> X[REA Adapter opcional]
- S --> M[Application MCP Gateway opcional]
+ S --> X[Optional REA Adapter]
+ S --> M[Optional Application MCP Gateway]
  X --> E[Unified Evidence + Coverage]
  M --> E
  S --> E
@@ -89,288 +89,288 @@ flowchart TD
  Q -.feedback.-> B
 ```
 
-**Craft:** lifecycle, browser, CLI/MCP, UI, agente, build runner, pause/resume. **Redesign:** modelos semânticos, decisão UX, DS, gating, rastreabilidade, instrumentos de confiança. **REA:** estudo Deep seletivo de JS/rotas/endpoints/capturas/ambientes. **Layout CLI:** fornece DS e checks auxiliares, não decide sozinho a conformidade. **App MCP:** declara informações funcionais conforme permissões; não é verdade absoluta.
+**Craft:** lifecycle, browser, CLI/MCP, UI, agent, build runner, pause/resume. **Redesign:** semantic models, UX decisions, DS, gating, traceability, trust instruments. **REA:** selective Deep study of JS/routes/endpoints/captures/environments. **Layout CLI:** provides the DS and auxiliary checks; it does not decide conformance on its own. **App MCP:** declares functional information according to permissions; it is not absolute truth.
 
-**Um controlador por run:** em `host_agent`, Cursor/Claude/Codex já controla os raciocínios, edição e ferramentas; a integração MCP/CLI apenas fornece capacidades e **não inicia automaticamente** o builder interno do Craft. Em `craft_runner`, o runner do Craft é controlador único, e REA/Layout/app MCP são providers passivos. `controller_conflict` impede uma chamada de Build aninhada; handoff requer aprovação explícita e checkpoint. `lean` é default independente de `clean_room`; `deep` exige autorização separada. O roteamento e limites detalhados estão em `COST_AND_EXECUTION.md`.
+**One controller per run:** in `host_agent`, Cursor/Claude/Codex already controls the reasoning, editing and tools; the MCP/CLI integration only provides capabilities and **does not automatically start** Craft's internal builder. In `craft_runner`, Craft's runner is the sole controller, and REA/Layout/app MCP are passive providers. `controller_conflict` prevents a nested Build call; handoff requires explicit approval and a checkpoint. `lean` is the default independent of `clean_room`; `deep` requires separate authorization. Routing and detailed limits are in `COST_AND_EXECUTION.md`.
 
-**Processos:** núcleo Rust; sidecars Node somente quando ativados, subprocessos sempre via `craft_anything_platform::process` com deadlines, cancelamento, limites de output e isolamento; nenhum serviço cloud central obrigatório. Runtime Node compatível com REA selecionado e versões pinadas; Rust segue baseline do checkout (README consultado: 1.97+). Não adicionar banco servidor central obrigatório à V1. `model.use_craft_selected_backend` só se aplica a `craft_runner`; em `host_agent` deve ser `false` e o modelo do host é o único ativo.
+**Processes:** Rust core; Node sidecars only when activated, subprocesses always through `craft_anything_platform::process` with deadlines, cancellation, output limits and isolation; no mandatory central cloud service. Node runtime compatible with the selected REA and pinned versions; Rust follows the checkout baseline (README consulted: 1.97+). Do not add a mandatory central server database to V1. `model.use_craft_selected_backend` applies only to `craft_runner`; in `host_agent` it must be `false` and the host's model is the only active one.
 
-**Modos de investigação:** `clean_room` usa somente superfície de visitante/operador; `deep` pode inspecionar JS, rede e estruturas internas com aprovação. Consultar MCP que revela regras internas deve ser consentimento separado e ter proveniência, não um bypass silencioso do modo Clean Room.
+**Investigation modes:** `clean_room` uses only the visitor/operator surface; `deep` may inspect JS, network and internal structures with approval. Querying an MCP that reveals internal rules must be a separate consent and carry provenance, not a silent bypass of Clean Room mode.
 
-## 5. Persistência, contratos e modelo semântico
+## 5. Persistence, contracts and semantic model
 
-### 5.1 Organização do projeto [PROPOSTA]
+### 5.1 Project organization [PROPOSAL]
 
-Preservar os diretórios nativos do Craft. Adicionar apenas `redesign/`:
+Preserve Craft's native directories. Add only `redesign/`:
 
 ```text
 <workspace>/
-  craft.json                  # existente; adicionar campos versionados somente se necessário
-  capture/                    # Craft, sem duplicar
-  app/                        # projeto gerado ou projeto autorizado para edição
+  craft.json                  # existing; add versioned fields only if necessary
+  capture/                    # Craft, without duplicating
+  app/                        # generated project or project authorized for editing
   checks/                     # Craft
-  investigation.cany/         # Craft / evidências
-  inbox/                      # Craft / pedidos de aprovação
+  investigation.cany/         # Craft / evidence
+  inbox/                      # Craft / approval requests
   redesign/
-    config.json               # política e contexto, sem credenciais
-    study-snapshot.json       # target/ambiente/perfil/versão/scope
-    capabilities.json         # capacidades conhecidas e unknowns
-    rules.json                # regras observadas/declaradas/inferidas
-    evidence-index.json       # refs para provas no Craft e em adaptadores
-    coverage.json             # denominadores explícitos
-    ds/registry.json          # componentes/tokens/contratos/imports aprovados
-    knowledge-lock.json       # packs, versões, licenças e hashes
-    decisions.json            # tradeoffs e justificativas
-    transformation-plan.json  # origem -> redesign + viabilidade + testes
-    traceability.json         # requisitos/capacidades -> artefatos -> checks
-    scenarios.json            # scripts e oráculos de testes
-    check-results.json        # resultados determinísticos e do Critic separados
-    usage.json                # snapshots versionados de consumo (nullable onde não observável)
-    report.md                 # relatório de engenharia
-    private/                  # APENAS artefatos locais sensíveis, gitignored
+    config.json               # policy and context, no credentials
+    study-snapshot.json       # target/environment/profile/version/scope
+    capabilities.json         # known capabilities and unknowns
+    rules.json                # observed/declared/inferred rules
+    evidence-index.json       # refs to proofs in Craft and in adapters
+    coverage.json             # explicit denominators
+    ds/registry.json          # approved components/tokens/contracts/imports
+    knowledge-lock.json       # packs, versions, licenses and hashes
+    decisions.json            # tradeoffs and justifications
+    transformation-plan.json  # origin -> redesign + feasibility + tests
+    traceability.json         # requirements/capabilities -> artifacts -> checks
+    scenarios.json            # test scripts and oracles
+    check-results.json        # deterministic results and Critic results, separate
+    usage.json                # versioned consumption snapshots (nullable where not observable)
+    report.md                 # engineering report
+    private/                  # ONLY sensitive local artifacts, gitignored
 ```
 
-Cada artefato possui `schema_version`, `project_id`, `revision`, `generated_at`, `source_refs` e limites de tamanho. Escrita atômica, `tmp → fsync → rename`, migração e falha explicável. Caminhos relativos são restritos à raiz do workspace. `redesign/private/` não é exportado por padrão; não armazenar credenciais lá. Artefatos individuais podem usar JSONL paginado quando volumosos, mas sem expor milhões de linhas no contexto do agente.
+Each artifact has `schema_version`, `project_id`, `revision`, `generated_at`, `source_refs` and size limits. Atomic writes, `tmp → fsync → rename`, migration and explainable failure. Relative paths are restricted to the workspace root. `redesign/private/` is not exported by default; do not store credentials there. Individual artifacts may use paginated JSONL when voluminous, but without exposing millions of lines in the agent's context.
 
-### 5.2 Entidades principais
+### 5.2 Main entities
 
-Os contratos completos estão em `CONTRACTS.md` e `schemas/`.
+The full contracts are in `CONTRACTS.md` and `schemas/`.
 
-- **EvidenceRecord:** id estável, origem (`craft`, `rea`, `app_mcp`, `user`, `source_repo`, `test`), tipo, localização, identidade da captura, digest, escopo, classe de dado, estado (`observed`, `declared`, `inferred`, `unknown`, `validated`, `refuted`), completude, timestamp.
-- **Capability:** objetivo/tarefa; ator/perfil; pré-condições; inputs; ações; resultados; estados; telas originais; evidence_ids; criticidade; teste/oráculo; status de cobertura.
-- **BusinessRule:** texto, expressão formal opcional, condições e transições, origem, status, conflitos e restrições de aplicação.
-- **ExperienceContext:** atores, frequência e criticidade das tarefas, volume de dados, restrições operacionais, métricas existentes; `unknown` quando não informado.
-- **DesignSystemRegistry:** componentes reais com pacote/import path, versão, props e variantes, estados, exemplos, regras de uso, tokens e proveniência.
-- **DesignDecision:** problema, alternativas incluindo `keep_as_is`, evidências, regras UX utilizadas, escolha, riscos, impacto, critérios de teste e confirmação humana.
-- **TransformationPlan:** capacidades originais → rotas/componentes/ações geradas, tipo de viabilidade, dependências de backend, preservações obrigatórias, check IDs.
-- **ScenarioOracle:** ação/entrada/estado anterior/resultado esperado, provedores de evidência e restrições da simulação.
-- **CheckResult:** `pass`, `fail`, `warn`, `blocked`, `not_evaluated`; severidade, execução, logs sanitizados, evidence_ids, gate aplicável.
+- **EvidenceRecord:** stable id, origin (`craft`, `rea`, `app_mcp`, `user`, `source_repo`, `test`), type, location, capture identity, digest, scope, data class, state (`observed`, `declared`, `inferred`, `unknown`, `validated`, `refuted`), completeness, timestamp.
+- **Capability:** goal/task; actor/profile; preconditions; inputs; actions; results; states; original screens; evidence_ids; criticality; test/oracle; coverage status.
+- **BusinessRule:** text, optional formal expression, conditions and transitions, origin, status, conflicts and application constraints.
+- **ExperienceContext:** actors, task frequency and criticality, data volume, operational constraints, existing metrics; `unknown` when not provided.
+- **DesignSystemRegistry:** real components with package/import path, version, props and variants, states, examples, usage rules, tokens and provenance.
+- **DesignDecision:** problem, alternatives including `keep_as_is`, evidence, UX rules used, choice, risks, impact, test criteria and human confirmation.
+- **TransformationPlan:** original capabilities → generated routes/components/actions, feasibility type, backend dependencies, mandatory preservations, check IDs.
+- **ScenarioOracle:** action/input/prior state/expected result, evidence providers and simulation constraints.
+- **CheckResult:** `pass`, `fail`, `warn`, `blocked`, `not_evaluated`; severity, execution, sanitized logs, evidence_ids, applicable gate.
 
-**Proibição:** gravar no mesmo campo uma observação de comportamento e uma conclusão de LLM sem origem explícita. Não usar confiança numérica autoatribuída como prova.
+**Prohibition:** do not record a behavior observation and an LLM conclusion in the same field without an explicit origin. Do not use self-assigned numeric confidence as proof.
 
 ### 5.3 Confidence & Coverage Engine
 
-- Denominadores necessários: `known_capabilities`, `scoped_capabilities`, `scenarios_with_oracle`, `scenarios_executed`, `scenarios_passed`, `roles_examined`, `states_examined`, `routes_examined`.
-- `tested_coverage = passed_known_scenarios / scenarios_with_oracle`, nunca “% da aplicação”. Se denominador zero → `unknown`, não `100%`.
-- `discovery_coverage` = capacidades enumeradas no escopo + estados/jornadas inspecionados; denominador precisa ser declarado, não extrapolado.
-- Confiança qualitativa: `observed`, `inferred`, `declared`, `corroborated`, `contradicted`, `unknown`; combinar fontes independentes sem apagar conflitos.
-- Quando Craft/REA/MCP discordarem, criar `conflict` ligado às versões/perfis e abrir questão. A fonte MCP não vence automaticamente a observação e vice-versa.
-- Regras não verificadas devem estar visíveis nos relatórios e nos briefings do builder, sem afirmar que são invariantes comprovados.
+- Required denominators: `known_capabilities`, `scoped_capabilities`, `scenarios_with_oracle`, `scenarios_executed`, `scenarios_passed`, `roles_examined`, `states_examined`, `routes_examined`.
+- `tested_coverage = passed_known_scenarios / scenarios_with_oracle`, never "% of the application". If the denominator is zero → `unknown`, not `100%`.
+- `discovery_coverage` = capabilities enumerated in scope + states/journeys inspected; the denominator must be declared, not extrapolated.
+- Qualitative confidence: `observed`, `inferred`, `declared`, `corroborated`, `contradicted`, `unknown`; combine independent sources without erasing conflicts.
+- When Craft/REA/MCP disagree, create a `conflict` linked to versions/profiles and open a question. The MCP source does not automatically win over observation, and vice versa.
+- Unverified rules must be visible in reports and builder briefings, without claiming they are proven invariants.
 
 ## 6. Corporate Design System Registry
 
-### 6.1 Entradas aceitas
+### 6.1 Accepted inputs
 
-Prioridade: (a) repositório/pacote React real com permissões; (b) Storybook; (c) tokens DTCG/CSS e documentação; (d) Layout CLI e importação de kit; (e) UI kit open source se não houver corporativo. Figma é provider opcional, não pré-requisito.
+Priority: (a) real React repository/package with permissions; (b) Storybook; (c) DTCG/CSS tokens and documentation; (d) Layout CLI and kit import; (e) open source UI kit if there is no corporate one. Figma is an optional provider, not a prerequisite.
 
-### 6.2 Compilação do Registry
+### 6.2 Registry compilation
 
-1. Localizar `package.json`, lockfile, exports, componentes e versão; nunca assumir o nome da API pela aparência.
-2. Extrair assinaturas/props/variantes quando possível por TypeScript AST ou metadados do Storybook, sem executar código desconhecido.
-3. Ler tokens DTCG 2025.10 ou converter fontes suportadas; registrar tema, densidade, contraste e aliases.
-4. Ingerir documentação com fonte, versão, licença e `usage`, `never`, `a11y`, `patterns`.
-5. Resolver componentes permitidos via `ComponentId`, `importPath`, `packageVersion`, `propsSchema` e `evidenceRefs`.
-6. Produzir `registry.json` assinado por digest de conteúdo; mudanças invalidam a verificação da versão anterior.
-7. Expor via provider interno `redesign_ds_list_components`, `redesign_ds_get_component`, `redesign_ds_get_tokens`.
+1. Locate `package.json`, lockfile, exports, components and version; never assume the API name from appearance.
+2. Extract signatures/props/variants when possible via TypeScript AST or Storybook metadata, without executing unknown code.
+3. Read DTCG 2025.10 tokens or convert supported sources; record theme, density, contrast and aliases.
+4. Ingest documentation with source, version, license and `usage`, `never`, `a11y`, `patterns`.
+5. Resolve allowed components via `ComponentId`, `importPath`, `packageVersion`, `propsSchema` and `evidenceRefs`.
+6. Produce `registry.json` signed by content digest; changes invalidate verification of the previous version.
+7. Expose via the internal provider `redesign_ds_list_components`, `redesign_ds_get_component`, `redesign_ds_get_tokens`.
 
-### 6.3 Política de aplicação
+### 6.3 Enforcement policy
 
-- `strict`: componentes permitidos **somente**; componentes inexistentes → `blocked` ou solicitação de extensão aprovada. Não criar HTML genérico visualmente parecido com componente corporativo quando existe componente oficial. Imports, props, eventos, tokens, tema e versão conferidos por análise de código e execução de build/testes.
-- `advisory`: sugestões, com exceções explicitamente registradas e justificadas.
-- Hierarquia: integridade, segurança e acessibilidade obrigatórias > políticas corporativas > objetivo de produto > padrões genéricos. Conflitos não solucionáveis exigem aprovação humana.
-- `Layout check_compliance` é evidência auxiliar, **não** certificado. Nosso checker adicional identifica importações proibidas, tokens/cores hardcoded, props incompatíveis, componentes duplicados e versões erradas.
-- Testes de componente em contexto: estados vazio, loading, erro, disabled, foco/teclado, densidade de dados e responsividade.
+- `strict`: allowed components **only**; nonexistent components → `blocked` or an approved extension request. Do not create generic HTML that visually resembles a corporate component when an official component exists. Imports, props, events, tokens, theme and version verified by code analysis and by running build/tests.
+- `advisory`: suggestions, with exceptions explicitly recorded and justified.
+- Hierarchy: mandatory integrity, security and accessibility > corporate policies > product goal > generic patterns. Unresolvable conflicts require human approval.
+- `Layout check_compliance` is auxiliary evidence, **not** a certificate. Our additional checker identifies forbidden imports, hardcoded tokens/colors, incompatible props, duplicate components and wrong versions.
+- Component tests in context: empty, loading, error, disabled states, focus/keyboard, data density and responsiveness.
 
-### 6.4 Exemplo
+### 6.4 Example
 
-Em uma tarefa de listagem com filtros, o agente recebe o contexto de que `@corp/ui` contém `DataTable`, `FilterBar` e `BulkActions`, com import paths e props reais. Deve reutilizá-los, não criar `MyTable` usando a mesma aparência. Se a versão corporativa não suportar seleção em massa, registrar limitação e propor alternativa; não inventar uma propriedade inexistente.
+In a listing task with filters, the agent receives the context that `@corp/ui` contains `DataTable`, `FilterBar` and `BulkActions`, with real import paths and props. It must reuse them, not create `MyTable` with the same appearance. If the corporate version does not support bulk selection, record the limitation and propose an alternative; do not invent a nonexistent property.
 
 ## 7. Design Intelligence Engine
 
 ### 7.1 Knowledge Packs
 
-- Fonte primária: bases abertas e licenciadas (UI/UX Pro Max, PatternFly/Carbon conforme licença específica, Open UI, DTCG, normas WCAG públicas); **não copiar integralmente materiais proprietários**.
-- Pack versionado com `id`, `version`, `license`, `source_url`, `retrieved_at`, `hash`, `domains`, `tasks`, `applicability`, `contraindications`, `examples`, `tests`, `reliability`.
-- Estrutura: `ux-core`, `enterprise-data`, `forms-validation`, `navigation-ia`, `dashboards`, `accessibility`, `density-productivity`, `mobile-responsive`, `content-localization`, `industry-patterns`.
-- Seleção de conhecimento: regras/tags e busca textual local (SQLite FTS5 ou equivalente) como baseline; embeddings são opcionais e não dependência da V1. Contexto pequeno e direcionado.
-- Regra de ouro: nenhum pack converte uma heurística em obrigação legal; o relatório distingue padrão, restrição corporativa e hipótese.
+- Primary source: open, licensed bases (UI/UX Pro Max, PatternFly/Carbon under their specific license, Open UI, DTCG, public WCAG standards); **do not copy proprietary materials in full**.
+- Versioned pack with `id`, `version`, `license`, `source_url`, `retrieved_at`, `hash`, `domains`, `tasks`, `applicability`, `contraindications`, `examples`, `tests`, `reliability`.
+- Structure: `ux-core`, `enterprise-data`, `forms-validation`, `navigation-ia`, `dashboards`, `accessibility`, `density-productivity`, `mobile-responsive`, `content-localization`, `industry-patterns`.
+- Knowledge selection: rules/tags and local text search (SQLite FTS5 or equivalent) as the baseline; embeddings are optional and not a V1 dependency. Small, targeted context.
+- Golden rule: no pack converts a heuristic into a legal obligation; the report distinguishes standard, corporate constraint and hypothesis.
 
 ### 7.2 Design Decision Engine
 
-Pipeline tipado: `diagnose` → `retrieve_rules` → `generate_alternatives` → `evaluate_tradeoffs` → `check_feasibility` → `select_or_ask` → `record_decision` → `build_guide`.
+Typed pipeline: `diagnose` → `retrieve_rules` → `generate_alternatives` → `evaluate_tradeoffs` → `check_feasibility` → `select_or_ask` → `record_decision` → `build_guide`.
 
-A avaliação considera: tarefa, perfil e experiência, frequência, densidade, custo cognitivo, risco de erro, interoperabilidade, acessibilidade, componente disponível, efeitos técnicos e métricas fornecidas. Gera pelo menos a opção `keep_as_is` e, quando solicitado, alternativas contrastantes. Não forçar wizard, cards ou menu lateral como template universal.
+The evaluation considers: task, profile and experience, frequency, density, cognitive cost, error risk, interoperability, accessibility, available component, technical effects and supplied metrics. It generates at least the `keep_as_is` option and, when requested, contrasting alternatives. Do not force wizard, cards or sidebar menu as a universal template.
 
 ### 7.3 Design Critic
 
-- Agente ou papel separado do gerador, com inputs: evidências, transformação, DS, screenshots do novo, testes executados.
-- Crítica estrutural sobre tarefas, hierarquia, densidade, atalhos, estados, erros e navegação; cada finding contém evidência, impacto e recomendação.
-- Crítica é `warn`/recomendação até existir teste objetivo ou política explícita; **não pode inventar aprovação técnica**.
-- A crítica pode propor uma experimento; não transforma preferência estética em verdade funcional.
+- Agent or role separate from the generator, with inputs: evidence, transformation, DS, screenshots of the new version, tests executed.
+- Structural critique of tasks, hierarchy, density, shortcuts, states, errors and navigation; each finding contains evidence, impact and a recommendation.
+- Critique is `warn`/recommendation until an objective test or explicit policy exists; it **cannot invent technical approval**.
+- The critique may propose an experiment; it does not turn aesthetic preference into functional truth.
 
-## 8. Application MCP Bridge e Trust Gateway
+## 8. Application MCP Bridge and Trust Gateway
 
-### 8.1 Conectar sem exigir implementação especial
+### 8.1 Connect without requiring special implementation
 
-- Suportar servidores MCP externos via infra existente do Craft, usando controle adicional de confiança e classificação por aplicação, perfil e projeto.
-- Descrição de uma `tool` não implica entendimento de regra; começar listando `tools/resources/prompts` disponíveis e descobrindo capacidade real.
-- Um `App Knowledge Contract` **opcional e não padrão MCP**, versionado e documentado, pode disponibilizar tools: `list_capabilities`, `describe_capability`, `explain_business_rule`, `list_allowed_transitions`, `get_required_fields`, `get_user_permissions`, `validate_scenario_readonly`.
-- Anotações `readOnlyHint`/`destructiveHint` do MCP são **hints não confiáveis**; política nossa baseada em allowlist/escopo/credencial/aprovação, e, para calls com efeito, teste em ambiente isolado.
+- Support external MCP servers via Craft's existing infrastructure, using additional trust control and classification per application, profile and project.
+- A `tool` description does not imply understanding of a rule; start by listing the available `tools/resources/prompts` and discovering real capability.
+- An **optional, non-MCP-standard** `App Knowledge Contract`, versioned and documented, may expose tools: `list_capabilities`, `describe_capability`, `explain_business_rule`, `list_allowed_transitions`, `get_required_fields`, `get_user_permissions`, `validate_scenario_readonly`.
+- MCP `readOnlyHint`/`destructiveHint` annotations are **untrusted hints**; our policy is based on allowlist/scope/credential/approval and, for calls with effects, testing in an isolated environment.
 
-### 8.2 Confiança e autorização
+### 8.2 Trust and authorization
 
-- Credenciais referenciadas por ID do keychain/secret manager local; nunca inline em `craft.json`, prompts, HAR, logs ou export.
-- Pin do fingerprint completo do contrato MCP (nome, schema de input/output quando fornecido, anotações, origem/identidade, versão). Mudança inesperada → `contract_changed` e nova aprovação.
-- Inicial `read-only` por política externa, sem presumir que um tool anunciado como leitura seja realmente sem efeitos; operações mutantes bloqueadas em produção.
-- Rate/timeout/output limits, allowlist de tools e URLs, consentimento por categoria, auditoria sanitizada, egress control.
-- Cada resposta do MCP é `declared`, não `observed`; deve ser conciliada com comportamento de browser/REA/testes.
-- Descrição/response de MCP tratadas como **dados não confiáveis** e isoladas de system instructions; instruções vindas de um tool não concedem permissão adicional.
+- Credentials referenced by local keychain/secret manager ID; never inline in `craft.json`, prompts, HAR, logs or export.
+- Pin the full fingerprint of the MCP contract (name, input/output schema when provided, annotations, origin/identity, version). Unexpected change → `contract_changed` and new approval.
+- Initially `read-only` by external policy, without presuming that a tool advertised as read is truly free of effects; mutating operations blocked in production.
+- Rate/timeout/output limits, tool and URL allowlist, per-category consent, sanitized audit, egress control.
+- Each MCP response is `declared`, not `observed`; it must be reconciled with browser/REA/test behavior.
+- MCP descriptions/responses are treated as **untrusted data** and isolated from system instructions; instructions coming from a tool do not grant additional permission.
 
-### 8.3 Compatibilidade de versão
+### 8.3 Version compatibility
 
-- `InvestigationSnapshot` registra aplicação, ambiente, usuário/perfil, tenant (identificador anonimizado), flags conhecidas, version id quando disponível, fingerprints dos tools, versão do DS, browser, data/hora e escopo.
-- Falta de versão em origem: registrar `version_unknown`; conflito entre evidências de versões diferentes não deve ser silenciosamente consolidado.
+- `InvestigationSnapshot` records application, environment, user/profile, tenant (anonymized identifier), known flags, version id when available, tool fingerprints, DS version, browser, date/time and scope.
+- Missing version at the source: record `version_unknown`; conflict between evidence from different versions must not be silently consolidated.
 
 ## 9. REA Investigation Adapter
 
-### 9.1 Uso seletivo e benefícios
+### 9.1 Selective use and benefits
 
-Ferramentas REA relevantes: `inspect_web_page`, `analyze_web_bundle`, `observe_web_session`, `capture_browser_scenario`, `inspect_web_network_capture`, `analyze_javascript_application`, `trace_application_feature`, `trace_javascript_semantics`, `compare_web_captures`, `export_web_scripts`, `environment-build` / views de coverage. Nomes e disponibilidade devem ser validados contra a **versão pinada** do REA, nunca inferidos da versão latest.
+Relevant REA tools: `inspect_web_page`, `analyze_web_bundle`, `observe_web_session`, `capture_browser_scenario`, `inspect_web_network_capture`, `analyze_javascript_application`, `trace_application_feature`, `trace_javascript_semantics`, `compare_web_captures`, `export_web_scripts`, `environment-build` / coverage views. Names and availability must be validated against the **pinned version** of REA, never inferred from the latest version.
 
-Gatilhos: validação/client-side incerta; rota/SPA não evidente; fluxo de formulário inconclusivo; contratos APIs pouco claros; divergência entre observação e MCP; necessidade de ambiente simulado mais fiel. Se Craft já responde com evidência suficiente, não disparar REA. Registrar justificativa, custo, deadline e diferenças descobertas.
+Triggers: uncertain client-side validation; non-obvious route/SPA; inconclusive form flow; unclear API contracts; divergence between observation and MCP; need for a more faithful simulated environment. If Craft already answers with sufficient evidence, do not trigger REA. Record justification, cost, deadline and differences discovered.
 
-### 9.2 Limites REA documentados
+### 9.2 Documented REA limits
 
-- Observação passiva não recupera eventos anteriores à ativação dos domínios CDP; sua ausência não comprova que nunca ocorreram.
-- Análise semântica JS estática não prova execução; imports dinâmicos, dependências ambíguas e código ofuscado continuam parciais.
-- Capturas podem truncar por janela, heap, prazo e limite de bytes; normalizar metadados e repassar `unknowns` sem falsos sucessos.
-- `environment-build` pode criar ambiente com estado derivado, mas só atende mutações cujos efeitos estão fundamentados pelas capturas; writes não modeladas são `withheld`.
-- CDP dá acesso poderoso ao perfil; usar perfil dedicado, portas locais, origens controladas, consentimento e isolamento. Não anexar simultaneamente várias ferramentas ao mesmo browser sem coordenador de sessão.
+- Passive observation does not recover events prior to the activation of the CDP domains; their absence does not prove they never occurred.
+- Static JS semantic analysis does not prove execution; dynamic imports, ambiguous dependencies and obfuscated code remain partial.
+- Captures may truncate by window, heap, deadline and byte limit; normalize metadata and pass on `unknowns` without false successes.
+- `environment-build` can create an environment with derived state, but only serves mutations whose effects are grounded by the captures; unmodeled writes are `withheld`.
+- CDP gives powerful access to the profile; use a dedicated profile, local ports, controlled origins, consent and isolation. Do not attach several tools to the same browser simultaneously without a session coordinator.
 
-### 9.3 REA como provider de evidências
+### 9.3 REA as an evidence provider
 
-Adaptador transforma `Evidence` externa em `EvidenceRecord` com `external_evidence_id`, `producer_version`, `capture_digest`, `coverage`, `limitations`, `authority`, `evidence_ref`. Preservar bruto apenas quando explicitamente permitido; exibir projeções/sumarização para agente.
+The adapter transforms external `Evidence` into `EvidenceRecord` with `external_evidence_id`, `producer_version`, `capture_digest`, `coverage`, `limitations`, `authority`, `evidence_ref`. Preserve raw data only when explicitly allowed; show projections/summaries to the agent.
 
-### 9.4 Ambiente simulado
+### 9.4 Simulated environment
 
-Política escalonada: (1) mocks sintéticos controlados; (2) stand-in do Craft quando registros suficientes; (3) REA Agent Environments se sua cobertura de reads/writes confirmadas aumentar a fidelidade. Nunca usar replay de credenciais/reais como fixture exportável. Se não houver provas de efeitos de escrita, marcar `not_modeled` e permitir apenas demonstração isolada.
+Tiered policy: (1) controlled synthetic mocks; (2) Craft's stand-in when records are sufficient; (3) REA Agent Environments if its coverage of confirmed reads/writes increases fidelity. Never use replay of real credentials as an exportable fixture. If there is no proof of write effects, mark `not_modeled` and allow only an isolated demonstration.
 
 ## 10. Feasibility & Transaction Semantics
 
-Antes de construir, cada mudança recebe classificação:
+Before building, each change receives a classification:
 
-- `ui_only`: aparência/navegação/apresentação sem novos efeitos de backend.
-- `frontend_orchestration`: novas sequências de calls existentes; exige teste de estado, idempotência, erros parciais, retries, race conditions e permissões.
-- `backend_change_required`: requer novo endpoint, regra, transação, autorização ou capacidade não exposta; produzir proposta e contrato pendente, não fingir implementação completa.
-- `not_determined`: informações insuficientes; só protótipo com hipótese rotulada ou bloqueio de engenharia.
+- `ui_only`: appearance/navigation/presentation without new backend effects.
+- `frontend_orchestration`: new sequences of existing calls; requires testing of state, idempotency, partial errors, retries, race conditions and permissions.
+- `backend_change_required`: requires a new endpoint, rule, transaction, authorization or capability that is not exposed; produce a proposal and a pending contract, do not pretend a complete implementation.
+- `not_determined`: insufficient information; only a prototype with a labeled hypothesis, or an engineering block.
 
-Para fluxos complexos, registrar operações, dependências, pré-condições, efeitos, garantias de atomicidade **conhecidas**, idempotência, compensação/rollback e eventos assíncronos. Não inferir atomicidade olhando apenas várias telas. Em integração live, requests mutantes só para staging/teste com credenciais restritas e permissão.
+For complex flows, record operations, dependencies, preconditions, effects, **known** atomicity guarantees, idempotency, compensation/rollback and asynchronous events. Do not infer atomicity by looking only at several screens. In live integration, mutating requests only against staging/test with restricted credentials and permission.
 
-## 11. Builder, gerador e proteção de código
+## 11. Builder, generator and code protection
 
-- Usar executor dos agentes do Craft. O Brief contém contexto compacto e versões: capability map, UX plan, registry DS, invariantes, desconhecidos, critérios executáveis. Limitar contexto e recuperar referências por demanda; não enviar a biblioteca/Storybook inteiro ao prompt. Em `host_agent` não iniciar novo modelo automaticamente.
-- React + TypeScript por default. Se o DS exigir uma estrutura suportada diferente, agente deve justificar ou registrar incompatibilidade. Em projeto existente, usar branch/worktree e staging autorizado, nunca alterar fonte sem confirmação.
-- Estrutura sugerida do frontend gerado: `src/app`, `src/routes`, `src/features/<capability>`, `src/components` (somente se aprovado), `src/lib/api`, `src/lib/state`, `src/mocks`, `tests/e2e`.
-- Componentes corporativos importados por caminhos reais. Proibido copiar seu código sem direito ou replicar sua aparência em wrappers genéricos para satisfazer compliance falso.
-- Simulação: dados sintéticos e banner de ambiente; desabilitar endpoints produtivos. `src/mocks` nunca inclui dados pessoais extraídos.
-- Gerar estados: loading, empty, invalid, error, success, disabled, permission-denied e timeout nos fluxos aplicáveis. Não inventar regras; desconhecidos visíveis em config/teste.
-- Toda decisão relevante registra onde foi implementada e quais testes a cobrem.
-- `Design Critic` separado do `Build Check`: opinião heurística não faz build passar.
-- Tratar código gerado como não confiável: comandos de pacote/build em ambiente controlado, sem rede/segredos por default, scripts de instalação auditados, limites de processo.
+- Use Craft's agent executor. The Brief contains compact context and versions: capability map, UX plan, DS registry, invariants, unknowns, executable criteria. Limit context and retrieve references on demand; do not send the whole library/Storybook into the prompt. In `host_agent`, do not start a new model automatically.
+- React + TypeScript by default. If the DS requires a different supported structure, the agent must justify it or record the incompatibility. In an existing project, use a branch/worktree and authorized staging, never alter source without confirmation.
+- Suggested structure of the generated frontend: `src/app`, `src/routes`, `src/features/<capability>`, `src/components` (only if approved), `src/lib/api`, `src/lib/state`, `src/mocks`, `tests/e2e`.
+- Corporate components imported through real paths. Copying their code without rights or replicating their appearance in generic wrappers to satisfy false compliance is prohibited.
+- Simulation: synthetic data and an environment banner; disable production endpoints. `src/mocks` never includes extracted personal data.
+- Generate states: loading, empty, invalid, error, success, disabled, permission-denied and timeout in applicable flows. Do not invent rules; unknowns visible in config/test.
+- Every relevant decision records where it was implemented and which tests cover it.
+- `Design Critic` is separate from `Build Check`: heuristic opinion does not make a build pass.
+- Treat generated code as untrusted: package/build commands in a controlled environment, with no network/secrets by default, audited install scripts, process limits.
 
-## 12. Validação e gates nativos de redesign
+## 12. Validation and native redesign gates
 
-### 12.1 Checks implementados no tipo `redesign`
+### 12.1 Checks implemented in the `redesign` kind
 
-| Check ID | Tipo | Condição de bloqueio |
+| Check ID | Type | Blocking condition |
 |---|---|---|
-| `redesign_build_check` | Determinístico | build/typecheck obrigatório falhou ou não executou |
-| `redesign_ds_check` | Determinístico | `strict`: import/token/props/componente não autorizado |
-| `redesign_functional_check` | Browser/testes | cenários críticos com oráculo não passam; execução faltante = not_evaluated |
-| `redesign_accessibility_check` | Automático + revisão | novas violações críticas identificadas; ausência de revisão humana permanece qualificada |
-| `redesign_security_check` | Política e artefatos | segredo exportado, egress não autorizado, uso de ação mutante proibida |
-| `redesign_traceability_check` | Estrutural | capacidade crítica conhecida sem destino ou justificativa |
-| `redesign_impact_check` | Diferencial | regressão comprovada em rota protegida de projeto existente |
-| `redesign_ux_critique` | Agente, consultivo | finding heurístico não é gate técnico até aceito como requisito |
+| `redesign_build_check` | Deterministic | mandatory build/typecheck failed or did not run |
+| `redesign_ds_check` | Deterministic | `strict`: unauthorized import/token/props/component |
+| `redesign_functional_check` | Browser/tests | critical scenarios with an oracle do not pass; missing execution = not_evaluated |
+| `redesign_accessibility_check` | Automatic + review | new critical violations identified; absence of human review remains qualified |
+| `redesign_security_check` | Policy and artifacts | secret exported, unauthorized egress, use of a prohibited mutating action |
+| `redesign_traceability_check` | Structural | known critical capability without a destination or justification |
+| `redesign_impact_check` | Differential | proven regression in a protected route of an existing project |
+| `redesign_ux_critique` | Agent, advisory | heuristic finding is not a technical gate until accepted as a requirement |
 
-Status são `pass`, `fail`, `warn`, `blocked`, `not_evaluated`. Cada check inclui `executed`, `environment`, `tool_version`, `scenario_ids`, `evidence_ids`, `started_at`, `duration_ms`, `limitations`, severidade e rota de reparo. **Nunca mapear falha de plugin para sucesso.**
+Statuses are `pass`, `fail`, `warn`, `blocked`, `not_evaluated`. Each check includes `executed`, `environment`, `tool_version`, `scenario_ids`, `evidence_ids`, `started_at`, `duration_ms`, `limitations`, severity and repair route. **Never map a plugin failure to success.**
 
-### 12.2 Critérios para os níveis Ready
+### 12.2 Criteria for the Ready levels
 
-- Concept: compila/renderiza ou sinaliza que é mock visual; fornece decisões e limites. Bloqueio de segurança ainda impede entrega não sanitizada.
-- Prototype: `build=pass`, DS strict se configurado `pass`, segurança `pass`, **100% dos cenários críticos com oráculo do escopo passaram**, nenhum comportamento conhecido crítico omitido sem aprovação, relatório de cobertura válido. Outros cenários não medidos continuam visíveis. Se não existem cenários executáveis, não qualificar como Prototype Ready sem aprovação explícita do escopo e denominação alternativa.
-- Engineering: condições Prototype + contratos de integração definidos para partes reais, suíte requerida aprovada, regressão de rotas protegidas aprovada, teste de acessibilidade relevante com revisão humana pendente **não** tratado como certificado. Necessita revisão de engenharia externa antes de produção.
-- `blocked` sempre vence `ready`. `not_evaluated` obrigatório bloqueia qualificação; apenas checks opcionais podem ficar qualificados como não avaliados.
+- Concept: compiles/renders or signals that it is a visual mock; provides decisions and limits. A security block still prevents unsanitized delivery.
+- Prototype: `build=pass`, DS strict if configured `pass`, security `pass`, **100% of the critical scenarios with an oracle in scope passed**, no known critical behavior omitted without approval, valid coverage report. Other unmeasured scenarios remain visible. If there are no executable scenarios, do not qualify as Prototype Ready without explicit scope approval and an alternative designation.
+- Engineering: Prototype conditions + integration contracts defined for the real parts, required suite passed, protected-route regression passed, relevant accessibility test with pending human review **not** treated as a certificate. Requires external engineering review before production.
+- `blocked` always beats `ready`. A mandatory `not_evaluated` blocks qualification; only optional checks may remain qualified as not evaluated.
 
-### 12.3 Performance e qualidade
+### 12.3 Performance and quality
 
-- Build com TypeScript estrito e testes executáveis; lint, imports consistentes, sem hardcoded de DS strict; assert de bundle e avisos.
-- Playwright: navegação, tecla Tab/Enter/Escape, mensagens de erro, estados vazios, responsividade, teclado e foco.
-- axe-core: reportar violações com escopo e versão. WCAG 2.2 AA é **alvo de avaliação**, não certificação automatizada.
-- Perf: Web Vitals/Lighthouse em ambiente comparável, com dados representativos e logs de hardware/rede; não declarar melhora com amostras incomparáveis.
-- UX: teste humano de tarefas, tempo, sucesso, erros, satisfação; se não houver, `ux_improvement=not_measured`, mesmo quando critic considera melhor.
+- Build with strict TypeScript and executable tests; lint, consistent imports, no hardcoded values under DS strict; bundle assertions and warnings.
+- Playwright: navigation, Tab/Enter/Escape keys, error messages, empty states, responsiveness, keyboard and focus.
+- axe-core: report violations with scope and version. WCAG 2.2 AA is an **evaluation target**, not automated certification.
+- Perf: Web Vitals/Lighthouse in a comparable environment, with representative data and hardware/network logs; do not claim improvement with incomparable samples.
+- UX: human testing of tasks, time, success, errors, satisfaction; if there is none, `ux_improvement=not_measured`, even when the critic considers it better.
 
-## 13. Ameaças e controles de segurança (STRIDE resumido)
+## 13. Threats and security controls (STRIDE summary)
 
-**Ativos:** browser autenticado, cookies, dados de clientes, código corporativo, tokens MCP, design system privado, registros de tráfego, arquivos gerados.
+**Assets:** authenticated browser, cookies, customer data, corporate code, MCP tokens, private design system, traffic records, generated files.
 
-**Ameaças principais:** SSRF via URL/endpoint, execução arbitrária de install scripts, prompt injection em páginas/MCP/README, tool poisoning, troca de contrato MCP, exfiltração em logs ou prompts, egress de dados para IA externa, mutação acidental em produção, supply chain de pacotes, vazamento de HAR, cross-tenant, navegação para domínio não autorizado, manipulação de artefatos e paths.
+**Main threats:** SSRF via URL/endpoint, arbitrary execution of install scripts, prompt injection in pages/MCP/README, tool poisoning, MCP contract swap, exfiltration in logs or prompts, data egress to external AI, accidental mutation in production, package supply chain, HAR leakage, cross-tenant, navigation to an unauthorized domain, manipulation of artifacts and paths.
 
 **MUST:**
 
-1. Permissões mínimas, env/test-first, allowlist de origens e métodos, bloqueio de mutações na origem sem autorização. O navegador pode disparar requisições normais — usar ambiente de teste isolado e não afirmar contenção impossível em browser comum.
-2. MCP por servidor + catálogo completo fixado por digest; anotações não confiáveis; mudanças exigem revisão.
-3. Secrets no OS keychain/variáveis de ambiente controladas; nunca persistir tokens, IDs pessoais ou corpos de resposta sensíveis em artefatos compartilhados.
-4. Dados destinados ao modelo passam por política de egress: `local_only`, `allow_remote_redacted`, `allow_remote_explicit`. O usuário deve saber quando conteúdo sai do dispositivo.
-5. Sanitização deny-by-default de HAR/JSON, URLs, headers e corpos. Detectores são auxiliares: capturas brutas não são exportadas automaticamente, mesmo se scanners não acharem nada.
-6. Sandboxing/isolamento dos builds e subprocessos quando disponível; sem segredos montados no processo de geração; fail-closed se controles obrigatórios não disponíveis.
-7. Logs de auditoria sem conteúdo sensível; identificadores de evidência, usuário/ambiente pseudonimizados, retentativa rastreável.
-8. Cancelamento e budgets obrigatórios por job; subprocessos sempre via process manager do Craft; política de limpeza e retenção configurável.
-9. Hash/versionamento de dependências, lockfile e SBOM no release. CI testa licenças da árvore real; pin de REA/Layout.
-10. Tratamento de conteúdo de site/MCP como **dados não confiáveis**. Instruções externas não podem mudar políticas, sistema de prompts ou autorizações.
+1. Minimum permissions, env/test-first, allowlist of origins and methods, blocking of mutations at the origin without authorization. The browser can fire normal requests — use an isolated test environment and do not claim impossible containment in an ordinary browser.
+2. MCP per server + full catalog pinned by digest; untrusted annotations; changes require review.
+3. Secrets in the OS keychain/controlled environment variables; never persist tokens, personal IDs or sensitive response bodies in shared artifacts.
+4. Data destined for the model passes through an egress policy: `local_only`, `allow_remote_redacted`, `allow_remote_explicit`. The user must know when content leaves the device.
+5. Deny-by-default sanitization of HAR/JSON, URLs, headers and bodies. Detectors are auxiliary: raw captures are not exported automatically, even if scanners find nothing.
+6. Sandboxing/isolation of builds and subprocesses when available; no secrets mounted in the generation process; fail-closed if mandatory controls are unavailable.
+7. Audit logs without sensitive content; pseudonymized evidence, user/environment identifiers; traceable retries.
+8. Cancellation and budgets mandatory per job; subprocesses always via Craft's process manager; configurable cleanup and retention policy.
+9. Hash/versioning of dependencies, lockfile and SBOM in the release. CI tests licenses of the real tree; REA/Layout pinned.
+10. Treat site/MCP content as **untrusted data**. External instructions cannot change policies, the prompt system or authorizations.
 
-### 13.1 Acesso ao browser / CDP
+### 13.1 Browser / CDP access
 
-- Perfil dedicado quando REA precisa de CDP; porta apenas loopback. Preferir a sessão coordenada pelo Craft, sem dois controladores simultâneos em execução conflitante.
-- Login interativo humano e perfis temporários; não exportar storage state, cookies ou HAR. Limpar no encerramento; falha de cleanup registrada.
-- Em aplicações SSO/MFA, nunca fazer bypass. Se automação for bloqueada, solicitar sessão ou evidência autorizada.
+- Dedicated profile when REA needs CDP; loopback-only port. Prefer the session coordinated by Craft, without two controllers running in conflict.
+- Human interactive login and temporary profiles; do not export storage state, cookies or HAR. Clean up on shutdown; a cleanup failure is recorded.
+- In SSO/MFA applications, never bypass. If automation is blocked, request an authorized session or evidence.
 
-### 13.2 Direitos de uso e licenciamento
+### 13.2 Usage rights and licensing
 
-- Craft: MIT OR Apache-2.0. REA, Layout CLI/Layout UI: MIT; Velloo Apache-2.0; Studio Layout AGPL-3.0 (não integrar código no core sem revisão). Carbon MCP hosted ≠ software local completo open source.
-- Dados/documentação externos têm licença própria, mesmo quando pacote de código tem MIT. Não redistribuir conteúdo sem permissão. Registrar autoria, URL, licença, versão, hash e avisos em `THIRD_PARTY_NOTICES.md`/SBOM.
-- Usar apenas aplicações que usuário possua ou tenha autorização para inspecionar; não copiar marca/logo/assets de terceiros automaticamente.
+- Craft: MIT OR Apache-2.0. REA, Layout CLI/Layout UI: MIT; Velloo Apache-2.0; Layout Studio AGPL-3.0 (do not integrate code into the core without review). Hosted Carbon MCP ≠ complete local open source software.
+- External data/documentation have their own license, even when the code package is MIT. Do not redistribute content without permission. Record authorship, URL, license, version, hash and notices in `THIRD_PARTY_NOTICES.md`/SBOM.
+- Use only applications the user owns or is authorized to inspect; do not automatically copy third-party brand/logo/assets.
 
-## 14. CLI, MCP e configuração [APIs PROPOSTAS]
+## 14. CLI, MCP and configuration [PROPOSED APIs]
 
-### 14.1 Ferramentas públicas, headless-first
+### 14.1 Public tools, headless-first
 
-Seguir a regra do Craft: uma capacidade = `ToolSpec`, acessível por engine, CLI e MCP; GUI somente cliente. Novos IDs propostos:
+Follow Craft's rule: one capability = `ToolSpec`, accessible via engine, CLI and MCP; the GUI is only a client. Proposed new IDs:
 
-| ToolSpec ID | Efeito esperado |
+| ToolSpec ID | Expected effect |
 |---|---|
-| `redesign_project_configure` | persistir config validada, sem secrets |
-| `redesign_study_run` | iniciar investigação autorizada, cria evidência |
-| `redesign_capabilities_list` | paginar capacidades e desconhecidos |
-| `redesign_coverage_show` | mostrar denominadores, escopo e lacunas |
-| `redesign_ds_import` | importar registry com aprovação de fonte |
-| `redesign_ds_check` | verificar conformidade de código |
-| `redesign_app_context_query` | consultar MCP autorizado através de gateway |
-| `redesign_rea_probe` | probe REA opcional, autorizado, devolver evidência |
-| `redesign_plan_generate` | criar alternativas/decisões/viabilidade |
-| `redesign_plan_approve` | registrar aprovação explícita para uma mudança |
-| `redesign_build_run` | direcionar ao runner existente do Craft |
-| `redesign_checks_run` | executar checks nativos, sem aprovação textual |
-| `redesign_report_export` | gerar report sanitizado e lista de artefatos |
+| `redesign_project_configure` | persist validated config, without secrets |
+| `redesign_study_run` | start authorized investigation, creates evidence |
+| `redesign_capabilities_list` | paginate capabilities and unknowns |
+| `redesign_coverage_show` | show denominators, scope and gaps |
+| `redesign_ds_import` | import registry with source approval |
+| `redesign_ds_check` | verify code conformance |
+| `redesign_app_context_query` | query authorized MCP through a gateway |
+| `redesign_rea_probe` | optional, authorized REA probe, return evidence |
+| `redesign_plan_generate` | create alternatives/decisions/feasibility |
+| `redesign_plan_approve` | record explicit approval for a change |
+| `redesign_build_run` | direct to Craft's existing runner |
+| `redesign_checks_run` | run native checks, without textual approval |
+| `redesign_report_export` | generate a sanitized report and artifact list |
 
-O conjunto final de `ToolSpec` deve evitar wrappers artificiais quando o comando já existir no Craft. Não duplicar a API do runner; criar *facade* apenas para coordenação e contracts. Ferramentas `list` devem oferecer `offset`, `limit`, filtros e limites de payload.
+The final set of `ToolSpec`s must avoid artificial wrappers when the command already exists in Craft. Do not duplicate the runner API; create a *facade* only for coordination and contracts. `list` tools must offer `offset`, `limit`, filters and payload limits.
 
-### 14.2 CLI proposta
+### 14.2 Proposed CLI
 
-Comandos **a implementar no fork**, não afirmar que já existem:
+Commands **to be implemented in the fork**; do not claim they already exist:
 
 ```bash
-# No primeiro PR, manter binário do Craft; renomear/alias na fase de distribuição.
+# In the first PR, keep the Craft binary; rename/alias in the distribution phase.
 craft-anything-cli redesign init https://app.example.test \
   --mode redesign --capture clean-room --project-folder ./project
 craft-anything-cli redesign study --project-folder ./project
@@ -382,9 +382,9 @@ craft-anything-cli redesign check --project-folder ./project
 craft-anything-cli redesign report --project-folder ./project
 ```
 
-Revalidar convenções da CLI existente e preferir subcomandos que usem `ToolSpec`; não inserir flags arbitrárias no core sem adaptação de parser e testes. A embalagem final poderá expor `redesign-anything` como alias/documentação sem substituir uma ferramenta pronta antes da hora.
+Revalidate the existing CLI's conventions and prefer subcommands that use `ToolSpec`; do not insert arbitrary flags into the core without parser adaptation and tests. The final packaging may expose `redesign-anything` as an alias/documentation without replacing a ready tool prematurely.
 
-### 14.3 Exemplo de configuração
+### 14.3 Configuration example
 
 ```json
 {
@@ -406,121 +406,121 @@ Revalidar convenções da CLI existente e preferir subcomandos que usem `ToolSpe
 }
 ```
 
-Esses defaults são **propostos**, não números observados de performance. Os schemas reais devem validar URL, escopo, enumerations e referências; `local_only` com agente remoto é incompatibilidade e deve bloquear até ajuste explícito.
+These defaults are **proposed**, not observed performance numbers. The real schemas must validate URL, scope, enumerations and references; `local_only` with a remote agent is an incompatibility and must block until explicitly adjusted.
 
-### 14.4 Uso agent-first e bootstrap por repositório GitHub — requisito obrigatório P0
+### 14.4 Agent-first use and bootstrap from a GitHub repository — mandatory P0 requirement
 
-**Caso de uso central:** alguém cola a URL do repositório Redesign Anything no Cursor/Claude Code/Codex/ACP e pede ao agente para usá-lo, como já faz com o Craft. Um GitHub URL é uma entrada de descoberta, não uma instalação executável. O agente deve obter o repositório por mecanismos permitidos, ler documentos de confiança e completar pré-requisitos com consentimento.
+**Central use case:** someone pastes the Redesign Anything repository URL into Cursor/Claude Code/Codex/ACP and asks the agent to use it, as they already do with Craft. A GitHub URL is a discovery entry, not an executable installation. The agent must obtain the repository through permitted mechanisms, read trust documents and complete prerequisites with consent.
 
-**O pacote de distribuição DEVE conter** README com quickstart de agente, `AGENTS.md` do produto, `docs/AGENT_FIRST.md` (este kit inclui `AGENT_FIRST.md`), `docs/extending.md` adaptada, CLI e MCP documentados, exemplos de configuração, fixtures offline e `doctor` headless. MAY oferecer `skills/redesign-anything/SKILL.md` portátil, desde que não quebre agentes que não implementam Skills. Nenhuma capacidade dependerá de janela egui.
+**The distribution package MUST contain** a README with an agent quickstart, the product's `AGENTS.md`, `docs/AGENT_FIRST.md` (this kit includes `AGENT_FIRST.md`), an adapted `docs/extending.md`, documented CLI and MCP, configuration examples, offline fixtures and a headless `doctor`. It MAY offer a portable `skills/redesign-anything/SKILL.md`, provided it does not break agents that do not implement Skills. No capability will depend on an egui window.
 
-**Contrato do fluxo:**
+**Flow contract:**
 
-1. Agente recebe URL do repositório Redesign Anything; valida origem/commit e obtém o código por Git/checkout autorizado.
-2. Lê README/`AGENTS.md`/guia agent-first, executa diagnóstico **sem alterar sistema** (`doctor --json`, sintaxe exata após implementar).
-3. Informa pré-requisitos ausentes e solicita consentimento antes de instalar dependências, executar programas terceiros, acessar browser autenticado ou configurar MCP.
-4. Permite invocar redesign pelo CLI ou expor as mesmas operações via MCP; lista e chama `redesign_*` sem UI. Evita duplicar o workflow Craft.
-5. Retorna artefatos locais no projeto, status, evidências, cenário de teste, relatório de cobertura e limitações, inclusive quando o processo é interrompido.
-6. Em retomada, preserva projeto, versão e evidências em vez de repetir captura e alterar respostas sem registrar.
+1. The agent receives the Redesign Anything repository URL; validates origin/commit and obtains the code through authorized Git/checkout.
+2. It reads the README/`AGENTS.md`/agent-first guide and runs a diagnostic **without altering the system** (`doctor --json`, exact syntax after implementation).
+3. It reports missing prerequisites and requests consent before installing dependencies, running third-party programs, accessing an authenticated browser or configuring MCP.
+4. It allows invoking redesign via the CLI or exposing the same operations via MCP; lists and calls `redesign_*` without a UI. It avoids duplicating the Craft workflow.
+5. It returns local artifacts in the project, status, evidence, test scenario, coverage report and limitations, including when the process is interrupted.
+6. On resumption, it preserves the project, version and evidence instead of repeating capture and altering answers without recording.
 
-**Comando futuro (PROPOSTO, não implementado):** `redesign-anything-cli redesign --url <url> --mode redesign --config <path>`; o nome executável e flags DEVEM ser confirmados contra os binários reais do fork no PR-01. As ferramentas MCP previstas estão na seção 14.
+**Future command (PROPOSED, not implemented):** `redesign-anything-cli redesign --url <url> --mode redesign --config <path>`; the executable name and flags MUST be confirmed against the fork's real binaries in PR-01. The planned MCP tools are in section 14.
 
-**Critérios de aceite:** uma máquina limpa com Git, Rust e dependências do SO documentadas; agente consegue seguir apenas instruções do repositório, preparar o CLI, identificar ausência de browsers/Node/REA/Layout e executar o fixture P0 sem abrir desktop. O fluxo também funciona quando REA/Layout/MCP da aplicação não estão instalados. Todas as instalações e ações com efeito são explícitas; nenhum script obtido da web é executado implicitamente.
+**Acceptance criteria:** a clean machine with Git, Rust and documented OS dependencies; the agent can follow only the repository's instructions, prepare the CLI, identify the absence of browsers/Node/REA/Layout and run the P0 fixture without opening the desktop app. The flow also works when REA/Layout/application MCP are not installed. All installations and actions with effects are explicit; no script obtained from the web is run implicitly.
 
-**Camada de ergonomia:** `README` oferece três prompts copiados: (a) preparar instalação; (b) redesenhar URL + DS; (c) validar projeto salvo. Devemos medir desde o início a fricção de copiar uma URL no agente versus iniciar por MCP pré-instalado.
+**Ergonomics layer:** the `README` offers three copyable prompts: (a) prepare installation; (b) redesign URL + DS; (c) validate a saved project. We must measure from the start the friction of pasting a URL into the agent versus starting from a preinstalled MCP.
 
-## 15. Observabilidade, controle de custo e erro
+## 15. Observability, cost control and errors
 
-**Contrato canônico:** `COST_AND_EXECUTION.md`. Orçamento de tokens do agente hospedeiro é apenas **advisory** quando seu cliente não fornece telemetria de uso. Limites efetivamente aplicáveis sobre ferramentas/sidecars executados pelo Redesign são hard; nenhum relatório pode tratar tokens não observáveis como zero.
+**Canonical contract:** `COST_AND_EXECUTION.md`. The host agent's token budget is only **advisory** when its client does not provide usage telemetry. Limits that actually apply to tools/sidecars executed by Redesign are hard; no report may treat unobservable tokens as zero.
 
-- Evento estruturado por etapa (`study_started`, `capture_completed`, `mcp_query_approved`, `rea_probe_completed`, `decision_recorded`, `build_started`, `check_completed`, `ready_gate_evaluated`) sem dados sensíveis.
-- Métricas: duração por etapa, chamadas REA/MCP, tokens de entrada/saída/cache **quando reportados**, qualidade da contabilidade, custo apenas quando comprovável, operações não executadas, chamadas e cache hits, cobertura do escopo, rodadas, checks e unknowns. Não somar cached input duas vezes.
-- Limites configuráveis de rotas, profundidade, cenários, artefatos, chamadas MCP/REA, número de críticas, tempo por processo, refinamentos e payload das ferramentas. `token_soft_limit` é **aviso**: hard cap só quando houver contador e controle de parada do modelo; caso contrário `warning_unenforceable`. UI e CLI mostram limites antes de uma investigação potencialmente longa.
-- `budget_exhausted`: preservar progresso parcial e retornar estado próprio `budget_exhausted` com `needs_evidence` quando pertinente; não converter checks desconhecidos em `pass` nem tratar uso de tokens não observável como limite cumprido.
-- Retry apenas para falha transitória/idempotente; chamadas com efeito nunca retry automático sem idempotency key e autorização.
-- Determinismo: versões pinadas, datas de captura, seeds, screen sizes, fixture, ambiente e locale. Modelo pode variar, mas toda verificação objetiva é reexecutável.
+- Structured event per step (`study_started`, `capture_completed`, `mcp_query_approved`, `rea_probe_completed`, `decision_recorded`, `build_started`, `check_completed`, `ready_gate_evaluated`) without sensitive data.
+- Metrics: duration per step, REA/MCP calls, input/output/cache tokens **when reported**, accounting quality, cost only when provable, operations not executed, calls and cache hits, scope coverage, rounds, checks and unknowns. Do not add cached input twice.
+- Configurable limits for routes, depth, scenarios, artifacts, MCP/REA calls, number of critiques, time per process, refinements and tool payload. `token_soft_limit` is a **warning**: a hard cap only when there is a counter and control to stop the model; otherwise `warning_unenforceable`. The UI and CLI show limits before a potentially long investigation.
+- `budget_exhausted`: preserve partial progress and return its own `budget_exhausted` state with `needs_evidence` where pertinent; do not convert unknown checks into `pass` nor treat unobservable token usage as a satisfied limit.
+- Retry only for transient/idempotent failure; calls with effects are never retried automatically without an idempotency key and authorization.
+- Determinism: pinned versions, capture dates, seeds, screen sizes, fixture, environment and locale. The model may vary, but every objective verification is re-executable.
 
-**Estimativas de planejamento, não medições:** tela simples 150–400 mil tokens processados; tela corporativa 400 mil–1,2 milhão; jornada de 3–5 telas 1–3 milhões; módulo 10–20 telas 3–10 milhões; aplicativo extenso acima disso. Incluem contexto repetido e podem variar amplamente. Não equivalem à janela de contexto nem ao custo cobrado. Os *defaults* experimentais, sem garantia de enforcement para agente externo, constam em `COST_AND_EXECUTION.md`. O Craft documentou testes de uso de cache e loops caros em `docs/ROADMAP.md` (R5.3/R5.4): registrar o baseline antes de estabelecer critérios numéricos.
+**Planning estimates, not measurements:** simple screen 150–400k processed tokens; corporate screen 400k–1.2 million; journey of 3–5 screens 1–3 million; module of 10–20 screens 3–10 million; large application above that. They include repeated context and can vary widely. They are not equivalent to the context window nor to the billed cost. The experimental *defaults*, with no guarantee of enforcement for an external agent, are in `COST_AND_EXECUTION.md`. Craft documented cache-usage tests and expensive loops in `docs/ROADMAP.md` (R5.3/R5.4): record the baseline before establishing numeric criteria.
 
-## 16. E2E de referência e jornada de aceite
+## 16. Reference E2E and acceptance journey
 
-**Teste adicional obrigatório:** executar o mesmo fixture com o agente hospedeiro como controlador único, validar que `rebuild_start` não é iniciado por padrão e reportar tokens do host como `unavailable` quando não houver metadados. A comparação Craft vs Lean vs Deep está em `COST_AND_EXECUTION.md` e `VALIDATION_MATRIX.md`.
+**Additional mandatory test:** run the same fixture with the host agent as the sole controller, validate that `rebuild_start` is not started by default and report host tokens as `unavailable` when there is no metadata. The comparison of Craft vs Lean vs Deep is in `COST_AND_EXECUTION.md` and `VALIDATION_MATRIX.md`.
 
-Aplicação fixture open source construída para o teste, com regras publicadas separadamente da versão inspecionada:
+An open source fixture application built for the test, with rules published separately from the inspected version:
 
-- Gestão genérica de solicitações: listagem densa, filtros, paginação, edição, detalhe, workflow de estados, validações dependentes, permissões (operator/approver), erros e efeitos persistidos no backend de testes.
-- Design system corporativo fixture: pacote React/TS com DataTable, FilterBar, FormField, StatusBadge, Dialog, Toast, tokens DTCG e Storybook, incluindo variantes/props incompatíveis deliberadas.
-- Application MCP fixture: duas ferramentas read-only com regras declaradas e uma ferramenta mutante bloqueada em produção; um tool malicioso para teste de prompt injection.
-- REA fixture: JavaScript distribuído com rotas SPA e validação; HAR sintético com token-canário (não real) e cenários de escrita confirmada/não confirmada.
+- Generic request management: dense listing, filters, pagination, editing, detail, state workflow, dependent validations, permissions (operator/approver), errors and effects persisted in the test backend.
+- Corporate design system fixture: React/TS package with DataTable, FilterBar, FormField, StatusBadge, Dialog, Toast, DTCG tokens and Storybook, including deliberately incompatible variants/props.
+- Application MCP fixture: two read-only tools with declared rules and one mutating tool blocked in production; a malicious tool for prompt-injection testing.
+- REA fixture: distributed JavaScript with SPA routes and validation; synthetic HAR with a canary token (not real) and confirmed/unconfirmed write scenarios.
 
-**Jornada de aceite do P0:**
+**P0 acceptance journey:**
 
-1. Usuário abre Craft fork → seleciona Redesign, URL fixture, modo Redesign, DS corporativo estrito.
-2. Study mapeia 1 jornada crítica, evidências, unknowns e erros, sem acesso a código fonte.
-3. Plan propõe reorganização justificada, `keep_as_is`, preservações e viabilidade.
-4. Build gera React/TS utilizando imports reais do DS, com dados sintéticos e fluxo funcional.
-5. Check detecta uma regressão intencional, refina uma vez e só aprova após testes passarem.
-6. Export inclui projeto, decisões, coverage com denominador, riscos, limitations, licenças e logs sanitizados.
-7. Teste de segurança confirma que não houve escrita na aplicação original nem segredo nos artefatos.
-8. Com REA desligado, o P0 continua; com REA habilitado, só registra ganho se houver evidência nova.
+1. The user opens the Craft fork → selects Redesign, fixture URL, Redesign mode, strict corporate DS.
+2. Study maps 1 critical journey, evidence, unknowns and errors, with no access to source code.
+3. Plan proposes a justified reorganization, `keep_as_is`, preservations and feasibility.
+4. Build generates React/TS using real DS imports, with synthetic data and a functional flow.
+5. Check detects an intentional regression, refines once and approves only after the tests pass.
+6. Export includes the project, decisions, coverage with denominator, risks, limitations, licenses and sanitized logs.
+7. A security test confirms there was no write to the original application and no secret in the artifacts.
+8. With REA off, P0 continues; with REA enabled, it records a gain only if there is new evidence.
 
-**Aceite P0:** build e testes passam; zero violações bloqueantes de DS/safety; nenhuma chamada mutante para original; 100% dos cenários críticos **definidos e executáveis do escopo** passam; toda capacidade crítica conhecida tem destino ou exceção aprovada; unknowns e fontes visíveis. Não exigir que a IA descubra regras desconhecidas.
+**P0 acceptance:** build and tests pass; zero blocking DS/safety violations; no mutating call to the original; 100% of the **defined and executable critical scenarios in scope** pass; every known critical capability has a destination or an approved exception; unknowns and sources visible. Do not require the AI to discover unknown rules.
 
-## 17. Plano de entrega e dependências
+## 17. Delivery plan and dependencies
 
-O `IMPLEMENTATION_PLAN.md` contém PRs pequenos, arquivos, testes e critérios de aceite. Resumo:
+`IMPLEMENTATION_PLAN.md` contains small PRs, files, tests and acceptance criteria. Summary:
 
-1. PR-00: fork, licenças, baseline testado e adaptações de `AGENTS.md`/roadmap.
-2. PR-01: `RedesignKind`, defaults e comando headless mínimo.
-3. PR-02: workspace `redesign/`, schemas, migrações, status e source refs.
+1. PR-00: fork, licenses, tested baseline and adaptations of `AGENTS.md`/roadmap.
+2. PR-01: `RedesignKind`, defaults and a minimal headless command.
+3. PR-02: `redesign/` workspace, schemas, migrations, status and source refs.
 4. PR-03: Study adapter + Capability/Evidence/Coverage.
-5. PR-04: Knowledge Packs + retrieval tipado, critic básico.
-6. PR-05: DS Registry + integração Layout CLI + compliance estrito.
-7. PR-06: Plan/Feasibility/Traceability + aprovação de decisões.
-8. PR-07: React/TS Build + briefing + mock/dados sintéticos.
-9. PR-08: checks nativos fail-closed + Playwright/axe + Ready gates.
-10. PR-09: Application MCP Bridge e Trust Gateway.
-11. PR-10: REA deep adapter e avaliação incremental; ambientes simulados se comprovado ganho.
-12. PR-11: E2E benchmark multi-perfil + segurança + scaling.
-13. PR-12: polish da UI Craft, distribuição/empacotamento, SBOM, documentação e release.
+5. PR-04: Knowledge Packs + typed retrieval, basic critic.
+6. PR-05: DS Registry + Layout CLI integration + strict compliance.
+7. PR-06: Plan/Feasibility/Traceability + decision approval.
+8. PR-07: React/TS Build + briefing + mock/synthetic data.
+9. PR-08: fail-closed native checks + Playwright/axe + Ready gates.
+10. PR-09: Application MCP Bridge and Trust Gateway.
+11. PR-10: REA deep adapter and incremental evaluation; simulated environments if a gain is proven.
+12. PR-11: multi-profile E2E benchmark + security + scaling.
+13. PR-12: Craft UI polish, distribution/packaging, SBOM, documentation and release.
 
-Ordem importa: **PR-00 → PR-03 → PR-05 → PR-08** fecha o caminho de valor antes de adicionar várias integrações. Se uma dependência adicional não elevar métricas frente à base, manter como plugin opcional.
+Order matters: **PR-00 → PR-03 → PR-05 → PR-08** closes the value path before adding several integrations. If an additional dependency does not raise metrics against the baseline, keep it as an optional plugin.
 
-## 18. Definição de pronto, incertezas e decisão final
+## 18. Definition of done, uncertainties and final decision
 
-### 18.1 Para cada PR
+### 18.1 For each PR
 
-- Código compila; testes unitários/integração adicionados; novo arquivo versionado tem migração/validação.
-- Comandos Craft apropriados passam (`cargo fmt`, clippy, test, `cargo xtask layers`, locks, wasm quando tocar L0–L2, secrets e checks de i18n quando relevante). Revalidar sintaxe no checkout.
-- Nenhum novo caminho de execução bypassa consentimento, cancela indevidamente jobs ou invade Clean Room.
-- Documentação `AGENTS.md`, roadmap/status/tools atualizada no fork; teste live descrito como executado ou não.
-- Fallbacks e erros exercitados; checks de segurança falham fechado.
-- O PR não altera funcionalidade de clonagem tradicional do Craft sem teste de regressão.
+- Code compiles; unit/integration tests added; a new versioned file has migration/validation.
+- Appropriate Craft commands pass (`cargo fmt`, clippy, test, `cargo xtask layers`, locks, wasm when touching L0–L2, secrets and i18n checks when relevant). Revalidate syntax in the checkout.
+- No new execution path bypasses consent, improperly cancels jobs or invades Clean Room.
+- `AGENTS.md`, roadmap/status/tools documentation updated in the fork; live test described as executed or not.
+- Fallbacks and errors exercised; security checks fail closed.
+- The PR does not alter Craft's traditional cloning functionality without a regression test.
 
-### 18.2 Decisões já tomadas
+### 18.2 Decisions already made
 
-- Arquitetura **fork do Craft**, não plataforma independente.
-- Diferencial: Design Intelligence, DS corporativo, transformação e verificação — não engenharia reversa duplicada.
-- REA/MCP da aplicação opcionais, conhecimento por fontes, egress controlado.
-- React/TypeScript e UX web como primeiro alvo; futuras plataformas podem reaproveitar a engine.
-- Três níveis Ready e `Confidence & Coverage` obrigatórios, com epistemologia honesta.
-- Custo baixo, free/open source, sem API paga obrigatória; inferência local pode ser limitada.
+- **Craft fork** architecture, not an independent platform.
+- Differentiator: Design Intelligence, corporate DS, transformation and verification — not duplicated reverse engineering.
+- REA/application MCP optional, knowledge by sources, controlled egress.
+- React/TypeScript and web UX as the first target; future platforms can reuse the engine.
+- Three Ready levels and `Confidence & Coverage` mandatory, with honest epistemology.
+- Low cost, free/open source, no mandatory paid API; local inference may be limited.
 
-### 18.3 Questões para **medir**, não para decidir por palpite
+### 18.3 Questions to **measure**, not to decide by guesswork
 
-- Qual modelo/agente, local ou autenticado, consegue executar uma cadeia útil de Redesign + Check em hardware real?
-- Quanto REA acrescenta à cobertura de regras em relação ao Craft sozinho, por unidade de esforço/tempo?
-- Quais limitações de Storybook/TypeScript o Registry não consegue captar para o DS-alvo?
-- Em quais padrões de aplicações o consolidar fluxos piora produtividade?
-- Qual taxa de falso positivo/falso negativo dos gates de paridade e DS?
-- Qual tempo/custo aceitável da descoberta com 5, 20, 100 rotas e vários perfis?
-- Como empacotar sidecars assinados e verificados em Windows/macOS/Linux sem instalar pacotes silenciosamente?
+- Which model/agent, local or authenticated, can execute a useful Redesign + Check chain on real hardware?
+- How much does REA add to rule coverage relative to Craft alone, per unit of effort/time?
+- Which Storybook/TypeScript limitations can the Registry not capture for the target DS?
+- In which application patterns does consolidating flows worsen productivity?
+- What is the false-positive/false-negative rate of the parity and DS gates?
+- What is the acceptable time/cost of discovery with 5, 20, 100 routes and several profiles?
+- How do we package signed and verified sidecars on Windows/macOS/Linux without installing packages silently?
 
-### 18.4 Limites não resolvíveis genericamente
+### 18.4 Limits that cannot be resolved generically
 
-Nenhuma observação finita garante descobrir regras nunca exercitadas; nenhum MCP necessariamente sabe explicar regras internas; nenhuma simulação reproduz garantidamente efeitos de backend não observados; não há comprovação de “UX melhor” sem evidência/avaliação de uso; nenhuma suíte automatizada prova ausência universal de bugs, falhas de segurança ou WCAG completa. O produto expõe essas fronteiras como parte da entrega.
+No finite observation guarantees discovering rules that were never exercised; no MCP necessarily knows how to explain internal rules; no simulation guaranteeably reproduces backend effects that were not observed; there is no proof of "better UX" without evidence/evaluation of use; no automated suite proves the universal absence of bugs, security flaws or full WCAG conformance. The product exposes these boundaries as part of the delivery.
 
-## 19. Referências canônicas e leitura antes da implementação
+## 19. Canonical references and reading before implementation
 
 - Craft [`README`](https://github.com/storytold/craft-anything/blob/main/README.md), [`AGENTS.md`](https://github.com/storytold/craft-anything/blob/main/AGENTS.md), [`docs/extending.md`](https://github.com/storytold/craft-anything/blob/main/docs/extending.md), [`kinds/mod.rs`](https://github.com/storytold/craft-anything/blob/main/crates/ai/src/rebuild/kinds/mod.rs), [`plugin_check.rs`](https://github.com/storytold/craft-anything/blob/main/crates/ai/src/rebuild/kinds/plugin_check.rs), [`docs/STATUS.md`](https://github.com/storytold/craft-anything/blob/main/docs/STATUS.md), [`docs/ROADMAP.md`](https://github.com/storytold/craft-anything/blob/main/docs/ROADMAP.md).
 - REA [`README`](https://github.com/morluto/rea/blob/main/README.md), [`browser observation`](https://github.com/morluto/rea/blob/main/docs/guides/web/browser-observation.md), [`JS semantics`](https://github.com/morluto/rea/blob/main/docs/guides/javascript/javascript-application-workflows.md), [`agent environments`](https://github.com/morluto/rea/blob/main/docs/agent-environments.md).
@@ -529,53 +529,52 @@ Nenhuma observação finita garante descobrir regras nunca exercitadas; nenhum M
 - MCP [tool annotations and risk](https://blog.modelcontextprotocol.io/posts/2026-03-16-tool-annotations/); OWASP [MCP Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/MCP_Security_Cheat_Sheet.html).
 
 
+## 20. Binding addendum v1.2.0 — critical council review
 
-## 20. Adendo vinculante v1.2.0 — revisão crítica do council
+> **Precedence:** this section and `COUNCIL_DECISIONS.md` take precedence over v1.1.0 scope/order descriptions that contradict them. The 1.0.0 schemas remain compatible; Task Model changes are initially optional files and do NOT make the previous configuration format invalid.
 
-> **Precedência:** esta seção e `COUNCIL_DECISIONS.md` prevalecem sobre descrições de escopo/ordem v1.1.0 que as contradigam. Os schemas 1.0.0 continuam compatíveis; mudanças de Task Model são inicialmente arquivos opcionais e NÃO tornam o formato de configuração anterior inválido.
+### 20.1 Thesis and differentiation criterion
 
-### 20.1 Tese e critério de diferenciação
+The product is not a promise of full system modernization from a URL. It is an **open source, evidence-based agent for redesigning web interfaces and journeys, which produces verifiable code and explicit limitations**. The hypothesis to demonstrate is that, for the same application, agent, model, budget and criteria, REA outperforms (A) Craft with a plain prompt and (B) Craft with structured UX instructions in at least one relevant outcome without critical regressions. **If B reaches equivalent performance, simplify to skill + checks instead of keeping unnecessary subsystems.**
 
-O produto não é uma promessa de modernização integral de sistemas a partir de URL. É um **agente open source de redesign de interfaces e jornadas web baseado em evidências, que produz código verificável e limitações explícitas**. A hipótese a demonstrar é que, sob a mesma aplicação, agente, modelo, orçamento e critérios, o REA supera (A) Craft com prompt comum e (B) Craft com instruções estruturadas de UX em pelo menos um resultado relevante sem regressões críticas. **Se B alcançar desempenho equivalente, simplificar para skill + checks em vez de manter subsistemas desnecessários.**
+### 20.2 Mandatory first internal vertical slice (not a public release)
 
-### 20.2 Primeiro vertical slice interno obrigatório (não release público)
+The first internal technical checkpoint is: authorized URL/fixture → Study reused from Craft → minimal Task Model → diagnosis with evidence → proposal including `keep_as_is` → React/TS build → essential checks (build, functional smoke, provenance and coverage honesty) → Concept/Prototype Ready report. CLI/MCP in `host_agent`, no mandatory desktop. **This milestone does not authorize publishing V1.** Corporate DS, rich intelligence, REA, Application MCP, journeys and quality are capabilities required before the first public release, with selective activation per `V1_FIRST_RELEASE.md`.
 
-O primeiro checkpoint técnico interno é: URL/fixture autorizada → Study reutilizado do Craft → Task Model mínimo → diagnóstico com evidências → proposta incluindo `keep_as_is` → build React/TS → checks essenciais (build, smoke funcional, proveniência e honestidade de cobertura) → relatório Concept/Prototype Ready. CLI/MCP no `host_agent`, sem desktop obrigatório. **Este marco não autoriza publicação da V1.** DS corporativo, inteligência rica, REA, Application MCP, jornadas e qualidade são capacidades exigidas antes do primeiro release público, com ativação seletiva conforme `V1_IMPACTANTE.md`.
+### 20.3 Task Model and content
 
-### 20.3 Task Model e conteúdo
+Each journey under evaluation MUST record `task_id`, goal, persona/role when known, frequency (`unknown` is valid), criticality, volume, preconditions, expected results, dependencies, source and before/after metrics when available. Fields without evidence stay `unknown`; do not infer metrics. Content quality includes labels, domain terminology, microcopy, error messages, empty states and clear language; textual decisions must reference evidence or a hypothesis.
 
-Cada jornada sob avaliação DEVE registrar `task_id`, objetivo, persona/papel quando conhecido, frequência (`unknown` é válido), criticidade, volume, precondições, resultados esperados, dependências, fonte e métricas antes/depois quando disponíveis. Campos sem evidência ficam `unknown`; não inferir métricas. A qualidade do conteúdo inclui rótulos, terminologia de domínio, microcopy, mensagens de erro, estados vazios e linguagem clara; decisões textuais devem referenciar evidências ou hipótese.
+### 20.4 Design System Policy with three categories
 
-### 20.4 Design System Policy com três categorias
+`required_component`: official component mandatory for a covered function; `allowed_composition`: authorized structural composition, without duplicating official components; `extension_requires_approval`: a gap with an explicit proposal and approval. The `strict` policy applies these categories and **does not automatically prohibit all HTML markup with no equivalent in the registry**. Tests verify import, props, version, tokens, state semantics and justification of an exception. The legacy `strict/advisory` configuration remains valid.
 
-`required_component`: componente oficial obrigatório para função coberta; `allowed_composition`: composição estrutural autorizada, sem duplicar componentes oficiais; `extension_requires_approval`: lacuna com proposta explícita e aprovação. A política `strict` aplica estas categorias e **não proíbe automaticamente toda marcação HTML sem equivalente no registry**. Testes verificam import, props, versão, tokens, semântica de estados e justificativa de exceção. Configuração legada `strict/advisory` permanece válida.
+### 20.5 Evidence of improvement and criticality
 
-### 20.5 Evidência de melhoria e criticidade
+Deterministic checks prove only their own criteria; Design Critic/LLM judge provide recommendations, not certification. The evaluation protocol must include representative tasks, preservation of results, success/time/errors when measurable, manual accessibility when applicable, content, density and the `keep_as_is` option. Do not claim a UX gain without a benchmark or user study. Failure of a known critical functional scenario prevents `prototype_ready`, regardless of appearance.
 
-Checks determinísticos provam somente seus critérios; Design Critic/LLM judge fornecem recomendações, não certificação. O protocolo de avaliação deve incluir tarefas representativas, preservação de resultados, sucesso/tempo/erros quando mensuráveis, acessibilidade manual quando aplicável, conteúdo, densidade e a opção `keep_as_is`. Não declarar ganho de UX sem benchmark ou estudo de usuários. Reprovação de cenário funcional crítico conhecido impede `prototype_ready`, independentemente da aparência.
+### 20.6 Execution governance and early stopping
 
-### 20.6 Governança de execução e early stopping
+Keep the single controller `host_agent` XOR `craft_runner`, Lean mode and optional REA/MCP. Record calls, time, payloads, progress in checks and tokens when available. Stop repeated refinement without objective improvement; when counters are not observable, use effective limits on time/calls/rounds, reporting `usage=unavailable`, never a fictitious zero. Do not impose token budgets as guaranteed limits if the backend does not allow enforcement.
 
-Manter controlador único `host_agent` XOR `craft_runner`, modo Lean e REA/MCP opcionais. Registrar chamadas, tempo, payloads, progresso nos checks e tokens quando disponíveis. Interromper refinamento repetido sem melhoria objetiva; quando contadores não forem observáveis, usar limites efetivos de tempo/chamadas/rodadas, reportando `usage=unavailable`, jamais zero fictício. Não impor orçamentos de tokens como limites garantidos se o backend não permite enforcement.
+### 20.7 Simplification and stopping triggers
 
-### 20.7 Gatilhos de simplificação e interrupção
+Reevaluate the fork if the extension requires intrusive changes to the core; reevaluate the Design Engine if it does not outperform baseline B; discard REA/optional integration without marginal gain; stop expansion when there is loss of critical functions, a risk to sensitive data or uncontrolled execution. Record decisions in an ADR with evidence and an owner. Quantitative criteria will be defined **before** the benchmark, not after seeing results.
 
-Reavaliar fork se a extensão exigir mudanças intrusivas no core; reavaliar Design Engine se não superar baseline B; descartar REA/integração opcional sem ganho marginal; interromper expansão quando houver perda de funções críticas, risco de dados sensíveis ou execução descontrolada. Registrar decisões em ADR com evidência e responsável. Critérios quantitativos serão definidos **antes** do benchmark, não depois de ver resultados.
+### 20.8 Security and product conditions
 
-### 20.8 Condições de segurança e produto
+Do not run untrusted installs/scripts without approval and isolation; segregate projects and credentials; prevent export of sessions and private data; apply an authorization scope per project. `Engineering Ready` continues to mean ready for review and integration, **never automatic production approval**. The product may return `needs_evidence` and `keep_as_is` as valid results.
 
-Não executar instalações/scripts não confiáveis sem aprovação e isolamento; segregar projetos e credenciais; impedir exportação de sessões e dados privados; aplicar escopo de autorização por projeto. `Engineering Ready` continua significando pronto para revisão e integração, **nunca aprovação automática de produção**. O produto pode retornar `needs_evidence` e `keep_as_is` como resultados válidos.
+## Normative addendum v1.3.0 — Council II controls
 
-## Adendo normativo v1.3.0 — controles do Council II
+**Precedence:** in conflict with earlier sections, `TRUST_BOUNDARIES.md`, `ORACLE_POLICY.md`, `SAFE_WORKSPACE_POLICY.md` and `OSS_DX_AND_UPSTREAM.md` prevail. These rules are implementation requirements, not proven features.
 
-**Precedência:** em conflito com seções anteriores, prevalecem `TRUST_BOUNDARIES.md`, `ORACLE_POLICY.md`, `SAFE_WORKSPACE_POLICY.md` e `OSS_DX_AND_UPSTREAM.md`. Estas regras são requisitos de implementação, não funcionalidades comprovadas.
-
-1. `host_agent` não implica sandbox global. O produto limita apenas suas ferramentas; comandos externos do agente ficam sob políticas do host.
-2. Toda escrita no projeto-alvo exige diff e aprovação; saída padrão é workspace isolado.
-3. Testes de paridade usam oráculos independentes e rastreáveis; hipótese de LLM nunca é expected result verificado.
-4. Evidências incluem ambiente, versão, role, tenant, flags, origem, retenção e política de redaction.
-5. MCP, páginas e documentos são fontes de dados não confiáveis, nunca instruções executáveis ou autoridade de aprovação.
-6. Design systems corporativos precisam de versão/hash, direitos de uso e cache segregado; ativos privados não são redistribuídos.
-7. Release exige compatibilidade declarada por agente/SO, acessibilidade além de checks automáticos e atualização upstream auditável.
-8. Em divergência entre segurança e DX, `doctor` permanece sem efeitos colaterais; instalações exigem consentimento.
-9. `Concept Ready`, `Prototype Ready` e `Engineering Ready` respeitam os gates da `ORACLE_POLICY.md`. Nenhum nível equivale automaticamente a produção.
+1. `host_agent` does not imply a global sandbox. The product limits only its own tools; the agent's external commands remain under the host's policies.
+2. Every write to the target project requires a diff and approval; the default output is an isolated workspace.
+3. Parity tests use independent, traceable oracles; an LLM hypothesis is never a verified expected result.
+4. Evidence includes environment, version, role, tenant, flags, origin, retention and redaction policy.
+5. MCP, pages and documents are untrusted data sources, never executable instructions or approval authority.
+6. Corporate design systems need version/hash, usage rights and segregated cache; private assets are not redistributed.
+7. Release requires declared compatibility per agent/OS, accessibility beyond automated checks and an auditable upstream update.
+8. In a divergence between security and DX, `doctor` remains free of side effects; installations require consent.
+9. `Concept Ready`, `Prototype Ready` and `Engineering Ready` respect the gates of `ORACLE_POLICY.md`. No level automatically equals production.

@@ -1,46 +1,46 @@
-# Protocolo de benchmark — Redesign Anything v1.2.0
+# Benchmark protocol — Redesign Anything v1.2.0
 
-## Hipótese
+## Hypothesis
 
-H1: REA oferece redesign de UX melhor ou mais confiável do que Craft com instruções de UX, **com o mesmo agente/modelo/fixture** e sem perda de funções críticas conhecidas.
+H1: REA delivers a better or more reliable UX redesign than Craft with UX instructions, **using the same agent/model/fixture** and without losing known critical functions.
 
-## Braços
+## Arms
 
-- **A — Craft comum:** pedido simples de redesign sem packs especializados.
-- **B — Craft + prompt de UX:** instruções detalhadas equivalentes ao conhecimento base, sem ferramentas REA próprias.
-- **C — Redesign Anything Lean:** Task Model, packs e checks, sem REA/MCP externos.
-- **D — REA Deep (opcional):** C + REA, apenas se houver lacunas específicas.
+- **A — Plain Craft:** a simple redesign request without specialized packs.
+- **B — Craft + UX prompt:** detailed instructions equivalent to the knowledge base, without REA's own tools.
+- **C — Redesign Anything Lean:** Task Model, packs and checks, without external REA/MCP.
+- **D — REA Deep (optional):** C + REA, only if there are specific gaps.
 
-## Controle experimental
+## Experimental control
 
-Fixar aplicação/commit, fixtures, credenciais sintéticas, DS quando aplicável, agente, modelo, temperatura quando controlável, limite de chamadas, hardware, tempo e instruções. Executar múltiplas repetições quando possível e registrar variância. Julgadores cegos quanto à origem da proposta. Nunca interpretar ausência de contagem de tokens como zero.
+Fix the application/commit, fixtures, synthetic credentials, DS when applicable, agent, model, temperature when controllable, call limit, hardware, time and instructions. Run multiple repetitions when possible and record variance. Judges are blind to the origin of each proposal. Never interpret a missing token count as zero.
 
-## Métricas e gates
+## Metrics and gates
 
-- **Bloqueantes:** resultados funcionais críticos conhecidos; nenhum segredo exportado; nenhum check falho marcado como aprovado; nenhum builder aninhado.
-- **Qualidade:** sucesso por tarefa, tempo/erros se medidos, revisão de conteúdo, densidade adequada, conformidade DS, acessibilidade automática + manual em amostra.
-- **Cobertura:** descoberto/observado/inferido/desconhecido com denominadores definidos; falsa inferência de regra é defeito.
-- **Custo:** duração, chamadas, retries, tokens reportados/cache/estimados/indisponíveis.
-- **UX:** avaliadores julgam com rubrica e sem saber qual braço produziu cada versão; o Design Critic não substitui avaliação.
+- **Blocking:** known critical functional outcomes; no secret exported; no failed check marked as passed; no nested builder.
+- **Quality:** per-task success, time/errors if measured, content review, appropriate density, DS conformance, automated accessibility + manual accessibility on a sample.
+- **Coverage:** discovered/observed/inferred/unknown with defined denominators; falsely inferring a rule is a defect.
+- **Cost:** duration, calls, retries, tokens reported/cached/estimated/unavailable.
+- **UX:** evaluators judge with a rubric and without knowing which arm produced each version; the Design Critic does not replace evaluation.
 
-## Decisão antes da execução
+## Decision before execution
 
-Registrar limiares numéricos, número de tarefas, tamanho da amostra, critérios de desempate e orçamento em ADR específico **antes** de gerar resultados. Sem isso, resultado é exploratório, não validação causal. Caso B seja equivalente a C, preferir a arquitetura mais simples. Se D não agregar cobertura, deixá-lo fora do fluxo padrão.
+Record numeric thresholds, number of tasks, sample size, tie-break criteria and budget in a dedicated ADR **before** generating results. Without this, the result is exploratory, not causal validation. If B is equivalent to C, prefer the simpler architecture. If D does not add coverage, leave it out of the default flow.
 
-## Estado
+## Status
 
-**Não executado.** Esta é uma metodologia proposta; nenhum score ou ganho foi medido.
+**Not executed.** This is a proposed methodology; no score or gain has been measured.
 
-## Complemento v1.3.0 — pré-registro obrigatório
+## v1.3.0 addendum — mandatory pre-registration
 
-Antes da primeira execução, criar um `BENCHMARK_RUN_PLAN` versionado com: conjunto e quantidade de fixtures; pelo menos uma tarefa densa e uma jornada com estados; critérios de inclusão; número de repetições por braço; configuração do agente/modelo; ordem de execução e aleatorização quando possível; orçamento igual; rubrica cega; critérios de desempate; métricas primárias; tamanho mínimo de efeito e limites de regressão funcional **numéricos definidos antes de observar resultados**. Não inventar thresholds nesta documentação.
+Before the first run, create a versioned `BENCHMARK_RUN_PLAN` with: the set and number of fixtures; at least one dense task and one journey with states; inclusion criteria; number of repetitions per arm; agent/model configuration; run order and randomization when possible; equal budget; blind rubric; tie-break criteria; primary metrics; minimum effect size and **numeric** functional-regression limits **defined before observing results**. Do not invent thresholds in this documentation.
 
-**Slice 0 pré-registro:** [`benchmark/BENCHMARK_RUN_PLAN.md`](benchmark/BENCHMARK_RUN_PLAN.md) (congelado em 2026-11-20; execução ainda não iniciada). Fixtures: [`fixtures/`](fixtures/).
+**Slice 0 pre-registration:** [`benchmark/BENCHMARK_RUN_PLAN.md`](benchmark/BENCHMARK_RUN_PLAN.md) (frozen on 2026-11-20; execution not yet started). Fixtures: [`fixtures/`](fixtures/).
 
-Amostras pequenas podem orientar decisões de engenharia, mas não autorizam generalização estatística. Separar resultados exploratórios de confirmatórios. Registrar todas as falhas, retries, outliers, versões, prompts, mudanças de ambiente, tokens unavailable e conflitos de interesse de avaliadores. Nenhum LLM pode aprovar sozinho a própria saída.
+Small samples can guide engineering decisions but do not authorize statistical generalization. Separate exploratory results from confirmatory ones. Record all failures, retries, outliers, versions, prompts, environment changes, unavailable tokens and evaluator conflicts of interest. No LLM may approve its own output alone.
 
-Oráculos independentes e dados sintéticos devem ser congelados antes de executar A/B/C; consultar `ORACLE_POLICY.md`. A baseline B deve receber instruções UX fortes, sem enfraquecimento artificial. Se C não superar B de maneira útil, preferir a solução mais simples.
+Independent oracles and synthetic data must be frozen before running A/B/C; see `ORACLE_POLICY.md`. Baseline B must receive strong UX instructions, without artificial weakening. If C does not usefully outperform B, prefer the simpler solution.
 
-## Gate de lançamento V1 Impactante
+## First public release launch gate
 
-O benchmark é obrigatório antes da primeira publicação pública; comparar Craft puro, Craft com instruções fortes e Redesign Anything em fixtures distintas, incluindo jornada multietapa e design system real. Pré-registrar métricas e limiares. Se não demonstrar ganho útil contra o baseline com instruções fortes, melhorar a implementação antes do lançamento. Ver `V1_IMPACTANTE.md`.
+The benchmark is mandatory before the first public release; compare plain Craft, Craft with strong instructions and Redesign Anything on distinct fixtures, including a multi-step journey and a real design system. Pre-register metrics and thresholds. If it does not show a useful gain over the baseline with strong instructions, improve the implementation before launch. See `V1_FIRST_RELEASE.md`.

@@ -1,66 +1,66 @@
-> **v1.4.0 — interpretação obrigatória:** slices 0–5 são checkpoints internos de integração, não MVPs nem releases públicos. O release V1 exige o conjunto completo e os gates de `V1_IMPACTANTE.md`. Trabalhar em frentes paralelas é permitido; integrar e testar continuamente.
+> **v1.4.0 — mandatory interpretation:** slices 0–5 are internal integration checkpoints, not MVPs or public releases. The V1 release requires the complete set and the gates in `V1_FIRST_RELEASE.md`. Working on parallel fronts is allowed; integrate and test continuously.
 
-# Plano de execução priorizado — v1.2.0
+# Prioritized execution plan — v1.2.0
 
-> **Prevalece sobre a ordem histórica de PRs em `IMPLEMENTATION_PLAN.md`**. Os PR-00..PR-12 permanecem como backlog técnico, mas o primeiro ciclo é reorganizado para provar valor e checks antes de infraestrutura avançada.
+> **Takes precedence over the historical PR order in `IMPLEMENTATION_PLAN.md`**. PR-00..PR-12 remain as the technical backlog, but the first cycle is reorganized to prove value and checks before advanced infrastructure.
 
-## Slice 0 — Baseline e fork mínimo
+## Slice 0 — Baseline and minimal fork
 
-- Fixar SHA upstream, licenças, requisitos Rust/Node e `cargo test --workspace`/smokes conforme suporte local.
-- Instalação assistida por URL do repo; nenhum setup ou script de terceiros executado silenciosamente.
-- Criar fixtures originais, uma tela densa e uma jornada com 2–3 passos, com regras e oráculos conhecidos.
-- Estabelecer baselines A=Craft comum, B=Craft+instruções UX e C=REA; congelar rubrica e condições antes da execução.
-- Aceite: ambiente reproduzível, baseline documentado, sem alegar melhoria.
+- Pin the upstream SHA, licenses, Rust/Node requirements and `cargo test --workspace`/smokes as local support allows.
+- Assisted installation from the repo URL; no third-party setup or script is executed silently.
+- Create original fixtures: one dense screen and one journey with 2–3 steps, with known rules and oracles.
+- Establish baselines A=plain Craft, B=Craft+UX instructions and C=REA; freeze the rubric and conditions before execution.
+- Acceptance: reproducible environment, documented baseline, no claim of improvement.
 
-## Slice 1 — Primeiro redesign ponta a ponta
+## Slice 1 — First end-to-end redesign
 
-- `RedesignKind` com integração CLI/MCP no host_agent, sem runner aninhado.
-- Reutilizar Study do Craft; persistir Task Model mínimo e evidências/unknowns.
-- Gerar diagnóstico e opções incluindo `keep_as_is`; construir React/TS.
-- **Antecipar checks mínimos:** build/typecheck, smoke da tarefa crítica, referências de evidência, falha fechada em timeout, relatório Concept/Prototype Ready.
-- Aceite: tarefa fixture funciona e não regrediu; logs sem segredos; `unknown` não vira `passed`.
+- `RedesignKind` with CLI/MCP integration in host_agent, without a nested runner.
+- Reuse Craft's Study; persist a minimal Task Model and evidence/unknowns.
+- Generate a diagnosis and options including `keep_as_is`; build React/TS.
+- **Bring forward minimal checks:** build/typecheck, critical-task smoke, evidence references, fail-closed on timeout, Concept/Prototype Ready report.
+- Acceptance: the fixture task works and has not regressed; logs contain no secrets; `unknown` does not become `passed`.
 
-## Slice 2 — Diferenciação de UX
+## Slice 2 — UX differentiation
 
-- Knowledge Packs locais com regras/contraindicações e recuperação enxuta.
-- Rastrear decisões e qualidade de conteúdo (rótulos, erros, estados).
-- Executar benchmark A/B/C com revisão cega e métricas pré-registradas; contabilizar chamadas, duração e tokens quando disponíveis.
-- Aceite: ganho demonstrável em pelo menos uma dimensão relevante sem regressão crítica; caso contrário, simplificar para skills/checks.
+- Local Knowledge Packs with rules/contraindications and lean retrieval.
+- Track decisions and content quality (labels, errors, states).
+- Run the A/B/C benchmark with blind review and pre-registered metrics; account for calls, duration and tokens when available.
+- Acceptance: demonstrable gain in at least one relevant dimension with no critical regression; otherwise, simplify to skills/checks.
 
-## Slice 3 — DS corporativo real
+## Slice 3 — Real corporate DS
 
-- Integrar um pacote React/TS de fixture com tokens e componentes.
+- Integrate a fixture React/TS package with tokens and components.
 - `required_component`, `allowed_composition`, `extension_requires_approval`.
-- Validar imports/props/versão, tokens e semântica de estado.
-- Aceite: build e checks positivos/negativos com política strict consistente.
+- Validate imports/props/version, tokens and state semantics.
+- Acceptance: build and positive/negative checks with a consistent strict policy.
 
-## Slice 4 — Investigação profunda seletiva
+## Slice 4 — Selective deep investigation
 
-- Primeiro medir lacunas do Study nativo. Só então testar REA ou Application MCP isoladamente.
-- Registrar cobertura marginal, falsos positivos, latência, custo e risco.
-- Aceite: integrar apenas se benefício incremental for reproduzível.
+- First measure the gaps in native Study. Only then test REA or Application MCP in isolation.
+- Record marginal coverage, false positives, latency, cost and risk.
+- Acceptance: integrate only if the incremental benefit is reproducible.
 
-## Slice 5 — Robustez, desktop e release
+## Slice 5 — Robustness, desktop and release
 
-- Regressão upstream, segurança adversarial, instalação multiplataforma, acessibilidade manual e governança OSS.
-- Aceite: release reproduzível, docs agent-first, limitações explícitas, sem promessa de produção automática.
+- Upstream regression, adversarial security, cross-platform installation, manual accessibility and OSS governance.
+- Acceptance: reproducible release, agent-first docs, explicit limitations, no promise of automatic production.
 
-## Regra de mudança
+## Change rule
 
-Nenhum módulo novo entra no caminho crítico sem hipótese, teste, orçamento e fallback documentados. Cada slice exige relatório de riscos residuais. Não há datas ou percentuais inventados.
+No new module enters the critical path without a documented hypothesis, test, budget and fallback. Each slice requires a residual-risk report. There are no invented dates or percentages.
 
-## Adendo obrigatório v1.3.0 — condições de entrada por slice
+## Mandatory addendum v1.3.0 — entry conditions per slice
 
-**Slice 0:** registrar `TRUST_BOUNDARIES.md`, `ORACLE_POLICY.md`, baseline de licenças/attribution, SHA upstream, `doctor` sem efeitos, fixture com oráculos independentes e plano de benchmark pré-registrado.
+**Slice 0:** record `TRUST_BOUNDARIES.md`, `ORACLE_POLICY.md`, license/attribution baseline, upstream SHA, side-effect-free `doctor`, a fixture with independent oracles and a pre-registered benchmark plan.
 
-**Slice 1:** output isolado por padrão, proibir patch sem aprovação, oráculos com origem externa à geração, falha fechada em timeout, redaction antes de persistir, escopo de paths/origens e proibição de builder aninhado.
+**Slice 1:** isolated output by default, prohibit patching without approval, oracles whose origin is external to generation, fail-closed on timeout, redaction before persisting, path/origin scope and prohibition of a nested builder.
 
-**Slice 2:** avaliação cega com amostragem e thresholds definidos antes da execução; não usar apenas LLM-as-judge; métricas de tarefas e resultados funcionais.
+**Slice 2:** blind evaluation with sampling and thresholds defined before execution; do not rely on LLM-as-judge alone; task metrics and functional results.
 
-**Slice 3:** DS versionado por hash/lockfile; não redistribuir ativos privados; validar semântica de componentes além de import/props.
+**Slice 3:** DS versioned by hash/lockfile; do not redistribute private assets; validate component semantics beyond import/props.
 
-**Slice 4:** REA/MCP opt-in; evidência nova, permissões e política de dados comprovadas; nenhuma chamada mutante automática.
+**Slice 4:** REA/MCP opt-in; new evidence, permissions and data policy demonstrated; no automatic mutating call.
 
-**Slice 5:** CI/regressão upstream, smoke real por agente/SO, teclado/foco/zoom/leitor de tela em amostra, retenção e purge testados.
+**Slice 5:** CI/upstream regression, real smoke per agent/OS, keyboard/focus/zoom/screen reader on a sample, retention and purge tested.
 
-**Regra de bloqueio:** nenhum slice pode declarar `Ready` se houver testes críticos sem execução ou oráculos apenas inferidos. O escopo e os desconhecidos permanecem visíveis.
+**Blocking rule:** no slice may declare `Ready` if there are critical tests not executed or oracles that are only inferred. Scope and unknowns remain visible.

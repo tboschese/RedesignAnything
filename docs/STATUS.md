@@ -2,7 +2,7 @@
 
 ## Redesign Anything — fork status (2026-11-20)
 
-**PR-01..PR-11 on main; quality runners + fixture smoke in progress; PR-12 checklist open.** Upstream pin `827be601e781…`. See [`V1_GAP.md`](V1_GAP.md). Native `redesign-ready` + oracle/Playwright/axe report ingestion. **V1 is not released.**
+**PR-01..PR-11 on main; quality runners + fixture smoke landed; PR-12 checklist open.** Upstream pin `827be601e781…`. Binding release bar: [`../REDESIGN_SPEC/V1_FIRST_RELEASE.md`](../REDESIGN_SPEC/V1_FIRST_RELEASE.md); gaps: [`V1_GAP.md`](V1_GAP.md). Native `redesign-ready` + oracle/Playwright/axe report ingestion. **First public release is not shipped.** Repository docs are English.
 
 ---
 

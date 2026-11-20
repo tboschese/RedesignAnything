@@ -1,47 +1,51 @@
-# Changelog — Spec Redesign Anything
+# Changelog — Redesign Anything specification
 
-## Documentação 1.2.0 — 19/11/2026
+## Documentation 1.4.1 — 2026-11-20
 
-- `COUNCIL_ROUND_2.md` acrescenta uma segunda revisão crítica com oito perspectivas, divergências, votos condicionais, lacunas e decisão GO/NO-GO para os slices iniciais.
+- Renamed product nickname **V1 Impactante** → **First public release**; binding doc is now `V1_FIRST_RELEASE.md` (removed `V1_IMPACTANTE.md`).
+- Root `README.md` and entry docs (`REDESIGN_SPEC/README.md`, `AGENT_FIRST.md`, `AGENTS_REDESIGN.md`, `docs/V1_GAP.md`) rewritten in **English**. Chat with maintainers may remain in Portuguese; repository text is English.
+- Cross-references updated across the kit and `docs/`.
 
+## Documentation 1.2.0 — 2026-11-19
 
-- Conselho simulado de software, IA, design e produto consolidado; inclusão de segurança, QA, DX/OSS e domínio corporativo na revisão seguinte.
-- `SPEC.md` recebe adendo vinculante v1.2: Task Model, melhoria mensurável, políticas de DS em três categorias, checks antecipados, early stopping e simplificação por evidência.
-- `EXECUTION_V12.md` substitui a ordem anterior de PRs por slices verticais, mantendo backlog detalhado histórico.
-- `BENCHMARK_PROTOCOL.md` define braços A/B/C/D, avaliação cega, controle experimental e critérios de parada.
-- `COUNCIL_DECISIONS.md` registra decisões e hipóteses não comprovadas.
-- `VALIDATION_MATRIX.md` ganha T-045 a T-056.
-- Schemas JSON 1.0.0 mantidos para compatibilidade; Task Model inicial é opcional até implementação/migração formal.
-- **Sem testes de integração ou benchmark executados.**
+- `COUNCIL_ROUND_2.md` adds a second critical review with eight perspectives, divergences, conditional votes, gaps and a GO/NO-GO decision for the initial slices.
+- Simulated council of software, AI, design and product consolidated; security, QA, DX/OSS and enterprise-domain perspectives added in the following review.
+- `SPEC.md` receives binding addendum v1.2: Task Model, measurable improvement, design-system policies in three categories, early checks, early stopping and simplification by evidence.
+- `EXECUTION_V12.md` replaces the previous PR order with vertical slices, keeping the detailed historical backlog.
+- `BENCHMARK_PROTOCOL.md` defines arms A/B/C/D, blind evaluation, experimental control and stopping criteria.
+- `COUNCIL_DECISIONS.md` records decisions and unproven hypotheses.
+- `VALIDATION_MATRIX.md` gains T-045 to T-056.
+- JSON Schemas 1.0.0 kept for compatibility; the initial Task Model is optional until implementation/formal migration.
+- **No integration tests or benchmarks were executed.**
 
-## Documentação 1.1.0 — 19/11/2026
+## Documentation 1.1.0 — 2026-11-19
 
-Atualização motivada pela análise de viabilidade da execução via agente e estimativas de tokens.
+Update motivated by the analysis of agent-execution feasibility and token estimates.
 
-- Introduz `COST_AND_EXECUTION.md` com controlador único (`host_agent` / `craft_runner`), modos Lean/Deep, recuperação sob demanda, regras anti-loop, limites por adapter e telemetria honesta.
-- Inclui `execution` opcional em `redesign-config.schema.json`, sem tornar incompatível o contrato de persistência 1.0.0. Exige `allow_nested_builder=false`; em `host_agent`, `model.use_craft_selected_backend=false`.
-- Adiciona `usage-snapshot.schema.json`, com dados de entrada/saída/cache, medição `reported`/`estimated`/`unavailable`, custo `null` quando não observável e exemplos sintéticos.
-- Atualiza `SPEC.md`, `CONTRACTS.md`, `AGENT_FIRST.md`, `AGENTS_REDESIGN.md`, `IMPLEMENTATION_PLAN.md` e `VALIDATION_MATRIX.md` para tornar controle de custo e agente único requisitos P0.
-- Amplia a matriz de testes T-031 a T-044 para orçamento, reinício, fallback, cache, payloads, handoff e benchmark Craft/Lean/Deep.
-- Corrige o gerador de schemas para usar caminho relativo ao kit, em vez de um diretório temporário de execução.
-- **Sem teste real de integração com Cursor/Craft/REA nesta revisão.** Os nove JSON Schemas e os exemplos foram validados por JSON Schema Draft 2020-12.
+- Introduces `COST_AND_EXECUTION.md` with a single controller (`host_agent` / `craft_runner`), Lean/Deep modes, on-demand retrieval, anti-loop rules, per-adapter limits and honest telemetry.
+- Adds an optional `execution` block to `redesign-config.schema.json`, without making the 1.0.0 persistence contract incompatible. Requires `allow_nested_builder=false`; in `host_agent`, `model.use_craft_selected_backend=false`.
+- Adds `usage-snapshot.schema.json`, with input/output/cache data, `reported`/`estimated`/`unavailable` measurement, cost `null` when not observable, and synthetic examples.
+- Updates `SPEC.md`, `CONTRACTS.md`, `AGENT_FIRST.md`, `AGENTS_REDESIGN.md`, `IMPLEMENTATION_PLAN.md` and `VALIDATION_MATRIX.md` to make cost control and a single agent P0 requirements.
+- Extends the test matrix T-031 to T-044 to cover budget, restart, fallback, cache, payloads, handoff and the Craft/Lean/Deep benchmark.
+- Fixes the schema generator to use a path relative to the kit instead of a temporary execution directory.
+- **No real integration test with Cursor/Craft/REA in this revision.** The nine JSON Schemas and the examples were validated against JSON Schema Draft 2020-12.
 
-## Documentação 1.0.0 — 19/11/2026
+## Documentation 1.0.0 — 2026-11-19
 
-Especificação inicial, arquitetura derivada do Craft, contratos semânticos, bibliotecas de UX, design system corporativo, opcional REA/MCP da aplicação, segurança, validação, agent-first e implementação em PRs.
+Initial specification, Craft-derived architecture, semantic contracts, UX libraries, enterprise design system, optional REA/application MCP, security, validation, agent-first and PR-based implementation.
 
-## v1.3.0 — incorporação normativa do Council II (19/11/2026)
+## v1.3.0 — normative incorporation of Council II (2026-11-19)
 
-- Quatro políticas normativas: trust boundaries, oráculos independentes, workspace/patch seguro, DX/OSS/upstream.
-- Adendos vinculantes em SPEC, execução, backlog, benchmark, agent-first, custos e validação.
-- Testes negativos T-057 a T-074 definidos, **não executados**.
-- O relatório `COUNCIL_ROUND_2.md` continua como registro da revisão; suas recomendações críticas passam a requisitos explícitos.
-- Nenhuma implementação de software, benchmark real, criação de GitHub ou aprovação de segurança é reivindicada.
+- Four normative policies: trust boundaries, independent oracles, safe workspace/patch, DX/OSS/upstream.
+- Binding addenda in SPEC, execution, backlog, benchmark, agent-first, costs and validation.
+- Negative tests T-057 to T-074 defined, **not executed**.
+- The `COUNCIL_ROUND_2.md` report remains as the record of the review; its critical recommendations become explicit requirements.
+- No software implementation, real benchmark, GitHub creation or security approval is claimed.
 
-## v1.4.0 — V1 Impactante
+## v1.4.0 — First public release
 
-- Substituído MVP/release parcial por primeira entrega pública completa e impactante.
-- Documento normativo `V1_IMPACTANTE.md` com capacidades, critérios de impacto, seis frentes paralelas, demo e gate de release.
-- Alinhados README, SPEC, plano, execução, agentes, benchmark, custo e matriz.
-- Testes T-075..T-082 especificados, não executados.
-- Mantidas políticas v1.3 de segurança, paridade, workspace e licença.
+- Replaced MVP/partial release with a complete first public delivery and first public release.
+- Normative document `V1_FIRST_RELEASE.md` with capabilities, impact criteria, six parallel workstreams, demo and release gate.
+- Aligned README, SPEC, plan, execution, agents, benchmark, cost and matrix.
+- Tests T-075..T-082 specified, not executed.
+- Kept the v1.3 policies on security, parity, workspace and license.

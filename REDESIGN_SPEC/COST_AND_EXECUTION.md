@@ -1,132 +1,132 @@
-# Redesign Anything — Orquestração, contexto, tokens e limites de execução
+# Redesign Anything — Orchestration, context, tokens and execution limits
 
-> **Status:** contrato proposto para implementação. As faixas abaixo são **hipóteses de planejamento**, não medições de builds do Redesign Anything. Nenhuma tarifa de provedor, assinatura ou gasto monetário é presumida. Leia junto com `SPEC.md`, `CONTRACTS.md`, `AGENT_FIRST.md`, `VALIDATION_MATRIX.md` e o roadmap real do Craft.
+> **Status:** contract proposed for implementation. The ranges below are **planning hypotheses**, not measurements of Redesign Anything builds. No provider rate, subscription or monetary spend is assumed. Read together with `SPEC.md`, `CONTRACTS.md`, `AGENT_FIRST.md`, `VALIDATION_MATRIX.md` and the real Craft roadmap.
 
-## 1. Princípio: um controlador por execução
+## 1. Principle: one controller per execution
 
-O Redesign Anything admite duas modalidades mutuamente exclusivas:
+Redesign Anything supports two mutually exclusive modes:
 
-1. **`host_agent` (preferencial no modo agent-first):** o usuário está no Cursor/Claude Code/Codex e fornece o repositório ou ferramentas MCP. **Esse agente** toma decisões, escreve o código e controla a execução. O Redesign fornece operações de Study, recuperação de conhecimento, decisões, artefatos de build, checks e relatórios. **Não iniciar `rebuild_start`, outro Claude/Codex/Cursor ou um loop de modelo interno automaticamente.** O agente hospedeiro pode escolher chamar o workflow Craft completo somente após consentimento explícito, encerrando/transferindo a responsabilidade de builder.
-2. **`craft_runner`:** usuário inicia o Build/Run pelo desktop ou CLI do Craft. O `RunSet`/runner do Craft possui o builder e seus refinamentos. Os providers de inteligência e investigação **não iniciam outros agentes**; são ferramentas do mesmo fluxo.
+1. **`host_agent` (preferred in agent-first mode):** the user is in Cursor/Claude Code/Codex and provides the repository or MCP tools. **That agent** makes decisions, writes the code and controls execution. Redesign provides Study operations, knowledge retrieval, decisions, build artifacts, checks and reports. **Do not start `rebuild_start`, another Claude/Codex/Cursor or an internal model loop automatically.** The host agent may choose to call the full Craft workflow only after explicit consent, ending/transferring the builder responsibility.
+2. **`craft_runner`:** the user starts Build/Run from the Craft desktop or CLI. Craft's `RunSet`/runner owns the builder and its refinements. The intelligence and investigation providers **do not start other agents**; they are tools of the same flow.
 
-**Invariante:** no máximo um controlador de execução de modelo para cada `run_id`. Se o mesmo processo receber solicitações conflitantes, recusar com erro tipado `controller_conflict`. Retomada reutiliza o controlador original ou exige *handoff* explícito, com log de identidade, checkpoint e consentimento. Um MCP conectado não ganha o direito de disparar o runner implicitamente.
+**Invariant:** at most one model execution controller for each `run_id`. If the same process receives conflicting requests, refuse with the typed error `controller_conflict`. Resumption reuses the original controller or requires an explicit *handoff*, with identity logging, a checkpoint and consent. A connected MCP does not gain the right to trigger the runner implicitly.
 
-**Fallback de modelo:** preferir agente autenticado pelo usuário; backend API ou local somente conforme seleção explícita. O uso de um pacote open source **não** torna inferência gratuita ou compatível com qualquer assinatura. Não copiar, compartilhar ou armazenar credenciais do host.
+**Model fallback:** prefer an agent authenticated by the user; API or local backends only on explicit selection. Using an open source package does **not** make inference free or compatible with any subscription. Do not copy, share or store the host's credentials.
 
-## 2. Perfis de execução
+## 2. Execution profiles
 
-| Perfil | Padrão / trigger | Conhecimento consultado | Agentes | REA e MCP da aplicação |
+| Profile | Default / trigger | Knowledge consulted | Agents | REA and application MCP |
 |---|---|---|---|---|
-| **`lean`** | Default do projeto | Recuperação sob demanda: padrões por tarefa, poucos componentes e evidências resumidas | 1 controlador, crítico no mesmo agente | REA desativado por padrão; MCP de app somente para dúvidas precisas e autorizado |
-| **`deep`** | Seleção explícita ou solicitação aprovada diante de uma lacuna concreta | Investigações incrementais, mais estados/jornadas, reconciliação de evidências | 1 controlador; segunda revisão opcional e orçada | REA só em `capture_mode=deep`; app MCP com política de confiança e consentimento |
+| **`lean`** | Project default | On-demand retrieval: per-task patterns, few components and summarized evidence | 1 controller, critic in the same agent | REA disabled by default; app MCP only for precise, authorized questions |
+| **`deep`** | Explicit selection or approved request in the face of a concrete gap | Incremental investigations, more states/journeys, evidence reconciliation | 1 controller; optional, budgeted second review | REA only with `capture_mode=deep`; app MCP with trust policy and consent |
 
-`deep` **não altera** sozinho o modo de inspeção `clean_room` para `deep`; são eixos distintos. O usuário autoriza separadamente a profundidade da investigação, o uso de ferramentas com efeitos e a saída de dados para modelos remotos. Aplicação MCP e design system podem ser consultados em `lean` se a política permitir e se agregarem contexto necessário.
+`deep` does **not** by itself change the `clean_room` inspection mode to `deep`; they are distinct axes. The user separately authorizes investigation depth, use of tools with side effects and data leaving for remote models. Application MCP and the design system may be consulted in `lean` if policy allows and if they add necessary context.
 
-### Gatilhos para REA (todos requerem Deep autorizado)
+### Triggers for REA (all require authorized Deep)
 
-- Uma capacidade crítica permanece incerta após o Study normal e pode ser esclarecida por JavaScript acessível/fluxo de API.
-- Há conflito específico entre uma evidência observada e uma declaração do MCP.
-- Há necessidade de simulação com estado e capturas suficientes para identificar efeitos confirmados.
+- A critical capability remains uncertain after normal Study and can be clarified by accessible JavaScript/API flow.
+- There is a specific conflict between observed evidence and an MCP claim.
+- There is a need for stateful simulation and sufficient captures to identify confirmed effects.
 
-**Não acionar** por padrão para screenshot, modificação somente de estilo, leitura de guideline, geração de componente ou simples divergência visual. Registrar `probe_reason`, hipóteses, ferramentas chamadas, fatos novos e custo marginal. Uma investigação que não trouxer evidência nova não justifica chamada idêntica novamente.
+**Do not trigger** by default for a screenshot, a style-only change, reading a guideline, generating a component or a simple visual divergence. Record `probe_reason`, hypotheses, tools called, new facts and marginal cost. An investigation that brings no new evidence does not justify an identical call again.
 
-## 3. Modelo de contexto (carga mínima)
+## 3. Context model (minimal load)
 
-1. **Indexar, não injetar:** knowledge packs locais como catálogo versionado com tags, aplicabilidade e contraindicações. Recuperar primeiro 3–8 regras/candidatos relevantes, com *source ids*; ampliar só após necessidade justificada.
-2. **Registry sob demanda:** listar componentes sucintamente, buscar contrato/props/exemplos de apenas componentes escolhidos; nunca colocar o Storybook ou todo o pacote no prompt.
-3. **Evidências com referência:** manter capturas completas no Workspace, transmitir somente sumários, ids estáveis e páginas pequenas. Paginação e tamanho máximo de resposta são aplicados antes de devolver resultados ao agente.
-4. **Sem prompts monolíticos:** `RedesignKind::brief_sections` informa metas, invariantes, índice de evidências, política DS, critérios e caminho de arquivos; decisões detalhadas são recuperadas por ferramentas quando necessárias.
-5. **Critic uma vez por proposta importante:** revisões adicionais somente quando houver falha de gate, decisão nova relevante ou autorização dentro do orçamento. Checks determinísticos têm precedência sobre julgamento verbal.
-6. **Cache seguro:** por `target_revision`, `role`, `environment`, `capture_mode`, `design_system_digest`, `knowledge_pack_version`, `tool_version` e `policy_hash`. TTL/expiração para dados mutáveis; não reutilizar evidência de um perfil/tenant em outro. Não guardar segredos em chave ou payload de cache.
+1. **Index, don't inject:** local knowledge packs as a versioned catalog with tags, applicability and contraindications. Retrieve 3–8 relevant rules/candidates first, with *source ids*; expand only after justified need.
+2. **On-demand registry:** list components concisely, fetch the contract/props/examples of only the chosen components; never put Storybook or the whole package in the prompt.
+3. **Evidence by reference:** keep full captures in the Workspace, transmit only summaries, stable ids and small pages. Pagination and maximum response size are applied before results are returned to the agent.
+4. **No monolithic prompts:** `RedesignKind::brief_sections` conveys goals, invariants, evidence index, DS policy, criteria and file paths; detailed decisions are retrieved through tools when needed.
+5. **Critic once per important proposal:** additional reviews only on a gate failure, a relevant new decision or authorization within budget. Deterministic checks take precedence over verbal judgment.
+6. **Safe cache:** keyed by `target_revision`, `role`, `environment`, `capture_mode`, `design_system_digest`, `knowledge_pack_version`, `tool_version` and `policy_hash`. TTL/expiry for mutable data; do not reuse evidence from one profile/tenant in another. Do not store secrets in the cache key or payload.
 
-## 4. Contabilização de tokens e custo
+## 4. Token and cost accounting
 
-Definições **distintas** por execução e por etapa:
+**Distinct** definitions per execution and per step:
 
-- `input_tokens_reported`: total de entradas informado pelo backend, **incluindo o que ele classifica como cached quando aplicável**. Não somar os cached novamente ao total.
-- `output_tokens_reported`: total de saída do modelo.
-- `cached_input_tokens_reported`: subconjunto dos tokens de entrada (ou reportar explicitamente a semântica do provider se diferente).
-- `reasoning_tokens_reported`: somente quando o backend informa, registrar separado e documentar se é subconjunto de output, para não duplicar.
-- `total_tokens_processed_reported`: soma de categorias mutuamente exclusivas, documentando o critério do backend; **não é uma janela de contexto nem o volume necessariamente cobrado**.
-- `billable_tokens` e `monetary_cost`: somente quando o provedor/host fornecer método confiável e sua base de cálculo; sem tarifa configurada/fornecida → `null`, nunca `0` presumido.
-- `tool_payload_bytes` / `model_context_bytes`: bytes, **não** “tokens exatos”; se estimados por tokenizer identificado, manter `tokens_estimated` separado de `tokens_reported`.
-- `accounting_quality`: `provider_reported`, `host_reported`, `estimated`, `unavailable`. Tratar dados parciais por campo e preservar origem e versão da medição.
+- `input_tokens_reported`: total inputs reported by the backend, **including what it classifies as cached when applicable**. Do not add cached tokens to the total again.
+- `output_tokens_reported`: total model output.
+- `cached_input_tokens_reported`: a subset of the input tokens (or explicitly report the provider's semantics if different).
+- `reasoning_tokens_reported`: only when the backend reports it; record separately and document whether it is a subset of output, to avoid double counting.
+- `total_tokens_processed_reported`: sum of mutually exclusive categories, documenting the backend's criterion; **it is not a context window nor necessarily the billed volume**.
+- `billable_tokens` and `monetary_cost`: only when the provider/host supplies a reliable method and its calculation basis; with no configured/supplied rate → `null`, never an assumed `0`.
+- `tool_payload_bytes` / `model_context_bytes`: bytes, **not** "exact tokens"; if estimated with an identified tokenizer, keep `tokens_estimated` separate from `tokens_reported`.
+- `accounting_quality`: `provider_reported`, `host_reported`, `estimated`, `unavailable`. Treat partial data per field and preserve the origin and version of the measurement.
 
-No modo `host_agent`, o servidor MCP pode **não receber** metadados das mensagens privadas do Cursor/Claude/Codex. Portanto, **não afirmar medição ou enforce de orçamento total em tokens quando o host não expõe telemetria**. Oferecer contadores efetivamente controláveis: chamadas às ferramentas do Redesign, chamadas ao REA, volume de saída, tempo decorrido do serviço, checks e refinamentos que passam pelo Redesign. A UI/relatório mostra “tokens do host indisponíveis” e orienta consulta ao consumo do próprio agente.
+In `host_agent` mode, the MCP server may **not receive** metadata of the private messages of Cursor/Claude/Codex. Therefore, **do not claim measurement or enforcement of a total token budget when the host does not expose telemetry**. Offer counters that can actually be controlled: calls to Redesign tools, calls to REA, output volume, elapsed service time, checks and refinements that pass through Redesign. The UI/report shows "host tokens unavailable" and directs the user to check the agent's own consumption.
 
-No modo `craft_runner`, usar `usage.json`/eventos do runner quando disponíveis e testar contabilidade de cached tokens por backend. Reportar como valor parcial se o agente/backend omitir dados; não simular precisão.
+In `craft_runner` mode, use the runner's `usage.json`/events when available and test cached-token accounting per backend. Report as a partial value if the agent/backend omits data; do not simulate precision.
 
-## 5. Limites: advisory vs enforced
+## 5. Limits: advisory vs enforced
 
-**Obrigatórios por implementação:**
+**Required per implementation:**
 
-- `token_soft_limit`: **aviso**, não bloqueio universal. Pode virar parada verificável apenas quando o controlador reporta tokens e aceita interrupção confiável. Caso contrário, estado `warning_unenforceable`.
-- `max_tool_result_chars`: truncamento/paginação no gateway, preservando evidência completa e referência para detalhes.
-- `max_mcp_calls` e `max_rea_invocations`: limites de chamadas feitas **através do adapter**, com contadores duráveis e retorno `budget_exhausted` antes da próxima execução.
-- `max_critic_passes`, `max_refine_rounds`: limitados no fluxo que o produto controla; se o host realizar refinamentos por fora, o produto não pode restringi-los.
-- `max_run_minutes`: deadline para operações/processos supervisionados pelo Redesign, não bloqueia sessão externa de Cursor/Claude.
-- `no_progress_limit`: detectar repetição de mesmas ferramentas/argumentos sem evidência nem alteração útil e encerrar o *loop* controlado pelo produto; apresentar motivo e próximos passos.
+- `token_soft_limit`: **warning**, not a universal block. It can become a verifiable stop only when the controller reports tokens and accepts a reliable interruption. Otherwise, state `warning_unenforceable`.
+- `max_tool_result_chars`: truncation/pagination at the gateway, preserving full evidence and a reference to the details.
+- `max_mcp_calls` and `max_rea_invocations`: limits on calls made **through the adapter**, with durable counters and a `budget_exhausted` return before the next execution.
+- `max_critic_passes`, `max_refine_rounds`: limited in the flow the product controls; if the host performs refinements outside, the product cannot restrict them.
+- `max_run_minutes`: deadline for operations/processes supervised by Redesign; it does not block an external Cursor/Claude session.
+- `no_progress_limit`: detect repetition of the same tools/arguments without evidence or useful change and end the *loop* controlled by the product; present the reason and next steps.
 
-Ao esgotar budget: persistir checkpoints/evidências, cancelar sidecars próprios, produzir `status: budget_exhausted` sem converter checks não executados em sucesso e solicitar decisão para ampliar limites. **Nunca repetir automaticamente uma operação cara** quando ela falhou por orçamento ou acesso negado.
+When the budget is exhausted: persist checkpoints/evidence, cancel own sidecars, produce `status: budget_exhausted` without converting unexecuted checks into success, and request a decision to raise the limits. **Never automatically repeat an expensive operation** when it failed due to budget or denied access.
 
-## 6. Faixas de tokens para planejar benchmarks (não são compromissos)
+## 6. Token ranges for planning benchmarks (not commitments)
 
-| Escopo | Tokens processados acumulados — hipótese inicial |
+| Scope | Accumulated processed tokens — initial hypothesis |
 |---|---:|
-| Uma tela simples | 150 mil–400 mil |
-| Tela corporativa complexa | 400 mil–1,2 milhão |
-| Jornada de 3–5 telas | 1–3 milhões |
-| Módulo de 10–20 telas | 3–10 milhões |
-| Aplicação extensa | Acima de 10 milhões; não estimar valor máximo antes de amostras |
+| One simple screen | 150k–400k |
+| Complex corporate screen | 400k–1.2 million |
+| Journey of 3–5 screens | 1–3 million |
+| Module of 10–20 screens | 3–10 million |
+| Large application | Above 10 million; do not estimate a maximum before samples |
 
-Incluem contexto repetido, entrada e saída ao longo de chamadas, dependendo das capacidades do modelo. **Não** usar essas faixas como preço, consumo incluso no plano, mínimo garantido ou capacidade de contexto. O projeto deve registrar **quantidade de interações, média/p95 por tipo de ferramenta, tokens reportados/estimados, cached share, custo quando observável, tempo, taxa de sucesso e qualidade final**.
+These include repeated context, input and output across calls, depending on the model's capabilities. **Do not** use these ranges as a price, consumption included in a plan, a guaranteed minimum or a context capacity. The project must record **number of interactions, mean/p95 per tool type, reported/estimated tokens, cached share, cost when observable, time, success rate and final quality**.
 
-Exemplo de **cenário apenas ilustrativo**, tela complexa com 600 mil tokens processados: Study 150 mil; decisão UX 90 mil; Build 240 mil; Check/refinamento 120 mil. O valor não foi aferido em REA nem no Craft do usuário.
+Example of an **illustrative scenario only**, complex screen with 600k processed tokens: Study 150k; UX decision 90k; Build 240k; Check/refinement 120k. The value was not measured in REA or in the user's Craft.
 
-## 7. Defaults de engenharia propostos, ajustáveis e não validados
+## 7. Proposed engineering defaults, adjustable and not validated
 
-| Parâmetro | Default inicial | Enforcement |
+| Parameter | Initial default | Enforcement |
 |---|---:|---|
-| `execution.controller` | `host_agent` ao entrar por MCP de um agente; `craft_runner` ao iniciar na UI/CLI Build | Exclusivo por run |
-| `execution.profile` | `lean` | Aplicar toolset e gating de providers |
-| `execution.allow_nested_builder` | `false` | **Hard block** salvo handoff explicitamente aprovado |
-| `token_soft_limit` | 750.000 por execução de tela corporativa | Aviso quando há contador; caso contrário indisponível |
-| `max_mcp_calls` | 30 chamadas do bridge da aplicação | Hard no gateway próprio |
-| `max_rea_invocations` | 2 por etapa de investigação | Hard no adapter |
-| `max_critic_passes` | 1 por alternativa aprovada | Hard nos passos controlados |
-| `max_tool_result_chars` | 12.000 caracteres por resultado resumido | Hard antes de enviar ao agente; paginação para detalhe |
-| `max_run_minutes` | 90 minutos de operações sob controle do Redesign | Hard nos processos próprios, não no agente hospedeiro |
-| `no_progress_limit` | 2 passos de execução controlada sem evidência/alteração útil | Hard onde houver observabilidade suficiente |
+| `execution.controller` | `host_agent` when entering via an agent's MCP; `craft_runner` when starting from the UI/CLI Build | Exclusive per run |
+| `execution.profile` | `lean` | Apply toolset and provider gating |
+| `execution.allow_nested_builder` | `false` | **Hard block** unless an explicitly approved handoff |
+| `token_soft_limit` | 750,000 per corporate-screen execution | Warning when a counter exists; otherwise unavailable |
+| `max_mcp_calls` | 30 application bridge calls | Hard at own gateway |
+| `max_rea_invocations` | 2 per investigation step | Hard at the adapter |
+| `max_critic_passes` | 1 per approved alternative | Hard in controlled steps |
+| `max_tool_result_chars` | 12,000 characters per summarized result | Hard before sending to the agent; pagination for detail |
+| `max_run_minutes` | 90 minutes of operations under Redesign's control | Hard on own processes, not on the host agent |
+| `no_progress_limit` | 2 controlled execution steps without useful evidence/change | Hard where there is sufficient observability |
 
-Os valores são **heurísticos de partida** e não devem impedir um resultado correto por falta de teste. Medir em benchmark e recalibrar por tamanho de tarefa; sem endereçar `max_refine_rounds` duplicadamente (já existe em `checks`). Se o controlador não suportar telemetria, o resultado deve indicar orçamento parcialmente monitorado.
+The values are **starting heuristics** and must not prevent a correct result for lack of testing. Measure in a benchmark and recalibrate by task size; do not address `max_refine_rounds` twice (it already exists in `checks`). If the controller does not support telemetry, the result must indicate partially monitored budget.
 
-## 8. Benchmark comparativo e critérios de liberação
+## 8. Comparative benchmark and release criteria
 
-Para uma mesma fixture, mesmo agente/modelo/modo, perfil, SO, browser, entradas e consentimentos, executar:
+For the same fixture, same agent/model/mode, profile, OS, browser, inputs and consents, run:
 
-A. Craft isolado como baseline.
-B. Redesign Lean (mesmo agente + conhecimento local/DS + checks nativos).
-C. Redesign Deep (apenas quando gap justificado: REA e/ou MCP da aplicação).
+A. Craft alone as the baseline.
+B. Redesign Lean (same agent + local knowledge/DS + native checks).
+C. Redesign Deep (only when a justified gap exists: REA and/or application MCP).
 
-Registrar resultados **por execução, não só por ferramenta**: qualidade das evidências, precisão/recall de regras conhecidas, cenários funcionais, aderência DS, alterações indevidas, tokens *reportados*, cache, duração, ferramentas invocadas e encerramentos por orçamento. Rodar repetições para avaliar variância; não declarar melhoria baseada em execução única. Comparar também número de modelos/controladores ativos (exigir um por run).
+Record results **per execution, not just per tool**: evidence quality, precision/recall of known rules, functional scenarios, DS adherence, undue changes, *reported* tokens, cache, duration, tools invoked and budget terminations. Run repetitions to assess variance; do not declare an improvement based on a single execution. Also compare the number of active models/controllers (require one per run).
 
-**Aceite inicial:** Lean conclui uma fixture com pelo menos um cenário funcional conhecido e DS aplicado; não usa REA sem gatilho, não lança segundo agente, não acessa modelo externo não autorizado; reporta uso somente quando mensurável. Se gerar resultado útil com overhead alto, **não** bloquear o projeto apenas por valor hipotético: registrar e otimizar, definindo threshold numérico após medição real.
+**Initial acceptance:** Lean completes a fixture with at least one known functional scenario and DS applied; does not use REA without a trigger, does not launch a second agent, does not access an unauthorized external model; reports usage only when measurable. If it produces a useful result with high overhead, **do not** block the project solely on a hypothetical value: record and optimize, defining a numeric threshold after real measurement.
 
-## 9. Limites que não podemos prometer
+## 9. Limits we cannot promise
 
-- Assinatura do Cursor/Claude/Codex cobre qualquer volume ou qualquer uso de MCP/CLI.
-- Contar tokens privados de um agente externo que não disponibiliza telemetria.
-- Proteger a quota do host com um hard cap aplicado por ferramentas externas.
-- Qualidade de redesign em qualquer modelo local pequeno.
-- Mesma qualidade de UX, tempo de execução ou custo em projetos e agentes diferentes.
-- Zero custo financeiro quando o host ou serviço externo possui política de cobrança própria.
+- A Cursor/Claude/Codex subscription covers any volume or any use of MCP/CLI.
+- Counting the private tokens of an external agent that does not provide telemetry.
+- Protecting the host's quota with a hard cap applied by external tools.
+- Redesign quality on any small local model.
+- The same UX quality, execution time or cost across different projects and agents.
+- Zero financial cost when the host or external service has its own billing policy.
 
-**Referências técnicas:** Craft `docs/ROADMAP.md` (R5.3, R5.4), `docs/STATUS.md`, `docs/extending.md`; REA `README.md` e `docs/reference/mcp-contracts.md`; Layout CLI `README.md`. Consulte `SOURCES.md` para URLs e status de implementação.
+**Technical references:** Craft `docs/ROADMAP.md` (R5.3, R5.4), `docs/STATUS.md`, `docs/extending.md`; REA `README.md` and `docs/reference/mcp-contracts.md`; Layout CLI `README.md`. See `SOURCES.md` for URLs and implementation status.
 
-## Adendo v1.3.0 — segurança do agente e custo de validação
+## Addendum v1.3.0 — agent security and validation cost
 
-Limites do gateway MCP/CLI não restringem ferramentas nativas do host. Registrar `host_enforcement=unknown|verified` separadamente de `gateway_enforcement`. Benchmarks devem contabilizar custo de verificações independentes e não reduzir testes críticos para caber em orçamento. Em caso de conflito, interromper e reportar `needs_evidence`, nunca promover `Ready`. Política de dados e consentimento em `TRUST_BOUNDARIES.md`.
+MCP/CLI gateway limits do not restrict the host's native tools. Record `host_enforcement=unknown|verified` separately from `gateway_enforcement`. Benchmarks must account for the cost of independent verifications and must not reduce critical tests to fit a budget. In case of conflict, stop and report `needs_evidence`, never promote `Ready`. Data policy and consent in `TRUST_BOUNDARIES.md`.
 
-## Alinhamento v1.4.0 — V1 Impactante
+## Alignment v1.4.0 — First public release
 
-A primeira entrega pública não é MVP. Todas as capacidades e critérios de lançamento estão em `V1_IMPACTANTE.md`. Os checkpoints técnicos internos não reduzem o escopo do release; políticas de segurança, custo e oráculos permanecem obrigatórias.
+The first public delivery is not an MVP. All capabilities and launch criteria are in `V1_FIRST_RELEASE.md`. Internal technical checkpoints do not reduce the release scope; security, cost and oracle policies remain mandatory.

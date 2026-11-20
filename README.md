@@ -1,70 +1,70 @@
 # Redesign Anything
 
-**Redesenhe aplicações web existentes com evidência, design system e preservação de jornadas — agent-first, open source, local-first.**
+**Redesign existing web applications with evidence, design systems, and journey preservation — agent-first, open source, local-first.**
 
-Fork independente do [Craft Anything](https://github.com/storytold/craft-anything) (MIT OR Apache-2.0). Este repositório é o produto **Redesign Anything**; o Craft continua sendo o motor de estudo/reconstrução.
+Independent fork of [Craft Anything](https://github.com/storytold/craft-anything) (MIT OR Apache-2.0). This repository is the **Redesign Anything** product; Craft remains the study/rebuild engine.
 
 | | |
 |---|---|
 | **Repo** | https://github.com/tboschese/RedesignAnything |
-| **Licença** | MIT OR Apache-2.0 — ver [`LICENSE-MIT`](LICENSE-MIT), [`LICENSE-APACHE`](LICENSE-APACHE), [`NOTICE`](NOTICE), [`ATTRIBUTION.md`](ATTRIBUTION.md) |
+| **License** | MIT OR Apache-2.0 — see [`LICENSE-MIT`](LICENSE-MIT), [`LICENSE-APACHE`](LICENSE-APACHE), [`NOTICE`](NOTICE), [`ATTRIBUTION.md`](ATTRIBUTION.md) |
 | **Upstream pin** | `827be601e781…` — [`docs/UPSTREAM.md`](docs/UPSTREAM.md) |
-| **Status** | PR-01…PR-11 no `main`; V1 pública **ainda não** lançada — [`docs/STATUS.md`](docs/STATUS.md) |
+| **Status** | PR-01…PR-11 on `main`; **First public release** not shipped yet — [`docs/STATUS.md`](docs/STATUS.md), [`REDESIGN_SPEC/V1_FIRST_RELEASE.md`](REDESIGN_SPEC/V1_FIRST_RELEASE.md) |
 | **Spec** | [`REDESIGN_SPEC/`](REDESIGN_SPEC/README.md) |
 
-> **Não é clone visual.** Pixel likeness não é gate. O foco é capacidade conhecida, UX justificada (incluindo `keep_as_is`), DS real e checks que falham fechados.
+> **Not a visual clone.** Pixel likeness is not a gate. Focus is known capability, justified UX (including `keep_as_is`), real design systems, and fail-closed checks.
 
 ---
 
-## O que faz
+## What it does
 
-1. **Study** — reutiliza captura/evidência do Craft; mapeia rotas e oráculos para capacidades com *unknowns* explícitos.
-2. **Plan** — knowledge packs locais, Design Critic (sempre com `keep_as_is`), decisões e plano de transformação tipado.
-3. **Build** — stack padrão React + TypeScript (Vite); scaffold com mocks simulados; sem builder aninhado no modo `host_agent`.
-4. **Check** — registry de design system, rastreabilidade, Ready nativo (`concept` / `prototype` / `engineering`); sem PluginJudge WASM como gate bloqueante.
+1. **Study** — reuses Craft capture/evidence; maps routes and oracles to capabilities with explicit *unknowns*.
+2. **Plan** — local knowledge packs, Design Critic (always with `keep_as_is`), decisions, and a typed transformation plan.
+3. **Build** — default React + TypeScript (Vite) stack; scaffold with simulated mocks; no nested Craft builder in `host_agent` mode.
+4. **Check** — design-system registry, traceability, native Ready (`concept` / `prototype` / `engineering`); no PluginJudge WASM as a blocking gate.
 
-Controle padrão: **`host_agent` + `lean`**. O agente do Cursor/Claude/Codex dirige o CLI/MCP; não inicia um segundo builder Craft sem handoff explícito.
+Default control: **`host_agent` + `lean`**. The Cursor/Claude/Codex agent drives the CLI/MCP; it does not start a second Craft builder without an explicit handoff.
 
 ---
 
-## Para agentes (comece por aqui)
+## For agents (start here)
 
-Cole no Cursor / Claude Code / Codex:
+Paste into Cursor / Claude Code / Codex:
 
 ```text
-Use este repositório: https://github.com/tboschese/RedesignAnything
-Leia README.md, AGENTS.md e REDESIGN_SPEC/AGENT_FIRST.md.
-Explique os pré-requisitos antes de instalar qualquer coisa.
-Não faça install silencioso. Confira docs/BASELINE.md e docs/UPSTREAM.md.
-Depois prepare um projeto kind=redesign (CLI/MCP), preserve jornadas conhecidas
-e reporte o que não foi verificado. Não altere o sistema original.
+Use this repository: https://github.com/tboschese/RedesignAnything
+Read README.md, AGENTS.md, and REDESIGN_SPEC/AGENT_FIRST.md.
+Explain prerequisites before installing anything.
+Do not silent-install. Check docs/BASELINE.md and docs/UPSTREAM.md.
+Then prepare a kind=redesign project (CLI/MCP), preserve known journeys,
+and report what was not verified. Do not modify the original system.
 ```
 
-Checklist do agente:
+Agent checklist:
 
-1. Ler `AGENTS.md`, `REDESIGN_SPEC/AGENTS_REDESIGN.md`, `docs/pitfalls.md`
-2. Confirmar Rust (ver Get started) e, no macOS recente, `DEVELOPER_DIR` / `SDKROOT` se o linker falhar
-3. Pedir consentimento antes de `rustup`, brew, npm, etc.
-4. Usar ferramentas `redesign_*` / CLI; não inventar endpoints nem alegar cobertura 100%
+1. Read `AGENTS.md`, `REDESIGN_SPEC/AGENTS_REDESIGN.md`, `docs/pitfalls.md`
+2. Confirm Rust (see Get started) and, on recent macOS, `DEVELOPER_DIR` / `SDKROOT` if the linker fails
+3. Ask consent before `rustup`, brew, npm, etc.
+4. Use `redesign_*` tools / CLI; do not invent endpoints or claim 100% coverage
 
 ---
 
 ## Get started
 
-### Pré-requisitos
+### Prerequisites
 
-- Rust estável recente (upstream pede 1.97+; baseline deste fork usou 1.100)
+- Recent stable Rust (upstream asks for 1.97+; this fork’s baseline used 1.100)
 - Git
-- Opcional: Node (Vite/REA), browser para Study web
+- Optional: Node (Vite/REA), browser for web Study
 
-**Sem instalação silenciosa.** Peça antes de instalar toolchains.
+**No silent installs.** Ask before installing toolchains.
 
 ```bash
 git clone https://github.com/tboschese/RedesignAnything.git
 cd RedesignAnything
-# remoto de produto
+# product remote
 git remote -v   # origin → tboschese/RedesignAnything
-# opcional: acompanhar Craft
+# optional: track Craft
 git remote add upstream https://github.com/storytold/craft-anything.git
 
 cargo build -p craft-anything-cli
@@ -72,102 +72,102 @@ cargo build -p craft-anything-cli
 ./target/debug/craft-anything-cli commands --format text | head
 ```
 
-No macOS, se o link falhar com SDK dos Command Line Tools:
+On macOS, if linking fails with the Command Line Tools SDK:
 
 ```bash
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 export SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
 ```
 
-### Fluxo mínimo (host agent)
+### Minimal flow (host agent)
 
-Os binários ainda usam o nome de máquina `craft-anything-cli` (herança do Craft). Comandos Redesign:
+Binaries still use the machine name `craft-anything-cli` (Craft heritage). Redesign commands:
 
 ```bash
-# criar projeto redesign sem iniciar builder aninhado
+# create a redesign project without starting a nested builder
 craft-anything-cli redesign-project-init \
-  --request "Redesenhar o formulário de despesas" \
+  --request "Redesign the expense form" \
   --target "https://example.test/expenses" \
   --projects-dir "$HOME/RedesignProjects"
 
-# listar kinds / default stack
+# list kinds / default stack
 craft-anything-cli redesign-kinds-list
 
-# ingestão do DS fixture + scaffold React/TS
+# ingest the fixture DS + React/TS scaffold
 craft-anything-cli redesign-ds-ingest \
-  --project /caminho/do/projeto \
+  --project /path/to/project \
   --package-dir REDESIGN_SPEC/fixtures/design-system \
   --policy strict
 
-craft-anything-cli redesign-scaffold-app --project /caminho/do/projeto
+craft-anything-cli redesign-scaffold-app --project /path/to/project
 
-# Study → store, critic, plano, ready
-craft-anything-cli redesign-study-map --project /caminho/do/projeto \
+# Study → store, critic, plan, ready
+craft-anything-cli redesign-study-map --project /path/to/project \
   --oracle-path REDESIGN_SPEC/fixtures/dense-form/oracle/scenarios.json
-craft-anything-cli redesign-knowledge-retrieve --query "tabela densa com filtros" --tags table,filtering
-craft-anything-cli redesign-critic-recommend --problem "formulário denso de despesas"
-craft-anything-cli redesign-checks-run --project /caminho/do/projeto
+craft-anything-cli redesign-knowledge-retrieve --query "dense table with filters" --tags table,filtering
+craft-anything-cli redesign-critic-recommend --problem "dense expense form"
+craft-anything-cli redesign-checks-run --project /path/to/project
 ```
 
-Rebuild “clássico” do Craft com kind explícito:
+Classic Craft rebuild with an explicit kind:
 
 ```bash
-craft-anything-cli rebuild https://example.test "Redesenhar checkout" \
+craft-anything-cli rebuild https://example.test "Redesign checkout" \
   --kind redesign \
   --projects-dir "$HOME/RedesignProjects"
 ```
 
-MCP: o mesmo conjunto de tools (`redesign_*`) via `craft-anything-cli mcp` (consulte `AGENTS.md`). Em sessão `host_agent`, `rebuild_start` sem handoff retorna `controller_conflict`.
+MCP: the same `redesign_*` tool set via `craft-anything-cli mcp` (see `AGENTS.md`). In a `host_agent` session, `rebuild_start` without handoff returns `controller_conflict`.
 
 ---
 
-## O que já existe neste fork
+## What already exists in this fork
 
-| Área | Estado |
+| Area | State |
 |---|---|
-| `kind=redesign` + persistência em `craft.json` | Pronto |
-| Store versionado `redesign/` | Pronto |
-| Study → capabilities / coverage | Pronto |
-| Knowledge packs + Critic (`keep_as_is`) | Pronto |
-| Design System registry (strict/advisory) | Pronto |
-| Decisões / plano / rastreabilidade | Pronto |
-| Scaffold React+TS+Vite com mocks | Pronto |
-| Ready nativo (`redesign-ready` no kind) | Pronto |
-| Trust gateway Application MCP | Pronto (catálogo/gate) |
-| REA Deep | Contratos + fallback; **binário live ainda não** |
-| Benchmark A/B/C/D | Dry-run honesto; **sem KPIs inventados / sem resultados publicados** |
-| Instaladores / SBOM / rebrand completo | Aberto — [`docs/PR12_RELEASE_CHECKLIST.md`](docs/PR12_RELEASE_CHECKLIST.md) |
+| `kind=redesign` + persistence in `craft.json` | Ready |
+| Versioned `redesign/` store | Ready |
+| Study → capabilities / coverage | Ready |
+| Knowledge packs + Critic (`keep_as_is`) | Ready |
+| Design System registry (strict/advisory) | Ready |
+| Decisions / plan / traceability | Ready |
+| React+TS+Vite scaffold with mocks + multi-route pages from plan | Ready |
+| Native Ready (`redesign-ready` on the kind) | Ready |
+| Application MCP trust gateway | Ready (catalogue/gate) |
+| REA Deep | Contracts + fallback; **live binary not yet** |
+| A/B/C/D benchmark | Honest dry-run; **no invented KPIs / no published results** |
+| Installers / SBOM / full rebrand | Open — [`docs/PR12_RELEASE_CHECKLIST.md`](docs/PR12_RELEASE_CHECKLIST.md) |
 
-Docs por PR: `docs/PR01_*.md` … `docs/PR12_*.md`.
+Per-PR docs: `docs/PR01_*.md` … `docs/PR12_*.md`.
 
 Fixtures: `REDESIGN_SPEC/fixtures/` (dense-form, multi-step-journey, design-system).
 
 ---
 
-## Princípios
+## Principles
 
-- **Unknowns explícitos** — nunca 100% de cobertura quando o denominador é incompleto
-- **`keep_as_is` é válido** — mudança exige justificativa
-- **Sem inventar backend** — `backend_change_required` quando falta contrato atômico
-- **Telemetria honesta** — `unavailable` ≠ zero tokens
-- **Clean room** — tools `redesign_*` allowlisted; Deep/REA exigem consentimento
-- **Não escrever na origem** — saída em `app/` + `redesign/`
+- **Explicit unknowns** — never claim 100% coverage when the denominator is incomplete
+- **`keep_as_is` is valid** — change requires justification
+- **Do not invent backend** — `backend_change_required` when an atomic contract is missing
+- **Honest telemetry** — `unavailable` ≠ zero tokens
+- **Clean room** — `redesign_*` tools are allowlisted; Deep/REA need consent
+- **Do not write to the origin** — output under `app/` + `redesign/`
 
 ---
 
-## Layout do repositório
+## Repository layout
 
 ```text
 apps/                 craft-anything, craft-anything-cli, craft-anything-web
-crates/               motor Craft (L0–L6) + camada AI com módulos redesign_*
-REDESIGN_SPEC/        contratos, schemas, fixtures, plano V1
+crates/               Craft engine (L0–L6) + AI layer with redesign_* modules
+REDESIGN_SPEC/        contracts, schemas, fixtures, First public release plan
 docs/                 STATUS, UPSTREAM, BASELINE, PRxx
-AGENTS.md             regras para agentes neste repo
+AGENTS.md             agent rules for this repo
 ```
 
 ---
 
-## Desenvolvimento
+## Development
 
 ```bash
 cargo xtask fmt
@@ -177,28 +177,28 @@ cargo xtask layers
 cargo xtask secrets
 ```
 
-Branches: `feature/`, `bugfix/`, … + id do roadmap quando houver. Não faça push para `upstream`.
+Branches: `feature/`, `bugfix/`, … + roadmap id when applicable. Do not push to `upstream`.
 
 ---
 
 ## Upstream Craft
 
-Este fork herda o engine, CLI, MCP e UI do Craft. Documentação e branding Craft/ArtCraft ainda aparecem em partes do tree até o rebrand completo.
+This fork inherits Craft’s engine, CLI, MCP, and UI. Craft/ArtCraft docs and branding still appear in parts of the tree until full rebrand.
 
-- Sync e pin: [`docs/UPSTREAM.md`](docs/UPSTREAM.md)
-- Baseline de testes: [`docs/BASELINE.md`](docs/BASELINE.md)
+- Sync and pin: [`docs/UPSTREAM.md`](docs/UPSTREAM.md)
+- Test baseline: [`docs/BASELINE.md`](docs/BASELINE.md)
 - Craft upstream: https://github.com/storytold/craft-anything
 
-**Nunca faça push para o remoto `upstream`.**
+**Never push to the `upstream` remote.**
 
 ---
 
-## Licença e créditos
+## License and credits
 
-Código sob **MIT OR Apache-2.0**, igual ao Craft Anything. Preserve avisos em `NOTICE` e [`ATTRIBUTION.md`](ATTRIBUTION.md). Não redistribua design systems ou dados privados de clientes.
+Code under **MIT OR Apache-2.0**, same as Craft Anything. Preserve notices in `NOTICE` and [`ATTRIBUTION.md`](ATTRIBUTION.md). Do not redistribute private customer design systems or data.
 
 ---
 
-## O que a V1 pública ainda exige
+## What the First public release still requires
 
-Antes de chamar isto de release V1 Impactante, falta (entre outros): installers, SBOM, benchmarks medidos publicados, integração live do REA com consentimento, e a matriz completa de [`REDESIGN_SPEC/V1_IMPACTANTE.md`](REDESIGN_SPEC/V1_IMPACTANTE.md). Checkpoints internos ≠ lançamento.
+Before calling this the First public release, still missing (among others): installers, SBOM, published measured benchmarks, live REA integration with consent, and the full matrix in [`REDESIGN_SPEC/V1_FIRST_RELEASE.md`](REDESIGN_SPEC/V1_FIRST_RELEASE.md). Internal checkpoints ≠ launch. Gap tracking: [`docs/V1_GAP.md`](docs/V1_GAP.md).

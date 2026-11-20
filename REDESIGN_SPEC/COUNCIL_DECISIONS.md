@@ -1,39 +1,39 @@
-# Council — decisões consolidadas da revisão v1.2.0
+# Council — consolidated decisions from the v1.2.0 review
 
-**Status:** simulação de perspectivas profissionais, não reunião com PhDs reais nem consulta a múltiplos modelos independentes. **Escopo:** análise crítica da especificação e da arquitetura; sem benchmark executado. **Decisão:** avançar com P0-minimal e gates mensuráveis.
+**Status:** simulation of professional perspectives; not a meeting with real PhDs and not a consultation of multiple independent models. **Scope:** critical analysis of the specification and architecture; no benchmark was executed. **Decision:** proceed with P0-minimal and measurable gates.
 
-## Membros simulados e conflitos de interesse
+## Simulated members and conflicts of interest
 
-- **Engenharia de software / arquitetura:** manutenção do fork, interfaces, testes e qualidade do código. Veta acoplamento excessivo sem evidência.
-- **Engenharia de IA:** qualidade do raciocínio, baselines, tokens e avaliação. Veta “inteligência” não demonstrada.
-- **Design / HCI:** tarefas, acessibilidade, conteúdo e métricas de UX. Veta avaliação apenas estética.
-- **Product Management:** usuário-alvo, diferenciação, escopo e adoção. Veta P0 inflado.
-- **Segurança e privacidade (novo):** isolamento, consentimento, dados e MCP. Veta fluxos que exponham credenciais ou permitam operações não autorizadas.
-- **QA / confiabilidade (novo):** oráculos, cenários, não-regressão e falsos positivos. Veta `passed` quando não executado.
-- **Developer Experience e OSS (novo):** instalação via URL do repositório, CLI/MCP, documentação, licença, contribuição e upgrades upstream. Veta bootstrap opaco e instalação obrigatória de toda stack.
-- **Especialista de domínio / operação empresarial (novo):** regras reais, papéis, tarefas frequentes, integrações e mudanças transacionais. Veta simplificações sem viabilidade comprovada.
+- **Software engineering / architecture:** fork maintenance, interfaces, tests and code quality. Vetoes excessive coupling without evidence.
+- **AI engineering:** reasoning quality, baselines, tokens and evaluation. Vetoes undemonstrated "intelligence".
+- **Design / HCI:** tasks, accessibility, content and UX metrics. Vetoes purely aesthetic evaluation.
+- **Product Management:** target user, differentiation, scope and adoption. Vetoes an inflated P0.
+- **Security and privacy (new):** isolation, consent, data and MCP. Vetoes flows that expose credentials or allow unauthorized operations.
+- **QA / reliability (new):** oracles, scenarios, non-regression and false positives. Vetoes `passed` when nothing was executed.
+- **Developer Experience and OSS (new):** installation from the repository URL, CLI/MCP, documentation, license, contribution and upstream upgrades. Vetoes opaque bootstrap and mandatory installation of the whole stack.
+- **Domain / enterprise operations specialist (new):** real rules, roles, frequent tasks, integrations and transactional changes. Vetoes simplifications without proven feasibility.
 
-## Decisões vinculantes
+## Binding decisions
 
-| ID | Decisão | Racional | Prova de aceite |
+| ID | Decision | Rationale | Acceptance proof |
 |---|---|---|---|
-| C-01 | P0-minimal em vertical slice | Evitar subsistemas sem valor validado | Uma jornada Study→Build→Check executada no agente |
-| C-02 | Benchmark A/B/C pré-registrado | Isolar diferencial do REA | Mesma fixture/agente/modelo, rubrica cega, relatório |
-| C-03 | Task Model explícito | UX depende do trabalho, não da tela | Task Model com unknowns e resultado esperado |
-| C-04 | Checks mínimos antecipados | Detectar perda funcional cedo | Build + smoke + traceability desde primeiro slice |
-| C-05 | DS em três categorias | Evitar `strict` impraticável | Testes de componentes oficiais/composição/extensão |
-| C-06 | Critic consultivo | LLM judge não é prova | Resultado não promove Ready sozinho |
-| C-07 | REA e MCP opt-in | Evitar custo e risco sem benefício | Desligados no P0-minimal; degradam graciosamente |
-| C-08 | Agente único e limites efetivos | Evitar loops caros e dupla execução | Testes anti-nesting, timeout e usage unavailable |
-| C-09 | Proteção por projeto | Evitar vazamento e ações perigosas | Testes de exfiltração, permissões e isolamento |
-| C-10 | Critérios de simplificação | Evitar sunk cost | ADR documentando manter/remover subsistemas |
-| C-11 | Conteúdo como parte do redesign | Rótulos e erros afetam usabilidade | Revisão de microcopy e terminologia |
-| C-12 | Viabilidade de transações | UX não cria serviços inexistentes | Classificação UI-only/orchestration/backend-change |
+| C-01 | P0-minimal as a vertical slice | Avoid subsystems with no validated value | One Study→Build→Check journey executed in the agent |
+| C-02 | Pre-registered A/B/C benchmark | Isolate the REA differential | Same fixture/agent/model, blind rubric, report |
+| C-03 | Explicit Task Model | UX depends on the work, not the screen | Task Model with unknowns and expected outcome |
+| C-04 | Minimal checks brought forward | Detect functional loss early | Build + smoke + traceability from the first slice |
+| C-05 | DS in three categories | Avoid an impractical `strict` mode | Tests for official components / composition / extension |
+| C-06 | Advisory Critic | An LLM judge is not proof | Its result alone does not promote to Ready |
+| C-07 | REA and MCP opt-in | Avoid cost and risk without benefit | Off in P0-minimal; degrade gracefully |
+| C-08 | Single agent and effective limits | Avoid expensive loops and double execution | Anti-nesting, timeout and usage-unavailable tests |
+| C-09 | Per-project protection | Avoid leaks and dangerous actions | Exfiltration, permission and isolation tests |
+| C-10 | Simplification criteria | Avoid sunk cost | ADR documenting keep/remove decisions for subsystems |
+| C-11 | Content as part of the redesign | Labels and errors affect usability | Microcopy and terminology review |
+| C-12 | Transaction feasibility | UX does not create services that do not exist | UI-only/orchestration/backend-change classification |
 
-## Restrições de escopo
+## Scope restrictions
 
-O P0-minimal não requer REA, MCP da aplicação, canvas, Figma, ingestão completa de Storybook, segundo agente crítico, inferência paga, multi-tenant ou backend novo. Essas capacidades permanecem opcionais/futuras. A experiência desktop do Craft não deve regredir.
+P0-minimal does not require REA, the application MCP, canvas, Figma, full Storybook ingestion, a second critic agent, paid inference, multi-tenancy or a new backend. These capabilities remain optional/future. The Craft desktop experience must not regress.
 
-## Registro de hipóteses não comprovadas
+## Register of unproven hypotheses
 
-H1: Knowledge Packs melhoram a qualidade versus Craft + prompt de UX. H2: adapter de DS produz maior conformidade sem prejudicar tarefas. H3: REA amplia cobertura suficiente para compensar custo. H4: MCP semântico reduz desconhecidos sem introduzir dados incorretos. H5: o fluxo host_agent mantém consumo viável. **Nenhuma hipótese é considerada validada por esta documentação.**
+H1: Knowledge Packs improve quality versus Craft + a UX prompt. H2: a DS adapter produces higher conformance without harming tasks. H3: REA broadens coverage enough to offset its cost. H4: semantic MCP reduces unknowns without introducing incorrect data. H5: the host_agent flow keeps consumption viable. **No hypothesis is considered validated by this documentation.**

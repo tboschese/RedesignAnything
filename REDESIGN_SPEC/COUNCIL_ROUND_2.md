@@ -1,84 +1,84 @@
-# Council II — Revisão adversarial da spec v1.2.0
+# Council II — Adversarial review of the v1.2.0 spec
 
-**Data:** 19/11/2026. **Natureza:** simulação estruturada de oito perspectivas profissionais, não participação de especialistas reais ou de modelos independentes. **Evidência disponível:** documentação/spec e referências aos repositórios; nenhum benchmark integrado foi executado.
+**Date:** 2026-11-19. **Nature:** structured simulation of eight professional perspectives; not the participation of real experts or independent models. **Available evidence:** documentation/spec and references to the repositories; no integrated benchmark was executed.
 
-## Participantes
+## Participants
 
-1. Arquitetura de software: modularidade, compatibilidade upstream, correção do fork.
-2. Engenharia de IA: baselines, inferência, avaliações e controle de contexto.
-3. Design/HCI: tarefas, acessibilidade, conteúdo, pesquisa e qualidade operacional.
-4. Product Management: posicionamento, escopo, adoção, métricas e estratégia.
-5. Segurança e privacidade (novo): credenciais, isolamento, supply chain, MCP e autorização.
-6. QA e confiabilidade (novo): oráculos, falsos positivos, regressões e reprodutibilidade.
-7. Developer Experience e OSS (novo): instalação, CI, suporte, documentação, licenças e distribuição.
-8. Especialista em operação empresarial (novo): papéis, transações, processos, dados e impactos reais.
+1. Software architecture: modularity, upstream compatibility, fork correctness.
+2. AI engineering: baselines, inference, evaluations and context control.
+3. Design/HCI: tasks, accessibility, content, research and operational quality.
+4. Product Management: positioning, scope, adoption, metrics and strategy.
+5. Security and privacy (new): credentials, isolation, supply chain, MCP and authorization.
+6. QA and reliability (new): oracles, false positives, regressions and reproducibility.
+7. Developer Experience and OSS (new): installation, CI, support, documentation, licenses and distribution.
+8. Enterprise operations specialist (new): roles, transactions, processes, data and real-world impact.
 
-## Rodada adversarial — críticas e respostas
+## Adversarial round — critiques and responses
 
-### Arquitetura
-**Objeção:** Mesmo o v1.2 mantém contratos e nomes de módulos que podem não mapear de forma estável aos pontos de extensão do Craft. `TargetKind` sozinho não garante CLI/MCP/desktop, persistência e gating. **Resposta:** Slice 0 precisa fixar SHA e mapear integrações reais; Slice 1 só passa com E2E headless. **Veto:** alterações profundas no core sem ADR comparando fork e extensão.
+### Architecture
+**Objection:** Even v1.2 keeps contracts and module names that may not map stably onto Craft's extension points. `TargetKind` alone does not guarantee CLI/MCP/desktop, persistence and gating. **Response:** Slice 0 must pin the SHA and map real integrations; Slice 1 passes only with a headless E2E. **Veto:** deep changes to the core without an ADR comparing fork and extension.
 
-### IA
-**Objeção:** A/B/C não são comparáveis se B recebe instruções piores do que C, se o modelo muda ou se os avaliadores conhecem a origem. **Resposta:** rubrica pré-registrada, mesmo orçamento e prompt B forte, avaliação cega, múltiplas execuções e registro de variância. **Veto:** reivindicação de superioridade baseada só em LLM-as-judge.
+### AI
+**Objection:** A/B/C are not comparable if B gets worse instructions than C, if the model changes, or if evaluators know the origin. **Response:** pre-registered rubric, same budget and a strong B prompt, blind evaluation, multiple runs and variance recording. **Veto:** a superiority claim based only on LLM-as-judge.
 
 ### Design/HCI
-**Objeção:** `Task Model` é necessário, mas frequência/criticidade frequentemente são desconhecidas. Uma tela mais limpa pode ser pior para usuários experientes. **Resposta:** `unknown` legítimo; preservar alternativa original; incluir teclado, densidade, tarefas em lote, estados e conteúdo. **Veto:** aprovar redesign por estética, screenshots ou score heurístico isolado.
+**Objection:** `Task Model` is necessary, but frequency/criticality are often unknown. A cleaner screen can be worse for experienced users. **Response:** `unknown` is legitimate; preserve the original alternative; include keyboard, density, batch tasks, states and content. **Veto:** approving a redesign based on aesthetics, screenshots or an isolated heuristic score.
 
-### Produto
-**Objeção:** “Qualquer aplicação web” é ambicioso demais; valor para designer e para modernizador são jobs distintos. **Resposta:** primeiro usuário-alvo = desenvolvedor ou designer técnico que precisa redesenhar uma jornada web existente com código verificável. Produto de modernização integral é horizonte, não promessa P0. **Veto:** expansão de escopo antes de prova de diferenciação.
+### Product
+**Objection:** "Any web application" is too ambitious; value for a designer and for a modernizer are distinct jobs. **Response:** first target user = a developer or technical designer who needs to redesign an existing web journey with verifiable code. A full modernization product is a horizon, not a P0 promise. **Veto:** scope expansion before proof of differentiation.
 
-### Segurança e privacidade
-**Objeção:** `host_agent` é controlado por outro processo; o REA não consegue garantir por si só que o agente externo não executará comandos ou enviará capturas a um modelo remoto. **Resposta:** separar controles *enforceable by REA* de orientações ao host; não declarar sandbox completo; isolamento por projeto, autorização explícita e revisão de dados. **Veto:** execução de scripts de origem não confiável, exportação de cookies/tokens ou escrita em produção sem aprovação.
+### Security and privacy
+**Objection:** `host_agent` is controlled by another process; REA cannot by itself guarantee that the external agent will not run commands or send captures to a remote model. **Response:** separate controls *enforceable by REA* from guidance to the host; do not claim a complete sandbox; per-project isolation, explicit authorization and data review. **Veto:** executing scripts from untrusted sources, exporting cookies/tokens, or writing to production without approval.
 
-### QA e confiabilidade
-**Objeção:** `Prototype Ready` pode ser falsamente aprovado se os testes cobrem apenas os fluxos conhecidos e o relatório omite os desconhecidos. **Resposta:** gate exige denominador e escopo explícitos; resultado de check com erro/timeout = falha/inconclusivo; oráculos independentes das hipóteses do próprio gerador. **Veto:** qualquer `passed=true` sem execução verificável.
+### QA and reliability
+**Objection:** `Prototype Ready` can be falsely approved if tests cover only the known flows and the report omits the unknowns. **Response:** the gate requires an explicit denominator and scope; a check result with error/timeout = failure/inconclusive; oracles independent of the generator's own hypotheses. **Veto:** any `passed=true` without verifiable execution.
 
 ### DX/OSS
-**Objeção:** A experiência “passe a URL” não será igual em Cursor, Claude e Codex se exigir Rust, Node, browsers, permissões e configuração de MCP. **Resposta:** bootstrap por etapas com `doctor`, caminhos alternativos e setup explícito; testar ambiente limpo por agente/SO; distinguir licença do core e licenças de cada integração. **Veto:** alegar instalação automática universal ou custo zero de inferência.
+**Objection:** The "pass the URL" experience will not be the same in Cursor, Claude and Codex if it requires Rust, Node, browsers, permissions and MCP configuration. **Response:** staged bootstrap with `doctor`, alternative paths and explicit setup; test a clean environment per agent/OS; distinguish the core license from each integration's license. **Veto:** claiming universal automatic installation or zero inference cost.
 
-### Operação empresarial
-**Objeção:** Consolidar cinco telas pode exigir atomicidade, auditoria e permissões específicas. Um protótipo com mock não demonstra equivalência de negócio. **Resposta:** classificar mudanças UI-only/orchestration/backend-required; usar MCP semântico apenas como fonte, com verificação cruzada; evidenciar regras desconhecidas e proibir inferência de transações. **Veto:** `Engineering Ready` para fluxos críticos sem contrato ou oráculo confiável.
+### Enterprise operations
+**Objection:** Consolidating five screens may require atomicity, auditing and specific permissions. A mock prototype does not demonstrate business equivalence. **Response:** classify changes as UI-only/orchestration/backend-required; use semantic MCP only as a source, with cross-verification; surface unknown rules and forbid inferring transactions. **Veto:** `Engineering Ready` for critical flows without a contract or a trustworthy oracle.
 
-## Debates entre membros
+## Debates between members
 
-**Produto vs. HCI:** Produto defende entregar uma única tela rapidamente; HCI exige pelo menos uma tarefa completa. **Conciliação:** uma jornada pequena, não uma screenshot isolada.
+**Product vs. HCI:** Product argues for shipping a single screen quickly; HCI requires at least one complete task. **Reconciliation:** one small journey, not an isolated screenshot.
 
-**IA vs. Arquitetura:** IA quer manter o Design Engine flexível; Arquitetura quer contratos estáveis. **Conciliação:** contratos para evidências e resultados, não para cada passo interno de raciocínio.
+**AI vs. Architecture:** AI wants to keep the Design Engine flexible; Architecture wants stable contracts. **Reconciliation:** contracts for evidence and results, not for every internal reasoning step.
 
-**DX vs. Segurança:** DX quer bootstrap sem atrito; Segurança veta scripts automáticos. **Conciliação:** diagnóstico automático, execução de instalações apenas com consentimento e registro.
+**DX vs. Security:** DX wants frictionless bootstrap; Security vetoes automatic scripts. **Reconciliation:** automatic diagnosis; installations run only with consent and logging.
 
-**QA vs. Produto:** Produto quer release rápido; QA exige oráculos independentes. **Conciliação:** Concept Ready pode sair com hipóteses; Prototype Ready exige cenários críticos conhecidos testados; Engineering Ready exige integração e escopo explícito.
+**QA vs. Product:** Product wants a fast release; QA requires independent oracles. **Reconciliation:** Concept Ready may ship with hypotheses; Prototype Ready requires the known critical scenarios to be tested; Engineering Ready requires integration and explicit scope.
 
-## Achados novos — lacunas ainda abertas na v1.2.0
+## New findings — gaps still open in v1.2.0
 
-1. **Enforcement fora do processo:** a ferramenta não controla todos os comandos do agente hospedeiro; precisa documentação de fronteiras de confiança e testes host-specific.
-2. **Benchmark sem protocolo de amostragem fechado:** quantidade de fixtures/repetições e limiares devem ser pré-registrados antes de declarar ganho.
-3. **Fonte de verdade de oráculos:** não gerar testes e expected results exclusivamente da própria hipótese do redesign; preferir comportamento observado, contrato ou confirmação humana.
-4. **Edição de projeto existente vs. geração nova:** risco de sobrepor código e rotas do cliente; P0 deve gerar em workspace separado e exigir aprovação para aplicar patches.
-5. **Reprodutibilidade de design systems privados:** pacotes, tokens e Storybook podem mudar; registrar hash/versão, evitar redistribuição de ativos proprietários.
-6. **Compatibilidade do fork com upstream:** estabelecer política de cherry-pick/merge, CI de regressão e ADR se o delta crescer.
-7. **Acessibilidade além do axe:** keyboard-only, foco, leitor de tela em amostra e alto zoom; declarar limitações.
-8. **Segurança de prompts e evidências:** fontes não confiáveis, retenção, TTL, redaction e proibição de exportar sessões.
+1. **Out-of-process enforcement:** the tool does not control all commands of the host agent; it needs trust-boundary documentation and host-specific tests.
+2. **Benchmark without a closed sampling protocol:** the number of fixtures/repetitions and thresholds must be pre-registered before declaring a gain.
+3. **Source of truth for oracles:** do not generate tests and expected results exclusively from the redesign's own hypothesis; prefer observed behavior, a contract or human confirmation.
+4. **Editing an existing project vs. new generation:** risk of overwriting the client's code and routes; P0 must generate into a separate workspace and require approval to apply patches.
+5. **Reproducibility of private design systems:** packages, tokens and Storybook can change; record hash/version, and avoid redistributing proprietary assets.
+6. **Fork compatibility with upstream:** establish a cherry-pick/merge policy, regression CI and an ADR if the delta grows.
+7. **Accessibility beyond axe:** keyboard-only, focus, screen reader on a sample and high zoom; declare limitations.
+8. **Prompt and evidence security:** untrusted sources, retention, TTL, redaction and a ban on exporting sessions.
 
-## Votação simulada
+## Simulated vote
 
-- Arquitetura: **aprova condicionalmente** ao spike e isolamento do core.
-- IA: **aprova condicionalmente** ao benchmark contra baseline B forte.
-- Design/HCI: **aprova condicionalmente** ao Task Model e teste por jornada.
-- Produto: **aprova condicionalmente** ao posicionamento e P0 restrito.
-- Segurança: **aprova condicionalmente** a controles de autorização, dados e supply chain.
-- QA: **aprova condicionalmente** a oráculos independentes e falha fechada.
-- DX/OSS: **aprova condicionalmente** a bootstrap honesto e CI multiambiente.
-- Domínio empresarial: **aprova condicionalmente** a limites transacionais explícitos.
+- Architecture: **conditionally approves**, subject to the spike and core isolation.
+- AI: **conditionally approves**, subject to a benchmark against a strong B baseline.
+- Design/HCI: **conditionally approves**, subject to the Task Model and per-journey testing.
+- Product: **conditionally approves**, subject to positioning and a restricted P0.
+- Security: **conditionally approves**, subject to authorization, data and supply-chain controls.
+- QA: **conditionally approves**, subject to independent oracles and fail-closed behavior.
+- DX/OSS: **conditionally approves**, subject to honest bootstrap and multi-environment CI.
+- Enterprise domain: **conditionally approves**, subject to explicit transactional limits.
 
-**Decisão: GO para Slice 0 e Slice 1; NO-GO para alegações de paridade completa, uso corporativo sensível sem controles testados ou release Engineering Ready sem evidência.** Não há nota empírica de qualidade nem estimativa confiável de ganho de UX.
+**Decision: GO for Slice 0 and Slice 1; NO-GO for claims of full parity, sensitive enterprise use without tested controls, or an Engineering Ready release without evidence.** There is no empirical quality score and no reliable estimate of UX gain.
 
-## Alterações recomendadas para a próxima revisão
+## Recommended changes for the next revision
 
-1. Criar `TRUST_BOUNDARIES.md` com controles reais do processo REA vs. responsabilidades do agente host.
-2. Criar `ORACLE_POLICY.md` e exigir independência de expected results.
-3. Registrar política de output separado e aplicação de patches mediante aprovação.
-4. Fixar protocolo de benchmark antes da execução, inclusive amostragem e limiares.
-5. Criar checklist de DX e licenças por sistema operacional e agente.
+1. Create `TRUST_BOUNDARIES.md` with the real controls of the REA process vs. the host agent's responsibilities.
+2. Create `ORACLE_POLICY.md` and require independence of expected results.
+3. Record a policy of separate output and patch application upon approval.
+4. Fix the benchmark protocol before execution, including sampling and thresholds.
+5. Create a DX and license checklist per operating system and agent.
 
-Essas alterações são recomendações; não foram implementadas nem testadas nesta rodada.
+These changes are recommendations; they were not implemented or tested in this round.

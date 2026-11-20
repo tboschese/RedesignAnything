@@ -36,7 +36,7 @@ git merge upstream/main   # or rebase; resolve conflicts; run CI / cargo test
 
 - Redesign specification kit: [`REDESIGN_SPEC/`](../REDESIGN_SPEC/README.md)
 - Slice plan: [`REDESIGN_SPEC/EXECUTION_V12.md`](../REDESIGN_SPEC/EXECUTION_V12.md)
-- Binding V1 scope: [`REDESIGN_SPEC/V1_IMPACTANTE.md`](../REDESIGN_SPEC/V1_IMPACTANTE.md)
+- Binding V1 scope: [`REDESIGN_SPEC/V1_FIRST_RELEASE.md`](../REDESIGN_SPEC/V1_FIRST_RELEASE.md)
 - Agent coding contract for the fork: [`REDESIGN_SPEC/AGENTS_REDESIGN.md`](../REDESIGN_SPEC/AGENTS_REDESIGN.md)
 
 ## Attribution

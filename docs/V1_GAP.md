@@ -1,36 +1,36 @@
-# Gap para V1 Impactante (2026-11-20)
+# Gap for the First public release (2026-11-20)
 
-Critério vinculante: [`REDESIGN_SPEC/V1_IMPACTANTE.md`](../REDESIGN_SPEC/V1_IMPACTANTE.md).  
-Checkpoints PR-01…11 **não** autorizam release público.
+Binding criterion: [`REDESIGN_SPEC/V1_FIRST_RELEASE.md`](../REDESIGN_SPEC/V1_FIRST_RELEASE.md).  
+PR-01…11 checkpoints do **not** authorize a public release.
 
-## Resumo
+## Summary
 
-| Frente V1 | Situação hoje | Falta para publicação |
+| V1 front | Status today | Still needed for publication |
 |---|---|---|
-| Core Craft / redesign lean | Operacional headless (`redesign_*`, kind, store, scaffold, Ready nativo) | Smoke multi-agente anunciado; regressão contínua documentada |
-| UX Intelligence | Packs mínimos + Critic + `keep_as_is` | Biblioteca **rica** (mais domínios: jornada, estados, conteúdo empresarial); retrieval já existe |
-| Jornadas multi-tela | Study/plan/traceability; scaffold single-page | App gerado com **múltiplas rotas/estados** a partir do plano; demo corporativa completa |
-| DS corporativo | Ingest package.json + DTCG + strict check | Caminho Storybook/docs; typecheck real opcional; DS fixture “corporativo” mais completo |
-| Preservação funcional | Oráculos fixtures + proxy smoke | **Playwright** (ou runner equivalente) ligado aos oráculos; cenários positivo/negativo executáveis |
-| Investigação avançada | MCP trust + REA **contratos**/fallback | **REA live** com Node; Application MCP conectado a server fixture real |
-| Quality Engine | Ready nativo, secrets, DS | **axe-core** (ou similar); amostra a11y manual documentada; relatório exportável unificado |
-| Agent-first / DX | README + CLI/MCP | Matriz Cursor/Claude/Codex executada e publicada; `doctor` redesign-aware |
-| Experiência | CLI/report | Preview/comparação antes-depois no fluxo fixture; UI redesign opcional |
-| OSS / distribuição | Licenças herdadas | **SBOM**, installers, rebrand binário, CI do fork, upgrade/rollback |
-| Impacto (benchmark) | Dry-run A/B/C/D + fixtures pré-registradas | **Execução medida** + avaliação humana cega; ganho vs braço B; **sem inventar KPI** |
+| Core Craft / redesign lean | Headless operational (`redesign_*`, kind, store, scaffold, native Ready) | Announced multi-agent smoke; documented continuous regression |
+| UX Intelligence | Minimal packs + Critic + `keep_as_is` | **Rich** library (more domains: journey, states, enterprise content); retrieval already exists |
+| Multi-screen journeys | Study/plan/traceability; scaffold emits **multiple hash routes + UI states** from plan/capabilities | Full corporate demo; richer page bodies beyond simulated states |
+| Corporate DS | Ingest package.json + DTCG + strict check | Storybook/docs path; optional real typecheck; richer “corporate” DS fixture |
+| Functional preservation | Fixture oracles + proxy smoke | **Playwright** (or equivalent) wired to oracles; executable positive/negative scenarios |
+| Advanced investigation | MCP trust + REA **contracts**/fallback | **Live REA** with Node; Application MCP connected to a real fixture server |
+| Quality Engine | Native Ready, secrets, DS | **axe-core** (or similar); documented manual a11y sample; unified exportable report |
+| Agent-first / DX | README + CLI/MCP | Cursor/Claude/Codex matrix executed and published; redesign-aware `doctor` |
+| Experience | CLI/report | Before/after preview/comparison in the fixture flow; optional redesign UI |
+| OSS / distribution | Inherited licences | **SBOM**, installers, binary rebrand, fork CI, upgrade/rollback |
+| Impact (benchmark) | A/B/C/D dry-run + pre-registered fixtures | **Measured run** + blind human evaluation; gain vs arm B; **do not invent KPIs** |
 
-## Prioridade sugerida (código antes de release)
+## Suggested priority (code before release)
 
-1. Runner de cenários/oráculos + Playwright (fail-closed / `not_evaluated`)
-2. axe-core integrado ao Ready (sem certificação WCAG falsa)
-3. Scaffold multi-rota a partir do transformation plan
-4. Packs UX mais ricos + fixture DS “corporativa”
-5. Smoke E2E fixture → `check_results.json`
-6. REA live (opt-in)
-7. Benchmark publicado + empacotamento (PR-12)
+1. Scenario/oracle runner + Playwright (fail-closed / `not_evaluated`)
+2. axe-core in Ready (no false WCAG certification)
+3. Multi-route scaffold from the transformation plan
+4. Richer UX packs + “corporate” DS fixture
+5. Fixture E2E smoke → `check_results.json`
+6. Live REA (opt-in)
+7. Published benchmark + packaging (PR-12)
 
-## Explicitamente fora deste momento
+## Explicitly out of scope right now
 
-- Declarar V1 lançada
-- Inventar resultados de benchmark
-- Exigir REA/MCP/DS em toda tarefa
+- Declaring V1 shipped
+- Inventing benchmark results
+- Requiring REA/MCP/DS on every task
