@@ -1344,3 +1344,9 @@ unknowns disappeared. Preserve when the existing `knowledge_status` ranks higher
 longer task); merge `source_refs` / `unknowns`. Static oracle hints that only know form keywords
 also fail closed on library/Wayback journeys — extend `then_to_hint`, and treat native `<button>`
 as a valid functional smoke signal, not only DS `<Button>`.
+
+**Approving `backend_change_required` unlocked Engineering Ready.** Traceability correctly
+passed after a human approved the gap, but Ready treated that as `backend_deps_approved`.
+Engineering Ready now requires `backend_contracts_clear`: no plan mapping may still list
+`backend_change_required` (and `not_determined` needs `exception_approved`). An approved gap is
+not a known contract.

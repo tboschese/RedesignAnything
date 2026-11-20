@@ -285,6 +285,32 @@ pub fn load_plan(ws: &Workspace) -> Result<TransformationPlan, ToolError> {
     serde_json::from_slice(&bytes).map_err(|e| ToolError::invalid(format!("plan json: {e}")))
 }
 
+/// Engineering Ready must not ship while any mapping still needs a backend contract.
+/// Approving a `backend_change_required` decision clears traceability, but does **not**
+/// invent the contract — those mappings keep Engineering Ready false.
+/// `not_determined` is allowed only with an explicit `exception_approved` (unknown trackers).
+pub fn backend_contracts_clear(plan: &TransformationPlan) -> (bool, Vec<String>) {
+    let mut blocking = Vec::new();
+    for m in &plan.mappings {
+        match m.feasibility.as_str() {
+            "backend_change_required" => {
+                blocking.push(format!(
+                    "{}: backend_change_required (approved gap ≠ known contract)",
+                    m.capability_id
+                ));
+            }
+            "not_determined" if !m.exception_approved => {
+                blocking.push(format!(
+                    "{}: not_determined without exception_approved",
+                    m.capability_id
+                ));
+            }
+            _ => {}
+        }
+    }
+    (blocking.is_empty(), blocking)
+}
+
 /// Critical capabilities need a destination or approved exception; divergent decisions need approval.
 pub fn traceability_check(ws: &Workspace, caps: &[Capability], plan: &TransformationPlan) -> Result<TraceabilityReport, ToolError> {
     let decisions = list_decisions(ws)?;
@@ -465,6 +491,44 @@ mod tests {
         let report = traceability_check(&ws, &[cap("cap_finalize", "critical")], &plan).unwrap();
         assert_eq!(report.status, "blocked", "{report:?}");
         assert!(report.blocked.iter().any(|b| b.contains("no destination")));
+    }
+
+    #[test]
+    fn approved_backend_gap_clears_traceability_but_not_contracts() {
+        let d = tempfile::tempdir().unwrap();
+        let ws = Workspace::create(d.path(), "Plan", "p", TargetRef::None).unwrap();
+        let critic = redesign_knowledge::critic("x", &[]);
+        let dec = propose_decision(
+            "x",
+            &["cap_wayback".into()],
+            &critic,
+            "backend_change_required",
+            &["snapshot api".into()],
+            &[],
+        );
+        save_decision(&ws, &dec).unwrap();
+        approve_decision(&ws, &dec.id, "ev_ok").unwrap();
+        let plan = build_plan(
+            &ws,
+            "redesign",
+            vec![PlanMapping {
+                capability_id: "cap_wayback".into(),
+                target_route: Some("/wayback".into()),
+                target_component: Some("Calendar".into()),
+                target_action: Some("browse".into()),
+                decision_id: dec.id.clone(),
+                scenario_ids: vec![],
+                exception_approved: false,
+                feasibility: "backend_change_required".into(),
+            }],
+            vec![],
+        )
+        .unwrap();
+        let report = traceability_check(&ws, &[cap("cap_wayback", "critical")], &plan).unwrap();
+        assert_eq!(report.status, "pass", "{report:?}");
+        let (clear, blocking) = backend_contracts_clear(&plan);
+        assert!(!clear, "{blocking:?}");
+        assert!(blocking.iter().any(|b| b.contains("backend_change_required")));
     }
 
     #[test]

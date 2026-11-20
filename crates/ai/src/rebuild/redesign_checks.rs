@@ -111,8 +111,10 @@ pub fn prototype_ready(inp: &CheckInputs, unmapped_critical_unapproved: u32) -> 
         && !matches!(inp.ds_status, CheckExec::Error | CheckExec::Timeout | CheckExec::Fail | CheckExec::Blocked)
 }
 
-pub fn engineering_ready(inp: &CheckInputs, unmapped_critical_unapproved: u32, backend_deps_approved: bool) -> bool {
-    prototype_ready(inp, unmapped_critical_unapproved) && backend_deps_approved && !inp.secrets_exported
+/// `backend_contracts_ok` means no plan mapping still lists `backend_change_required`
+/// (and no unresolved `not_determined`). Traceability approval alone is not enough.
+pub fn engineering_ready(inp: &CheckInputs, unmapped_critical_unapproved: u32, backend_contracts_ok: bool) -> bool {
+    prototype_ready(inp, unmapped_critical_unapproved) && backend_contracts_ok && !inp.secrets_exported
 }
 
 /// Host-agent previews often use native `<button>`; scaffolds may use DS `<Button>`.
@@ -206,9 +208,9 @@ pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
         details: serde_json::to_value(&coverage).unwrap_or(json!({})),
     });
 
-    // Traceability.
+    // Traceability + backend-contract clarity for Engineering Ready.
     let caps = redesign_store::list_capabilities(ws).unwrap_or_default();
-    let (trace_status, unmapped) = match redesign_plan::load_plan(ws) {
+    let (trace_status, unmapped, backend_contracts_ok) = match redesign_plan::load_plan(ws) {
         Ok(plan) => {
             let report = redesign_plan::traceability_check(ws, &caps, &plan)?;
             let st = match report.status.as_str() {
@@ -223,7 +225,18 @@ pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
                 summary: format!("status={} blocked={}", report.status, report.blocked.len()),
                 details: serde_json::to_value(&report).unwrap_or(json!({})),
             });
-            (st, n)
+            let (clear, blocking) = redesign_plan::backend_contracts_clear(&plan);
+            checks.push(CheckResult {
+                id: "backend_contracts".into(),
+                status: if clear { "pass" } else { "blocked" }.into(),
+                summary: if clear {
+                    "no backend_change_required mappings remain".into()
+                } else {
+                    format!("blocking={} (approved gap ≠ known contract)", blocking.len())
+                },
+                details: json!({ "blocking": blocking, "clear": clear }),
+            });
+            (st, n, clear && st == "pass")
         }
         Err(_) => {
             checks.push(CheckResult {
@@ -232,7 +245,17 @@ pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
                 summary: "no transformation plan".into(),
                 details: json!({}),
             });
-            ("not_evaluated", caps.iter().filter(|c| c.criticality == "critical" || c.criticality == "high").count() as u32)
+            checks.push(CheckResult {
+                id: "backend_contracts".into(),
+                status: "not_evaluated".into(),
+                summary: "no transformation plan".into(),
+                details: json!({}),
+            });
+            (
+                "not_evaluated",
+                caps.iter().filter(|c| c.criticality == "critical" || c.criticality == "high").count() as u32,
+                false,
+            )
         }
     };
 
@@ -331,13 +354,15 @@ pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
     let report = ReadyReport {
         concept_ready: concept_ready(&inp),
         prototype_ready: prototype_ready(&inp, unmapped),
-        engineering_ready: engineering_ready(&inp, unmapped, trace_status == "pass"),
+        engineering_ready: engineering_ready(&inp, unmapped, backend_contracts_ok),
         checks,
         notes: vec![
             "Native Rust checks are authoritative; WASM PluginJudge is not used for Ready.".into(),
             "unavailable usage/tokens are not treated as zero.".into(),
             "Design Critic recommendations never alone set Ready.".into(),
             "Accessibility not_evaluated ≠ WCAG pass.".into(),
+            "Engineering Ready requires no backend_change_required mappings; approving a gap is not a contract.".into(),
+            format!("traceability={trace_status}"),
         ],
     };
 
@@ -520,5 +545,24 @@ mod tests {
         assert!(primary_action_present("<div role=\"button\">Go</div>"));
         assert!(!primary_action_present("export function App(){return null}"));
         assert!(!primary_action_present("<button>TODO_BROKEN_BUTTON</button>"));
+    }
+
+    #[test]
+    fn engineering_ready_needs_backend_contracts_not_just_traceability() {
+        let inp = CheckInputs {
+            preview_available: true,
+            security_ok: true,
+            build_status: CheckExec::Pass,
+            ds_status: CheckExec::Pass,
+            functional: FunctionalSummary {
+                critical_scenarios_total: 2,
+                critical_scenarios_passed: 2,
+                button_works: true,
+            },
+            ..Default::default()
+        };
+        assert!(prototype_ready(&inp, 0));
+        assert!(!engineering_ready(&inp, 0, false), "approved backend gap must not unlock engineering");
+        assert!(engineering_ready(&inp, 0, true));
     }
 }
