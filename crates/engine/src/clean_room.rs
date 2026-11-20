@@ -104,6 +104,7 @@ pub const TOOLS: &[&str] = &[
     "redesign_mcp_gate",
     "redesign_rea_discover",
     "redesign_rea_request",
+    "redesign_benchmark_dry_run",
     // The builder's own project.
     "build_files_list",
     "build_file_read",

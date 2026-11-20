@@ -50,6 +50,7 @@ pub mod notes;
 mod output;
 pub mod project;
 pub mod question;
+pub mod redesign_benchmark;
 pub mod redesign_build;
 pub mod redesign_checks;
 pub mod redesign_ds;

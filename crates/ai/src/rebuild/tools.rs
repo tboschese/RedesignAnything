@@ -421,6 +421,17 @@ pub fn specs() -> Vec<ToolSpec> {
             input_schema: schema_of::<ReaRequestParams>,
             run: redesign_rea_request,
         },
+        ToolSpec {
+            id: "redesign_benchmark_dry_run",
+            title: "Benchmark dry-run manifest",
+            summary: "Emit arms A/B/C/D with unavailable usage (not zero). Does not invent KPIs; use after controlled runs to fill measured fields only.",
+            beginner: "Creates an empty honest benchmark template.",
+            toolset: Toolset::Projects,
+            effects: Effects::READ_ONLY,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<BenchmarkDryRunParams>,
+            run: redesign_benchmark_dry_run,
+        },
     ]
 }
 
@@ -469,6 +480,13 @@ struct ListParams {
     pub limit: Option<usize>,
     #[serde(default)]
     pub offset: Option<usize>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct BenchmarkDryRunParams {
+    #[serde(default)]
+    pub fixture_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -1348,6 +1366,15 @@ fn redesign_mcp_gate(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, To
     Ok(ToolOutput::Value(serde_json::to_value(decision).map_err(|e| ToolError::internal(e.to_string()))?))
 }
 
+fn redesign_benchmark_dry_run(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: BenchmarkDryRunParams = parse_params(params)?;
+    let run = super::redesign_benchmark::dry_run_template(p.fixture_id.as_deref().unwrap_or("dense-form"));
+    for arm in &run.arms {
+        super::redesign_benchmark::validate_arm(arm).map_err(ToolError::invalid)?;
+    }
+    Ok(ToolOutput::Value(serde_json::to_value(run).map_err(|e| ToolError::internal(e.to_string()))?))
+}
+
 fn redesign_rea_discover(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
     let p: ReaDiscoverParams = parse_params(params)?;
     let d = super::redesign_rea::discover(
@@ -1573,6 +1600,7 @@ mod tests {
             "redesign_mcp_gate",
             "redesign_rea_discover",
             "redesign_rea_request",
+            "redesign_benchmark_dry_run",
         ] {
             assert!(e.registry().get(id).is_some(), "{id}");
         }
