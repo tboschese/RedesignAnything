@@ -190,6 +190,39 @@ pub fn specs() -> Vec<ToolSpec> {
             input_schema: schema_of::<CapabilityPutParams>,
             run: redesign_capability_put,
         },
+        ToolSpec {
+            id: "redesign_capabilities_list",
+            title: "List redesign capabilities",
+            summary: "List Capability records in redesign/capabilities/ (paginated with limit/offset).",
+            beginner: "Lists known redesign capabilities.",
+            toolset: Toolset::Projects,
+            effects: Effects::READ_ONLY,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<ListParams>,
+            run: redesign_capabilities_list,
+        },
+        ToolSpec {
+            id: "redesign_coverage_show",
+            title: "Show redesign coverage",
+            summary: "Show coverage over mapped capabilities. Never claims 100% when unknowns remain.",
+            beginner: "Shows what is known vs unknown after Study mapping.",
+            toolset: Toolset::Projects,
+            effects: Effects::READ_ONLY,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<ProjectParams>,
+            run: redesign_coverage_show,
+        },
+        ToolSpec {
+            id: "redesign_study_map",
+            title: "Map Study into redesign store",
+            summary: "Map Craft capture routes into capabilities, and/or import an independent fixture oracle JSON. Does not start a new crawl.",
+            beginner: "Turns Study captures or fixture oracles into redesign capabilities.",
+            toolset: Toolset::Projects,
+            effects: Effects::WRITES_FILESYSTEM,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<StudyMapParams>,
+            run: redesign_study_map,
+        },
     ]
 }
 
@@ -228,6 +261,32 @@ struct EvidencePutParams {
 struct CapabilityPutParams {
     pub project: PathBuf,
     pub capability: super::redesign_store::Capability,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct ListParams {
+    pub project: PathBuf,
+    #[serde(default)]
+    pub limit: Option<usize>,
+    #[serde(default)]
+    pub offset: Option<usize>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct StudyMapParams {
+    pub project: PathBuf,
+    /// Also map Craft capture/ routes when present.
+    #[serde(default = "default_true")]
+    pub map_capture: bool,
+    /// Optional path to an independent fixture oracle JSON.
+    #[serde(default)]
+    pub oracle_path: Option<PathBuf>,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -780,6 +839,41 @@ fn redesign_capability_put(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutp
     Ok(ToolOutput::Value(json!({"envelope": env})))
 }
 
+fn redesign_capabilities_list(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: ListParams = parse_params(params)?;
+    let ws = open(&p.project)?;
+    let mut caps = super::redesign_store::list_capabilities(&ws)?;
+    let total = caps.len();
+    let offset = p.offset.unwrap_or(0).min(total);
+    let limit = p.limit.unwrap_or(50).min(200);
+    if offset < total {
+        caps = caps.into_iter().skip(offset).take(limit).collect();
+    } else {
+        caps.clear();
+    }
+    Ok(ToolOutput::Value(json!({"total": total, "offset": offset, "limit": limit, "capabilities": caps})))
+}
+
+fn redesign_coverage_show(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: ProjectParams = parse_params(params)?;
+    let ws = open(&p.project)?;
+    Ok(ToolOutput::Value(serde_json::to_value(super::redesign_study::coverage_of(&ws)?).map_err(|e| ToolError::internal(e.to_string()))?))
+}
+
+fn redesign_study_map(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: StudyMapParams = parse_params(params)?;
+    let ws = open(&p.project)?;
+    let mut out = json!({});
+    if p.map_capture {
+        out["capture"] = super::redesign_study::map_capture(&ws)?;
+    }
+    if let Some(path) = p.oracle_path {
+        out["oracle"] = super::redesign_study::import_oracle_file(&ws, &path)?;
+    }
+    out["coverage"] = serde_json::to_value(super::redesign_study::coverage_of(&ws)?).map_err(|e| ToolError::internal(e.to_string()))?;
+    Ok(ToolOutput::Value(out))
+}
+
 /// Why `rebuild_check` got no report: a run took the check and it is still going (a step may be
 /// stuck), or no run took it at all.
 fn unanswered(taken: bool, minutes: u64) -> ToolError {
@@ -862,6 +956,9 @@ mod tests {
             "redesign_store_show",
             "redesign_evidence_put",
             "redesign_capability_put",
+            "redesign_capabilities_list",
+            "redesign_coverage_show",
+            "redesign_study_map",
         ] {
             assert!(e.registry().get(id).is_some(), "{id}");
         }

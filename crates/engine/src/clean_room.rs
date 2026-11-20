@@ -83,6 +83,9 @@ pub const TOOLS: &[&str] = &[
     "redesign_store_show",
     "redesign_evidence_put",
     "redesign_capability_put",
+    "redesign_capabilities_list",
+    "redesign_coverage_show",
+    "redesign_study_map",
     // The builder's own project.
     "build_files_list",
     "build_file_read",

@@ -51,6 +51,7 @@ mod output;
 pub mod project;
 pub mod question;
 pub mod redesign_store;
+pub mod redesign_study;
 pub mod runs;
 pub mod self_check;
 pub mod stacks;
