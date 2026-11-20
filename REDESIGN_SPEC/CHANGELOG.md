@@ -1,5 +1,9 @@
 # Changelog — Redesign Anything specification
 
+## Documentation 1.4.5 — 2026-11-20
+
+- Likeness to the original is measured per page and reported, not judged against a limit; variants of one study are compared by order. See `docs/PR16_LIKENESS.md`. No contract or schema change.
+
 ## Documentation 1.4.4 — 2026-11-20
 
 - `SPEC.md` scope: one version by default; on request, one variant project per mode from the same study.

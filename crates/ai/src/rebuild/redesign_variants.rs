@@ -25,7 +25,7 @@ pub const VARIANTS_FILE: &str = "variants.json";
 const SCHEMA_VERSION: &str = "1.0.0";
 /// Shared inputs under `redesign/`. Everything else there is one project's own output.
 const CARRIED: [&str; 5] = ["evidence", "capabilities", "oracle", "identity.json", "design_system.json"];
-const NOT_CARRIED: [&str; 6] = ["transformation_plan.json", "scaffold_refs.json", "check_results.json", "quality", "report", "app"];
+const NOT_CARRIED: [&str; 7] = ["transformation_plan.json", "scaffold_refs.json", "check_results.json", "quality", "report", "prototype_capture", "app"];
 
 /// In a variant: the project it was made from and its mode.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -190,6 +190,7 @@ fn summary(ws: &Workspace) -> Value {
         "name": ws.manifest.name,
         "plan": redesign_plan::plan_path(ws).is_file(),
         "app": ws.app_dir().join("package.json").is_file(),
+        "likeness": super::redesign_likeness::load(ws).map(|l| l.pages),
         "checks": match &report {
             Some(r) => json!({
                 "concept_ready": r.concept_ready,
@@ -204,6 +205,28 @@ fn summary(ws: &Workspace) -> Value {
     })
 }
 
+/// Whether the variants are as alike to the original as their modes say: on a page, a variant that
+/// changes less must not score lower than one that changes more. `(mode, page → overall)` in, the
+/// pairs out of order out. Needs no limit of our own: the variants share one original.
+pub fn out_of_order(scores: &[(RedesignMode, Vec<(String, f64)>)]) -> Vec<String> {
+    let rank = |m: RedesignMode| RedesignMode::ALL.iter().position(|x| *x == m);
+    let mut out = Vec::new();
+    for (i, (less, less_pages)) in scores.iter().enumerate() {
+        for (more, more_pages) in &scores[i + 1..] {
+            let (less, less_pages, more, more_pages) =
+                if rank(*less) <= rank(*more) { (less, less_pages, more, more_pages) } else { (more, more_pages, less, less_pages) };
+            for (page, a) in less_pages {
+                if let Some((_, b)) = more_pages.iter().find(|(p, _)| p == page)
+                    && a < b
+                {
+                    out.push(format!("{page}: `{}` is less like the original ({a:.0}) than `{}` ({b:.0})", less.as_str(), more.as_str()));
+                }
+            }
+        }
+    }
+    out
+}
+
 /// The variants of a project (asked on the source or on any variant), with what its last checks said.
 pub fn show(ws: &Workspace) -> Result<Value, ToolError> {
     let source: Workspace = match variant_of(ws)? {
@@ -216,9 +239,13 @@ pub fn show(ws: &Workspace) -> Result<Value, ToolError> {
     };
     let mut variants = Vec::new();
     let mut not_found = Vec::new();
+    let mut scores = Vec::new();
     for (listed, found) in paths(&source)? {
         match found {
             Some(v) => {
+                if let Some(l) = super::redesign_likeness::load(&v) {
+                    scores.push((listed.mode, l.measured().map(|(p, s)| (p.to_string(), s)).collect::<Vec<_>>()));
+                }
                 let mut s = summary(&v);
                 s["mode"] = json!(listed.mode.as_str());
                 s["label"] = json!(listed.mode.label());
@@ -228,10 +255,21 @@ pub fn show(ws: &Workspace) -> Result<Value, ToolError> {
                 .push(json!({"mode": listed.mode.as_str(), "project": listed.project, "why": "not a project beside the source that points back to it"})),
         }
     }
+    let unordered = out_of_order(&scores);
+    let compared = scores.iter().filter(|(_, pages)| !pages.is_empty()).count();
     Ok(json!({
         "source": summary(&source),
         "variants": variants,
         "not_found": not_found,
+        "likeness_order": {
+            "status": if compared < 2 { "not_measured" } else if unordered.is_empty() { "ok" } else { "warn" },
+            "out_of_order": unordered,
+            "note": if compared < 2 {
+                "Fewer than two variants have a measured page (redesign_likeness_measure), so their order can't be told."
+            } else {
+                "A variant that changes less should be at least as like the original as one that changes more, on the same page."
+            },
+        },
         "note": if variants.is_empty() { "No variants yet; make them with redesign_variants_create." } else { "Checks are what each project's last redesign_checks_run wrote; this tool runs none." },
     }))
 }
@@ -341,6 +379,21 @@ mod tests {
 
         write_record(&redesign_dir(&ws).join(VARIANTS_FILE), &Variants { schema_version: SCHEMA_VERSION.into(), variants: list }).unwrap();
         assert!(show(&ws).is_err(), "a listed path that leaves the folder is refused");
+    }
+
+    #[test]
+    fn a_variant_that_changes_less_but_is_less_like_the_original_is_out_of_order() {
+        let page = |score: f64| vec![("home".to_string(), score)];
+        let ordered = [(RedesignMode::Refresh, page(60.0)), (RedesignMode::Redesign, page(40.0)), (RedesignMode::Reimagine, page(10.0))];
+        assert!(out_of_order(&ordered).is_empty(), "{:?}", out_of_order(&ordered));
+        // The case that started this: organizing the screens changed more than the redesign did.
+        let swapped = [(RedesignMode::Redesign, page(60.0)), (RedesignMode::Refresh, page(40.0)), (RedesignMode::Reimagine, page(10.0))];
+        let found = out_of_order(&swapped);
+        assert_eq!(found.len(), 1, "{found:?}");
+        assert!(found[0].contains("`refresh`") && found[0].contains("`redesign`"), "{found:?}");
+        // Pages only one of them measured say nothing.
+        let apart = [(RedesignMode::Refresh, page(10.0)), (RedesignMode::Reimagine, vec![("details".to_string(), 90.0)])];
+        assert!(out_of_order(&apart).is_empty());
     }
 
     #[cfg(unix)]

@@ -1383,10 +1383,15 @@ full-height clip showed the first window and left 65% of the picture's height fl
 now takes that picture again one window at a time while scrolling, waits for the pictures in each
 window (in shadow roots too), and stitches the bands; what doesn't scroll with the page is shown
 once. It does so only when the tall picture has large flat bands, so other pages are photographed as
-before.
+before. A picture that still has large flat bands is refused by `redesign_likeness_measure`, which says so.
 
 **Crop a picture with a tool whose origin you know before you describe what is at its top.**
 While chasing the bug above, `sips -c` was used to cut "the top" of tall screenshots for viewing. It
 crops around the centre, so a correct picture looked shifted by hundreds of pixels and "blank at the
 top", and that wrong reading went into an issue and two descriptions before a second method showed it.
 Check a reading of a picture another way (a pixel at a known place, a second tool) before writing it down.
+
+**A likeness score means nothing against a limit we pick.** A faithful prototype of a real page
+scored 23 of 100 in structure because the original has dozens of items the simulated data lacks.
+Compare variants of the same study with each other instead (`likeness_order` in
+`redesign_variants_show`), and report the raw numbers.

@@ -5,6 +5,11 @@
 //! backend work. `mode_scope` compares the plan with its mode. It is advisory: it reports `warn`,
 //! never `fail`, because a failed row would fail the kind's Ready check.
 //!
+//! How alike each page is to the original (`redesign_likeness`) is reported here as numbers and
+//! never judged against a limit: a real page with dozens of items scores low against a prototype
+//! with simulated data however faithful the layout is. The judgement is the order between the
+//! variants of one study, in `redesign_variants::show`. What wasn't measured is said in the summary.
+//!
 //! The mode ids are stored values; what users see is `label()`, in our own words.
 
 use craft_anything_engine::workspace::Workspace;
@@ -15,6 +20,7 @@ use serde_json::{Value, json};
 
 use super::redesign_checks::CheckResult;
 use super::redesign_identity::{IdentityProfile, TraitDecision};
+use super::redesign_likeness::LikenessReport;
 use super::redesign_plan::{DesignDecision, TransformationPlan};
 use super::redesign_store::Capability;
 
@@ -143,7 +149,13 @@ fn moved_routes(caps: &[Capability], plan: &TransformationPlan) -> Vec<String> {
         .collect()
 }
 
-pub fn evaluate_scope(caps: &[Capability], plan: Option<&TransformationPlan>, decisions: &[DesignDecision], identity: Option<&IdentityProfile>) -> CheckResult {
+pub fn evaluate_scope(
+    caps: &[Capability],
+    plan: Option<&TransformationPlan>,
+    decisions: &[DesignDecision],
+    identity: Option<&IdentityProfile>,
+    likeness: Option<&LikenessReport>,
+) -> CheckResult {
     let Some(plan) = plan else {
         return CheckResult {
             id: CHECK_ID.into(),
@@ -163,6 +175,11 @@ pub fn evaluate_scope(caps: &[Capability], plan: Option<&TransformationPlan>, de
     let replaced: Vec<String> =
         identity.map(|p| p.traits.iter().filter(|t| t.effective_decision() == TraitDecision::Replace).map(|t| t.id.clone()).collect()).unwrap_or_default();
     let divergent: Vec<String> = decisions.iter().filter(|d| d.chosen_option_id != "keep_as_is").map(|d| d.id.clone()).collect();
+    let measured: Vec<String> = likeness.into_iter().flat_map(|l| l.measured()).map(|(page, score)| format!("{page} {score:.0}")).collect();
+    let unmeasured = match likeness {
+        None => vec!["no prototype capture was measured (redesign_likeness_measure)".to_string()],
+        Some(l) => l.unmeasured(),
+    };
 
     let (status, summary) = match mode {
         RedesignMode::Refresh => {
@@ -190,6 +207,8 @@ pub fn evaluate_scope(caps: &[Capability], plan: Option<&TransformationPlan>, de
             ("pass", format!("{} route move(s), {} divergent decision(s), {} backend need(s) flagged", moved.len(), divergent.len(), backend.len()))
         }
     };
+    let summary = if measured.is_empty() { summary } else { format!("{summary}; likeness to the original (0..=100): {}", measured.join(", ")) };
+    let summary = if unmeasured.is_empty() { summary } else { format!("{summary}; layout not measured: {}", unmeasured.join(" | ")) };
     CheckResult {
         id: CHECK_ID.into(),
         status: status.into(),
@@ -204,6 +223,8 @@ pub fn evaluate_scope(caps: &[Capability], plan: Option<&TransformationPlan>, de
             "backend_change_required": backend,
             "replaced_traits": replaced,
             "divergent_decisions": divergent,
+            "likeness": likeness.map(|l| &l.pages),
+            "layout_not_measured": unmeasured,
         }),
     }
 }
@@ -233,7 +254,7 @@ pub fn scope_check(ws: &Workspace) -> CheckResult {
         Err(e) if e.code == craft_anything_evidence::ErrorCode::NotFound => None,
         Err(e) => return not_evaluated("transformation plan", e),
     };
-    evaluate_scope(&caps, plan.as_ref(), &decisions, identity.as_ref())
+    evaluate_scope(&caps, plan.as_ref(), &decisions, identity.as_ref(), super::redesign_likeness::load(ws).as_ref())
 }
 
 #[cfg(test)]
@@ -305,21 +326,21 @@ mod tests {
     #[test]
     fn a_tidy_up_that_moves_a_journey_or_replaces_a_trait_is_flagged() {
         let caps = [cap("cap_search", "/search")];
-        let same = evaluate_scope(&caps, Some(&plan("refresh", "/search/", "ui_only")), &[], None);
+        let same = evaluate_scope(&caps, Some(&plan("refresh", "/search/", "ui_only")), &[], None, None);
         assert_eq!(same.status, "pass", "{same:?}");
-        let moved = evaluate_scope(&caps, Some(&plan("refresh", "/find", "ui_only")), &[], None);
+        let moved = evaluate_scope(&caps, Some(&plan("refresh", "/find", "ui_only")), &[], None, None);
         assert_eq!(moved.status, "warn", "{moved:?}");
-        let replaced = evaluate_scope(&caps, Some(&plan("refresh", "/search", "ui_only")), &[], Some(&replaced_trait()));
+        let replaced = evaluate_scope(&caps, Some(&plan("refresh", "/search", "ui_only")), &[], Some(&replaced_trait()), None);
         assert_eq!(replaced.status, "warn", "{replaced:?}");
         // The same plan is within scope once the mode allows it.
-        let redesign = evaluate_scope(&caps, Some(&plan("redesign", "/find", "ui_only")), &[], Some(&replaced_trait()));
+        let redesign = evaluate_scope(&caps, Some(&plan("redesign", "/find", "ui_only")), &[], Some(&replaced_trait()), None);
         assert_eq!(redesign.status, "pass", "{redesign:?}");
     }
 
     #[test]
     fn an_out_of_scope_plan_warns_without_failing_the_ready_check() {
         let caps = [cap("cap_search", "/search")];
-        let out_of_scope = evaluate_scope(&caps, Some(&plan("refresh", "/find", "backend_change_required")), &[], Some(&replaced_trait()));
+        let out_of_scope = evaluate_scope(&caps, Some(&plan("refresh", "/find", "backend_change_required")), &[], Some(&replaced_trait()), None);
         let report = crate::rebuild::redesign_checks::ReadyReport {
             concept_ready: true,
             prototype_ready: true,
@@ -336,16 +357,44 @@ mod tests {
     #[test]
     fn a_rethink_that_changes_nothing_is_flagged() {
         let caps = [cap("cap_search", "/search")];
-        let same = evaluate_scope(&caps, Some(&plan("reimagine", "/search", "ui_only")), &[], None);
+        let same = evaluate_scope(&caps, Some(&plan("reimagine", "/search", "ui_only")), &[], None, None);
         assert_eq!(same.status, "warn", "{same:?}");
-        let moved = evaluate_scope(&caps, Some(&plan("reimagine", "/find", "backend_change_required")), &[], None);
+        let moved = evaluate_scope(&caps, Some(&plan("reimagine", "/find", "backend_change_required")), &[], None, None);
         assert_eq!(moved.status, "pass", "{moved:?}");
+    }
+
+    fn home_scored(overall: Option<f64>) -> LikenessReport {
+        LikenessReport {
+            schema_version: "1.0.0".into(),
+            pages: vec![crate::rebuild::redesign_likeness::PageLikeness {
+                page: "start".into(),
+                structure: overall,
+                text: None,
+                picture: None,
+                width: None,
+                overall,
+                not_measured: if overall.is_some() { vec![] } else { vec!["the prototype's capture.json is missing or unreadable".into()] },
+            }],
+        }
+    }
+
+    #[test]
+    fn likeness_is_reported_without_judging_and_what_was_not_measured_is_said() {
+        let caps = [cap("cap_search", "/search")];
+        let p = plan("refresh", "/search", "ui_only");
+        let measured = evaluate_scope(&caps, Some(&p), &[], None, Some(&home_scored(Some(20.0))));
+        assert!(!measured.summary.contains("not measured"), "{measured:?}");
+        assert_eq!(measured.status, "pass", "a low score alone is reported, not judged: {measured:?}");
+        for unmeasured in [None, Some(home_scored(None))] {
+            let r = evaluate_scope(&caps, Some(&p), &[], None, unmeasured.as_ref());
+            assert!(r.summary.contains("layout not measured"), "{r:?}");
+        }
     }
 
     #[test]
     fn an_unknown_mode_is_refused() {
         assert!(RedesignMode::parse("overhaul").is_err());
-        let r = evaluate_scope(&[], Some(&plan("overhaul", "/", "ui_only")), &[], None);
+        let r = evaluate_scope(&[], Some(&plan("overhaul", "/", "ui_only")), &[], None, None);
         assert_eq!(r.status, "warn", "{r:?}");
     }
 }
