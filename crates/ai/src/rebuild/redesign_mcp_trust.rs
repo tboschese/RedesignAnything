@@ -8,6 +8,10 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
+use std::fs;
+use std::io::{BufRead, BufReader, Write};
+use std::path::PathBuf;
+use std::process::{ChildStdin, ChildStdout, Command, Stdio};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct McpToolCatalogEntry {
@@ -196,6 +200,152 @@ pub fn profile_summary(profile: &ApplicationMcpProfile) -> Value {
     })
 }
 
+/// Path to the in-repo Application MCP fixture server entry.
+pub fn fixture_server_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../REDESIGN_SPEC/fixtures/application-mcp/server.mjs")
+}
+
+fn which_node() -> bool {
+    let Ok(path_env) = std::env::var("PATH") else {
+        return false;
+    };
+    for dir in std::env::split_paths(&path_env) {
+        if dir.join("node").is_file() {
+            return true;
+        }
+        #[cfg(windows)]
+        {
+            if dir.join("node.exe").is_file() {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// Load catalogue.json next to the fixture server (no process required).
+pub fn load_fixture_catalogue_file() -> Result<(Vec<(String, String, bool, Value)>, Vec<String>), ToolError> {
+    let path = fixture_server_path()
+        .parent()
+        .map(|p| p.join("catalogue.json"))
+        .ok_or_else(|| ToolError::invalid("fixture catalogue path"))?;
+    let bytes = fs::read(&path).map_err(|e| ToolError::io(path.display(), e))?;
+    let v: Value = serde_json::from_slice(&bytes).map_err(|e| ToolError::invalid(format!("catalogue json: {e}")))?;
+    let tools = v
+        .get("tools")
+        .and_then(|t| t.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let mut parsed = Vec::new();
+    let mut allowlist = Vec::new();
+    for t in tools {
+        let name = t.get("name").and_then(|n| n.as_str()).unwrap_or("").to_string();
+        let description = t.get("description").and_then(|n| n.as_str()).unwrap_or("").to_string();
+        let declared_read_only = t.get("declared_read_only").and_then(|n| n.as_bool()).unwrap_or(false);
+        let schema = t.get("schema").cloned().unwrap_or_else(|| json!({}));
+        if t.get("allowlisted").and_then(|n| n.as_bool()) == Some(true) {
+            allowlist.push(name.clone());
+        }
+        parsed.push((name, description, declared_read_only, schema));
+    }
+    Ok((parsed, allowlist))
+}
+
+/// Talk to the fixture stdio server: list tools, gate, and call a safe tool.
+pub fn smoke_fixture_server() -> Result<Value, ToolError> {
+    if !which_node() {
+        return Ok(json!({
+            "live": false,
+            "status": "not_evaluated",
+            "notes": ["Node.js not on PATH; lean redesign continues without Application MCP."],
+        }));
+    }
+    let server = fixture_server_path();
+    if !server.is_file() {
+        return Ok(json!({
+            "live": false,
+            "status": "not_evaluated",
+            "notes": [format!("fixture server missing at {}", server.display())],
+        }));
+    }
+
+    let (file_tools, allowlist) = load_fixture_catalogue_file()?;
+    let profile = catalogue_tools(&file_tools, &allowlist);
+
+    let mut child = Command::new("node")
+        .arg(&server)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| ToolError::new(ErrorCode::ProgramFailed, format!("spawn fixture MCP: {e}")))?;
+
+    let mut stdin = child.stdin.take().ok_or_else(|| ToolError::internal("no stdin"))?;
+    let stdout = child.stdout.take().ok_or_else(|| ToolError::internal("no stdout"))?;
+    let mut reader = BufReader::new(stdout);
+
+    let send = |stdin: &mut ChildStdin, msg: Value| -> Result<(), ToolError> {
+        let line = format!("{}\n", msg);
+        stdin
+            .write_all(line.as_bytes())
+            .map_err(|e| ToolError::new(ErrorCode::ProgramFailed, format!("write fixture MCP: {e}")))
+    };
+    let recv = |reader: &mut BufReader<ChildStdout>| -> Result<Value, ToolError> {
+        let mut line = String::new();
+        reader
+            .read_line(&mut line)
+            .map_err(|e| ToolError::new(ErrorCode::ProgramFailed, format!("read fixture MCP: {e}")))?;
+        serde_json::from_str(line.trim()).map_err(|e| ToolError::invalid(format!("fixture MCP json: {e}")))
+    };
+
+    send(&mut stdin, json!({"id":1,"method":"list_tools"}))?;
+    let listed = recv(&mut reader)?;
+    if listed.get("ok") != Some(&json!(true)) {
+        let _ = child.kill();
+        return Err(ToolError::new(ErrorCode::ProgramFailed, "fixture list_tools failed"));
+    }
+    let live_count = listed
+        .get("tools")
+        .and_then(|t| t.as_array())
+        .map(|a| a.len())
+        .unwrap_or(0);
+
+    let gate_ok = gate_call(&profile, "app_context_get", &json!({}), None)?;
+    let gate_mut = gate_call(&profile, "app_record_update", &json!({"id":"1"}), None)?;
+    let gate_hostile = gate_call(&profile, "app_exfiltrate", &json!({}), None)?;
+
+    send(
+        &mut stdin,
+        json!({"id":2,"method":"call","tool":"app_context_get","args":{}}),
+    )?;
+    let call = recv(&mut reader)?;
+    let _ = child.kill();
+    let _ = child.wait();
+
+    if call.get("network_egress") == Some(&json!(true)) {
+        return Err(ToolError::new(ErrorCode::NoPermission, "fixture claimed network_egress"));
+    }
+
+    Ok(json!({
+        "live": true,
+        "status": "pass",
+        "protocol": listed.get("protocol"),
+        "tools_listed": live_count,
+        "catalogue_tools": profile.tools.len(),
+        "gate": {
+            "app_context_get": gate_ok,
+            "app_record_update_blocked": !gate_mut.allowed,
+            "app_exfiltrate_blocked": !gate_hostile.allowed,
+        },
+        "call_app_context_get": call,
+        "notes": [
+            "Fixture protocol redesign-app-mcp-fixture/0.1 — not full MCP Spec.",
+            "Lean redesign works without this server."
+        ],
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -258,5 +408,28 @@ mod tests {
         let s = profile_summary(&p);
         assert_eq!(s["tool_count"], 0);
         assert!(s["note"].as_str().unwrap().contains("still work"));
+    }
+
+    #[test]
+    fn fixture_catalogue_blocks_hostile_and_mutations() {
+        let (tools, allowlist) = load_fixture_catalogue_file().unwrap();
+        let profile = catalogue_tools(&tools, &allowlist);
+        assert!(profile.tools.iter().any(|t| t.name == "app_context_get" && t.allowed));
+        assert!(profile.tools.iter().any(|t| t.name == "app_record_update" && !t.allowed));
+        assert!(profile.tools.iter().any(|t| t.name == "app_exfiltrate" && !t.allowed));
+    }
+
+    #[test]
+    fn fixture_server_smoke_when_node_present() {
+        let report = smoke_fixture_server().unwrap();
+        if report["live"] == false {
+            assert_eq!(report["status"], "not_evaluated");
+            return;
+        }
+        assert_eq!(report["status"], "pass");
+        assert_eq!(report["gate"]["app_record_update_blocked"], true);
+        assert_eq!(report["gate"]["app_exfiltrate_blocked"], true);
+        assert_eq!(report["call_app_context_get"]["ok"], true);
+        assert_eq!(report["call_app_context_get"]["network_egress"], false);
     }
 }

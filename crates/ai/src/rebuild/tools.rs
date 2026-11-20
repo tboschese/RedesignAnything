@@ -422,6 +422,17 @@ pub fn specs() -> Vec<ToolSpec> {
             run: redesign_mcp_gate,
         },
         ToolSpec {
+            id: "redesign_mcp_fixture_smoke",
+            title: "Smoke the Application MCP fixture server",
+            summary: "Spawn the in-repo fixture stdio server, catalogue tools, gate hostile/mutating tools, call app_context_get. Missing Node → not_evaluated. Lean path works without it.",
+            beginner: "Checks the Application MCP fixture against the trust gateway.",
+            toolset: Toolset::Projects,
+            effects: Effects::LAUNCHES_PROCESS,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<EmptyParams>,
+            run: redesign_mcp_fixture_smoke,
+        },
+        ToolSpec {
             id: "redesign_rea_discover",
             title: "Discover REA Deep availability",
             summary: "Probe Node + live adapter (fixture or REDESIGN_REA_ADAPTER). Missing adapter falls back to lean redesign. Does not start analysis.",
@@ -1503,6 +1514,11 @@ fn redesign_mcp_gate(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, To
     Ok(ToolOutput::Value(serde_json::to_value(decision).map_err(|e| ToolError::internal(e.to_string()))?))
 }
 
+fn redesign_mcp_fixture_smoke(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let _: EmptyParams = parse_params(params)?;
+    Ok(ToolOutput::Value(super::redesign_mcp_trust::smoke_fixture_server()?))
+}
+
 fn redesign_benchmark_dry_run(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
     let p: BenchmarkDryRunParams = parse_params(params)?;
     let run = super::redesign_benchmark::dry_run_template(p.fixture_id.as_deref().unwrap_or("dense-form"));
@@ -1767,6 +1783,7 @@ mod tests {
             "redesign_fixture_smoke",
             "redesign_mcp_catalogue",
             "redesign_mcp_gate",
+            "redesign_mcp_fixture_smoke",
             "redesign_rea_discover",
             "redesign_rea_request",
             "redesign_rea_run",

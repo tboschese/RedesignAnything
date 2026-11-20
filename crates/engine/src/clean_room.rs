@@ -104,6 +104,7 @@ pub const TOOLS: &[&str] = &[
     "redesign_fixture_smoke",
     "redesign_mcp_catalogue",
     "redesign_mcp_gate",
+    "redesign_mcp_fixture_smoke",
     "redesign_rea_discover",
     "redesign_rea_request",
     // redesign_rea_run is Deep/consent-gated and intentionally NOT clean-room allowlisted.

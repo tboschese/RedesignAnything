@@ -133,7 +133,7 @@ MCP: the same `redesign_*` tool set via `craft-anything-cli mcp` (see `AGENTS.md
 | Decisions / plan / traceability | Ready |
 | React+TS+Vite scaffold with mocks + multi-route pages from plan | Ready |
 | Native Ready (`redesign-ready` on the kind) | Ready |
-| Application MCP trust gateway | Ready (catalogue/gate) |
+| Application MCP trust gateway | Ready (catalogue/gate + fixture smoke) |
 | REA Deep | Contracts + fallback + **fixture live** (`redesign_rea_run`); override with `REDESIGN_REA_ADAPTER` |
 | A/B/C/D benchmark | Honest dry-run; **no invented KPIs / no published results** |
 | Installers / full rebrand | Open — [`docs/PR12_RELEASE_CHECKLIST.md`](docs/PR12_RELEASE_CHECKLIST.md) |
