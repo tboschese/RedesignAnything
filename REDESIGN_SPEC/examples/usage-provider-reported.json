@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0.0",
+  "run_id": "run_example_reported",
+  "source": "craft_runner:fixture",
+  "accounting_quality": "provider_reported",
+  "input_tokens_reported": 75000,
+  "output_tokens_reported": 12400,
+  "cached_input_tokens_reported": 48000,
+  "tokens_estimated": null,
+  "cost_amount": null,
+  "cost_currency": null,
+  "tool_calls": 40,
+  "captured_at": "2026-11-19T21:00:00Z",
+  "limitations": ["Dados sinteticos: nao representam um benchmark real ou custo de assinatura."]
+}

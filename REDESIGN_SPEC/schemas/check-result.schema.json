@@ -1,0 +1,117 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "check_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pass",
+        "fail",
+        "warn",
+        "not_evaluated",
+        "blocked"
+      ]
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "blocking",
+        "major",
+        "minor",
+        "info"
+      ]
+    },
+    "executed": {
+      "type": "boolean"
+    },
+    "environment": {
+      "type": "string"
+    },
+    "tool_version": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "scenario_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "evidence_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "duration_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "message": {
+      "type": "string"
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "id",
+    "check_id",
+    "status",
+    "severity",
+    "executed",
+    "environment",
+    "tool_version",
+    "scenario_ids",
+    "evidence_ids",
+    "started_at",
+    "duration_ms",
+    "message",
+    "limitations"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "executed": {
+            "const": false
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "status": {
+            "enum": [
+              "not_evaluated",
+              "blocked"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.redesign-anything.example/1.0.0/check-result.schema.json",
+  "title": "check-result"
+}

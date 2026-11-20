@@ -1,5 +1,8 @@
 # Roadmap
 
+> **Redesign Anything fork:** product scope for the independent fork is defined in [`REDESIGN_SPEC/`](../REDESIGN_SPEC/README.md) (`V1_IMPACTANTE.md`, `EXECUTION_V12.md`, `IMPLEMENTATION_PLAN.md`). Until Slice 0 completes, treat the Craft roadmap below as **upstream context**, not as authorization to ship Redesign as done. Fork work starts at PR-00/Slice 0; do not invent Redesign roadmap ids inside this file until PR-00 docs settle.
+
+
 The shared plan for reaching the product described in the README, for people and agents alike.
 `docs/STATUS.md` says what works today; this file says what comes next, who owns it and what an
 agent may pick up; [roadmap-history.md](roadmap-history.md) keeps what's finished. Rebuilt on

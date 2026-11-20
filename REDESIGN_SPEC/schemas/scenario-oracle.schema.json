@@ -1,0 +1,79 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^scenario_"
+    },
+    "capability_id": {
+      "type": "string",
+      "pattern": "^cap_"
+    },
+    "profile": {
+      "type": "string"
+    },
+    "fixture_id": {
+      "type": "string"
+    },
+    "given": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "when": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "then": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "assertion_source": {
+      "type": "string",
+      "enum": [
+        "observed",
+        "declared",
+        "user_approved"
+      ]
+    },
+    "evidence_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "safe_execution_target": {
+      "type": "string",
+      "enum": [
+        "generated_mock",
+        "sandbox",
+        "staging"
+      ]
+    },
+    "executable": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "id",
+    "capability_id",
+    "profile",
+    "fixture_id",
+    "given",
+    "when",
+    "then",
+    "assertion_source",
+    "evidence_ids",
+    "safe_execution_target",
+    "executable"
+  ],
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.redesign-anything.example/1.0.0/scenario-oracle.schema.json",
+  "title": "scenario-oracle"
+}

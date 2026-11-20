@@ -1,0 +1,352 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "project_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z0-9][a-z0-9-_]*$"
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "website",
+            "screenshot",
+            "folder"
+          ]
+        },
+        "url": {
+          "type": "string",
+          "pattern": "^https?://[^\\s]+$"
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "refresh",
+        "redesign",
+        "reimagine"
+      ]
+    },
+    "capture_mode": {
+      "type": "string",
+      "enum": [
+        "clean_room",
+        "deep"
+      ]
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_routes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "max_journeys": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "max_routes",
+        "max_journeys",
+        "roles"
+      ]
+    },
+    "design_system": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "none",
+            "local_repo",
+            "package",
+            "storybook",
+            "tokens",
+            "layout_kit"
+          ]
+        },
+        "source": {
+          "type": "string"
+        },
+        "policy": {
+          "type": "string",
+          "enum": [
+            "strict",
+            "advisory"
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "policy"
+      ]
+    },
+    "providers": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rea": {
+          "type": "string",
+          "enum": [
+            "disabled",
+            "auto",
+            "enabled"
+          ]
+        },
+        "application_mcp": {
+          "type": "string",
+          "enum": [
+            "disabled",
+            "enabled"
+          ]
+        }
+      },
+      "required": [
+        "rea",
+        "application_mcp"
+      ]
+    },
+    "backend": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "mock",
+            "sandbox",
+            "staging"
+          ]
+        },
+        "allow_production_writes": {
+          "type": "boolean",
+          "const": false
+        }
+      },
+      "required": [
+        "mode",
+        "allow_production_writes"
+      ]
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "use_craft_selected_backend": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "use_craft_selected_backend"
+      ]
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "controller": {
+          "type": "string",
+          "enum": [
+            "host_agent",
+            "craft_runner"
+          ]
+        },
+        "profile": {
+          "type": "string",
+          "enum": [
+            "lean",
+            "deep"
+          ]
+        },
+        "allow_nested_builder": {
+          "type": "boolean",
+          "const": false
+        },
+        "budgets": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "token_soft_limit": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "max_mcp_calls": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "max_rea_invocations": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "max_critic_passes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "max_tool_result_chars": {
+              "type": "integer",
+              "minimum": 1024
+            },
+            "max_run_minutes": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "no_progress_limit": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "required": [
+            "token_soft_limit",
+            "max_mcp_calls",
+            "max_rea_invocations",
+            "max_critic_passes",
+            "max_tool_result_chars",
+            "max_run_minutes",
+            "no_progress_limit"
+          ]
+        }
+      },
+      "required": [
+        "controller",
+        "profile",
+        "allow_nested_builder"
+      ]
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "model_egress": {
+          "type": "string",
+          "enum": [
+            "local_only",
+            "allow_remote_redacted",
+            "allow_remote_explicit"
+          ]
+        },
+        "export_raw_captures": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "model_egress",
+        "export_raw_captures"
+      ]
+    },
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_refine_rounds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20
+        },
+        "require_critical_scenarios": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "max_refine_rounds",
+        "require_critical_scenarios"
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "project_id",
+    "target",
+    "mode",
+    "capture_mode",
+    "scope",
+    "design_system",
+    "providers",
+    "backend",
+    "model",
+    "execution",
+    "privacy",
+    "checks"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "target": {
+            "properties": {
+              "kind": {
+                "const": "website"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "target": {
+            "required": [
+              "kind",
+              "url"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "execution": {
+            "required": [
+              "controller"
+            ],
+            "properties": {
+              "controller": {
+                "const": "host_agent"
+              }
+            }
+          }
+        },
+        "required": [
+          "execution"
+        ]
+      },
+      "then": {
+        "properties": {
+          "model": {
+            "properties": {
+              "use_craft_selected_backend": {
+                "const": false
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.redesign-anything.example/1.0.0/redesign-config.schema.json",
+  "title": "redesign-config"
+}

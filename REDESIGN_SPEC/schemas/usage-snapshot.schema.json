@@ -1,0 +1,168 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1
+    },
+    "accounting_quality": {
+      "type": "string",
+      "enum": [
+        "provider_reported",
+        "host_reported",
+        "estimated",
+        "unavailable"
+      ]
+    },
+    "input_tokens_reported": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 0
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "output_tokens_reported": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 0
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "cached_input_tokens_reported": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 0
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "tokens_estimated": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 0
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "cost_amount": {
+      "anyOf": [
+        {
+          "type": "number",
+          "minimum": 0
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "cost_currency": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "tool_calls": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "captured_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "run_id",
+    "source",
+    "accounting_quality",
+    "input_tokens_reported",
+    "output_tokens_reported",
+    "cached_input_tokens_reported",
+    "tokens_estimated",
+    "cost_amount",
+    "cost_currency",
+    "tool_calls",
+    "captured_at",
+    "limitations"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "accounting_quality": {
+            "const": "unavailable"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "input_tokens_reported": {
+            "type": "null"
+          },
+          "output_tokens_reported": {
+            "type": "null"
+          },
+          "cached_input_tokens_reported": {
+            "type": "null"
+          },
+          "tokens_estimated": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "cost_amount": {
+            "type": "number"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "cost_currency": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  ],
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.redesign-anything.example/1.0.0/usage-snapshot.schema.json",
+  "title": "usage-snapshot"
+}

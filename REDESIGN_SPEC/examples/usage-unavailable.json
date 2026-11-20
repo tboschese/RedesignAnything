@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0.0",
+  "run_id": "run_host_unavailable",
+  "source": "host_agent:cursor",
+  "accounting_quality": "unavailable",
+  "input_tokens_reported": null,
+  "output_tokens_reported": null,
+  "cached_input_tokens_reported": null,
+  "tokens_estimated": null,
+  "cost_amount": null,
+  "cost_currency": null,
+  "tool_calls": 17,
+  "captured_at": "2026-11-19T21:00:00Z",
+  "limitations": ["O host nao disponibilizou telemetria de tokens; nenhum hard cap de tokens foi aplicado ao host."]
+}

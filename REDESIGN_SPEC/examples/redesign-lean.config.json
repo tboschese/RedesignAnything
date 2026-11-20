@@ -1,0 +1,28 @@
+{
+  "schema_version": "1.0.0",
+  "project_id": "redesign-fixture-lean",
+  "target": {"kind": "website", "url": "https://app.example.test"},
+  "mode": "redesign",
+  "capture_mode": "clean_room",
+  "scope": {"max_routes": 12, "max_journeys": 3, "roles": ["operator"]},
+  "design_system": {"kind": "none", "policy": "advisory"},
+  "providers": {"rea": "disabled", "application_mcp": "disabled"},
+  "backend": {"mode": "mock", "allow_production_writes": false},
+  "model": {"use_craft_selected_backend": false},
+  "execution": {
+    "controller": "host_agent",
+    "profile": "lean",
+    "allow_nested_builder": false,
+    "budgets": {
+      "token_soft_limit": 750000,
+      "max_mcp_calls": 30,
+      "max_rea_invocations": 2,
+      "max_critic_passes": 1,
+      "max_tool_result_chars": 12000,
+      "max_run_minutes": 90,
+      "no_progress_limit": 2
+    }
+  },
+  "privacy": {"model_egress": "allow_remote_redacted", "export_raw_captures": false},
+  "checks": {"max_refine_rounds": 3, "require_critical_scenarios": true}
+}

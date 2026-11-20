@@ -1,3 +1,13 @@
+> [!IMPORTANT]
+> **This repository is [Redesign Anything](https://github.com/tboschese/RedesignAnything)** — an independent fork of Craft Anything focused on evidence-based redesign of existing web apps (design systems, journey preservation, agent-first CLI/MCP).
+>
+> - Spec kit (contracts, slices, V1 scope): [`REDESIGN_SPEC/`](REDESIGN_SPEC/README.md)
+> - Upstream pin and sync policy: [`docs/UPSTREAM.md`](docs/UPSTREAM.md)
+> - Status of this fork: [`docs/STATUS.md`](docs/STATUS.md) (Slice 0 bootstrap)
+> - Agent prompt after checkout: read `README.md`, `AGENTS.md`, `REDESIGN_SPEC/AGENT_FIRST.md`, then run diagnostics **without** silent installs.
+>
+> Craft Anything branding, binaries, and docs below remain the upstream baseline until Redesign features land. Do not treat this README as a claim that Redesign capabilities already exist in the binaries.
+
 <p align="center">
   <a href="https://getartcraft.com/">
     <picture>

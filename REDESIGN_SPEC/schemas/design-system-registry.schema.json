@@ -1,0 +1,140 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "project_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "policy": {
+      "type": "string",
+      "enum": [
+        "strict",
+        "advisory"
+      ]
+    },
+    "source_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "components": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "package_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "package_version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "import_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "export_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "props_schema": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "variants": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tokens": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "allowed": {
+            "type": "boolean"
+          },
+          "usage": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "never": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "evidence_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "package_name",
+          "package_version",
+          "import_path",
+          "export_name",
+          "props_schema",
+          "variants",
+          "tokens",
+          "allowed",
+          "usage",
+          "never",
+          "evidence_ids"
+        ]
+      }
+    },
+    "tokens": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "schema_version",
+    "project_id",
+    "revision",
+    "generated_at",
+    "policy",
+    "source_ref",
+    "source_digest",
+    "components",
+    "tokens"
+  ],
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.redesign-anything.example/1.0.0/design-system-registry.schema.json",
+  "title": "design-system-registry"
+}

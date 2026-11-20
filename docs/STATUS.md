@@ -1,5 +1,12 @@
 # Status
 
+## Redesign Anything — fork status (2026-11-20)
+
+**Slice 0 / PR-00 bootstrap.** This tree is Craft Anything at upstream SHA `827be601e781daea91ce2013fa0f64d658abd028`, plus the specification kit under `REDESIGN_SPEC/`. No Redesign engine features (`RedesignKind`, DS registry, REA integration) are implemented yet. Baseline test results for this machine belong in [`BASELINE.md`](BASELINE.md) after they are actually run. See [`UPSTREAM.md`](UPSTREAM.md) and [`REDESIGN_SPEC/EXECUTION_V12.md`](../REDESIGN_SPEC/EXECUTION_V12.md).
+
+---
+
+
 What works today and how it was checked. The plan, owners and order of work are in
 [ROADMAP.md](ROADMAP.md). Last updated 2026-11-09. The baseline audit on 2026-10-23 from `main` had 923 tests passing;
 workspace clippy, layers, fmt and the secret scan of all history were clean. Chinese UI checks are listed separately below.

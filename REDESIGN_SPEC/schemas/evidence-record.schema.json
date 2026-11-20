@@ -1,0 +1,146 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^ev_[a-zA-Z0-9_-]+$"
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "craft",
+        "rea",
+        "app_mcp",
+        "user",
+        "source_repo",
+        "test"
+      ]
+    },
+    "source_operation": {
+      "type": "string",
+      "minLength": 1
+    },
+    "subject": {
+      "type": "string",
+      "minLength": 1
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "ui",
+        "behavior",
+        "business_rule",
+        "api",
+        "design_system",
+        "test",
+        "user_context"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "observed",
+        "declared",
+        "inferred",
+        "unknown",
+        "validated",
+        "refuted"
+      ]
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "target_origin": {
+          "type": "string"
+        },
+        "route": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "environment": {
+          "type": "string"
+        },
+        "app_revision": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "target_origin",
+        "route",
+        "role",
+        "environment",
+        "app_revision"
+      ]
+    },
+    "locator": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "artifact_path": {
+          "type": "string"
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "step_id": {
+          "type": "string"
+        },
+        "external_evidence_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "artifact_path",
+        "line",
+        "step_id",
+        "external_evidence_id"
+      ]
+    },
+    "digest": {
+      "type": "string"
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "sensitivity": {
+      "type": "string",
+      "enum": [
+        "public",
+        "internal",
+        "restricted",
+        "unknown"
+      ]
+    },
+    "summary": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "source",
+    "source_operation",
+    "subject",
+    "kind",
+    "status",
+    "scope",
+    "observed_at",
+    "limitations",
+    "sensitivity",
+    "summary"
+  ],
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.redesign-anything.example/1.0.0/evidence-record.schema.json",
+  "title": "evidence-record"
+}
