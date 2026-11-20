@@ -2,7 +2,7 @@
 
 ## Redesign Anything — fork status (2026-11-20)
 
-**PR-01..PR-04 on main.** Upstream pin `827be601e781daea91ce2013fa0f64d658abd028`. Baseline: [`BASELINE.md`](BASELINE.md). See [`PR01_REDESIGN_KIND.md`](PR01_REDESIGN_KIND.md), [`PR02_REDESIGN_STORE.md`](PR02_REDESIGN_STORE.md), [`PR03_STUDY_MAP.md`](PR03_STUDY_MAP.md), [`PR04_KNOWLEDGE_PACKS.md`](PR04_KNOWLEDGE_PACKS.md). Spec kit under `REDESIGN_SPEC/`. DS registry, REA, Ready gates, and V1 release are **not** done.
+**PR-01..PR-05 on main.** Upstream pin `827be601e781daea91ce2013fa0f64d658abd028`. Baseline: [`BASELINE.md`](BASELINE.md). See PR01–PR05 docs under `docs/`. Spec kit under `REDESIGN_SPEC/`. Design decisions, builder, Ready gates, REA, and V1 release are **not** done.
 
 ---
 

@@ -88,6 +88,9 @@ pub const TOOLS: &[&str] = &[
     "redesign_study_map",
     "redesign_knowledge_retrieve",
     "redesign_critic_recommend",
+    "redesign_ds_ingest",
+    "redesign_ds_show",
+    "redesign_ds_check",
     // The builder's own project.
     "build_files_list",
     "build_file_read",

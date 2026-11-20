@@ -245,6 +245,39 @@ pub fn specs() -> Vec<ToolSpec> {
             input_schema: schema_of::<CriticParams>,
             run: redesign_critic_recommend,
         },
+        ToolSpec {
+            id: "redesign_ds_ingest",
+            title: "Ingest design system package",
+            summary: "Build a Design System Registry from a React/TS package.json + exports and optional DTCG tokens. Missing Storybook does not block. Layout CLI is optional and never overrides local policy.",
+            beginner: "Loads a design system package into the redesign project.",
+            toolset: Toolset::Projects,
+            effects: Effects::WRITES_FILESYSTEM,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<DsIngestParams>,
+            run: redesign_ds_ingest,
+        },
+        ToolSpec {
+            id: "redesign_ds_show",
+            title: "Show design system registry",
+            summary: "Show the saved redesign/design_system.json registry for a project.",
+            beginner: "Shows the registered design system.",
+            toolset: Toolset::Projects,
+            effects: Effects::READ_ONLY,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<ProjectParams>,
+            run: redesign_ds_show,
+        },
+        ToolSpec {
+            id: "redesign_ds_check",
+            title: "Check design system compliance",
+            summary: "Check app source files against the registry (imports, props, hardcoded colors). Strict failures are never masked by Layout CLI degradation.",
+            beginner: "Checks whether the app uses the design system correctly.",
+            toolset: Toolset::Projects,
+            effects: Effects::READ_ONLY,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<DsCheckParams>,
+            run: redesign_ds_check,
+        },
     ]
 }
 
@@ -293,6 +326,39 @@ struct ListParams {
     pub limit: Option<usize>,
     #[serde(default)]
     pub offset: Option<usize>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct DsIngestParams {
+    pub project: PathBuf,
+    /// Path to a React/TS design-system package directory (with package.json).
+    pub package_dir: PathBuf,
+    /// `strict` or `advisory` (default strict).
+    #[serde(default)]
+    pub policy: Option<String>,
+    /// Whether Layout CLI MCP is reachable (optional; does not override local checks).
+    #[serde(default)]
+    pub layout_cli_available: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct DsCheckParams {
+    pub project: PathBuf,
+    /// Source files to check: [{ "path": "app/App.tsx", "content": "..." }] or omit to scan app/ for .tsx/.ts/.jsx/.js.
+    #[serde(default)]
+    pub sources: Option<Vec<DsSourceFile>>,
+    /// If set, registry package_version must match.
+    #[serde(default)]
+    pub required_package_version: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct DsSourceFile {
+    pub path: String,
+    pub content: String,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -910,6 +976,61 @@ fn redesign_coverage_show(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutpu
     Ok(ToolOutput::Value(serde_json::to_value(super::redesign_study::coverage_of(&ws)?).map_err(|e| ToolError::internal(e.to_string()))?))
 }
 
+fn redesign_ds_ingest(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: DsIngestParams = parse_params(params)?;
+    let ws = open(&p.project)?;
+    let policy = p.policy.as_deref().unwrap_or("strict");
+    let layout = p.layout_cli_available.unwrap_or(false);
+    let reg = super::redesign_ds::ingest_package(&ws, &p.package_dir, policy, layout)?;
+    Ok(ToolOutput::Value(serde_json::to_value(reg).map_err(|e| ToolError::internal(e.to_string()))?))
+}
+
+fn redesign_ds_show(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: ProjectParams = parse_params(params)?;
+    let ws = open(&p.project)?;
+    let reg = super::redesign_ds::load_registry(&ws)?;
+    Ok(ToolOutput::Value(serde_json::to_value(reg).map_err(|e| ToolError::internal(e.to_string()))?))
+}
+
+fn redesign_ds_check(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: DsCheckParams = parse_params(params)?;
+    let ws = open(&p.project)?;
+    let reg = super::redesign_ds::load_registry(&ws)?;
+    let sources: Vec<(String, String)> = if let Some(list) = p.sources {
+        list.into_iter().map(|s| (s.path, s.content)).collect()
+    } else {
+        scan_app_sources(&ws)?
+    };
+    let report = super::redesign_ds::check_sources(&reg, &sources, p.required_package_version.as_deref());
+    Ok(ToolOutput::Value(serde_json::to_value(report).map_err(|e| ToolError::internal(e.to_string()))?))
+}
+
+fn scan_app_sources(ws: &Workspace) -> Result<Vec<(String, String)>, ToolError> {
+    let app = ws.app_dir();
+    let mut out = Vec::new();
+    if !app.is_dir() {
+        return Ok(out);
+    }
+    fn walk(dir: &Path, root: &Path, out: &mut Vec<(String, String)>) -> Result<(), ToolError> {
+        for ent in std::fs::read_dir(dir).map_err(|e| ToolError::io(dir.display(), e))? {
+            let ent = ent.map_err(|e| ToolError::io(dir.display(), e))?;
+            let path = ent.path();
+            if path.is_dir() {
+                walk(&path, root, out)?;
+            } else if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                if matches!(ext, "ts" | "tsx" | "js" | "jsx" | "css") {
+                    let rel = path.strip_prefix(root).unwrap_or(&path).display().to_string();
+                    let content = std::fs::read_to_string(&path).map_err(|e| ToolError::io(path.display(), e))?;
+                    out.push((rel, content));
+                }
+            }
+        }
+        Ok(())
+    }
+    walk(&app, &ws.root, &mut out)?;
+    Ok(out)
+}
+
 fn redesign_knowledge_retrieve(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
     let p: KnowledgeRetrieveParams = parse_params(params)?;
     let limit = p.limit.unwrap_or(super::redesign_knowledge::RETRIEVE_MAX);
@@ -1033,6 +1154,9 @@ mod tests {
             "redesign_study_map",
             "redesign_knowledge_retrieve",
             "redesign_critic_recommend",
+            "redesign_ds_ingest",
+            "redesign_ds_show",
+            "redesign_ds_check",
         ] {
             assert!(e.registry().get(id).is_some(), "{id}");
         }
