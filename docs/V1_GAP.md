@@ -16,7 +16,7 @@ PR-01…11 checkpoints do **not** authorize a public release.
 | Quality Engine | Native Ready, secrets, DS | **axe-core** (or similar); documented manual a11y sample; unified exportable report |
 | Agent-first / DX | README + CLI/MCP | Cursor/Claude/Codex matrix executed and published; redesign-aware `doctor` |
 | Experience | CLI/report | Before/after preview/comparison in the fixture flow; optional redesign UI |
-| OSS / distribution | Inherited licences | **SBOM**, installers, binary rebrand, fork CI, upgrade/rollback |
+| OSS / distribution | Inherited licences + `cargo xtask sbom` inventory | Full `cargo about` HTML at release; installers; binary rebrand; fork CI; upgrade/rollback |
 | Impact (benchmark) | A/B/C/D dry-run + pre-registered fixtures | **Measured run** + blind human evaluation; gain vs arm B; **do not invent KPIs** |
 
 ## Suggested priority (code before release)

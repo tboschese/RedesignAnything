@@ -136,7 +136,8 @@ MCP: the same `redesign_*` tool set via `craft-anything-cli mcp` (see `AGENTS.md
 | Application MCP trust gateway | Ready (catalogue/gate) |
 | REA Deep | Contracts + fallback + **fixture live** (`redesign_rea_run`); override with `REDESIGN_REA_ADAPTER` |
 | A/B/C/D benchmark | Honest dry-run; **no invented KPIs / no published results** |
-| Installers / SBOM / full rebrand | Open — [`docs/PR12_RELEASE_CHECKLIST.md`](docs/PR12_RELEASE_CHECKLIST.md) |
+| Installers / full rebrand | Open — [`docs/PR12_RELEASE_CHECKLIST.md`](docs/PR12_RELEASE_CHECKLIST.md) |
+| SBOM inventory | `cargo xtask sbom` → [`docs/sbom/`](docs/sbom/), [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) |
 
 Per-PR docs: `docs/PR01_*.md` … `docs/PR12_*.md`.
 
@@ -201,4 +202,4 @@ Code under **MIT OR Apache-2.0**, same as Craft Anything. Preserve notices in `N
 
 ## What the First public release still requires
 
-Before calling this the First public release, still missing (among others): installers, SBOM, published measured benchmarks, live REA integration with consent, and the full matrix in [`REDESIGN_SPEC/V1_FIRST_RELEASE.md`](REDESIGN_SPEC/V1_FIRST_RELEASE.md). Internal checkpoints ≠ launch. Gap tracking: [`docs/V1_GAP.md`](docs/V1_GAP.md).
+Before calling this the First public release, still missing (among others): installers, full `cargo about` licence HTML, published measured benchmarks, optional real REA CLI wiring, and the full matrix in [`REDESIGN_SPEC/V1_FIRST_RELEASE.md`](REDESIGN_SPEC/V1_FIRST_RELEASE.md). Internal checkpoints ≠ launch. Gap tracking: [`docs/V1_GAP.md`](docs/V1_GAP.md).

@@ -1,4 +1,4 @@
-//! `cargo xtask <layers | locks | status | i18n-coverage | fmt [--check] | tools [--check] | wasm | licenses | schemas [--check] | pending [--count] | secrets [--history] | ci | version [set X.Y.Z] | ico <out.ico> <png>...>`
+//! `cargo xtask <layers | locks | status | i18n-coverage | fmt [--check] | tools [--check] | wasm | licenses | sbom | schemas [--check] | pending [--count] | secrets [--history] | ci | version [set X.Y.Z] | ico <out.ico> <png>...>`
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
 use std::collections::BTreeMap;
@@ -9,6 +9,7 @@ mod fmt;
 mod i18n_coverage;
 mod ico;
 mod locks;
+mod sbom;
 mod secrets;
 mod source_policy;
 mod status;
@@ -49,6 +50,7 @@ fn main() -> ExitCode {
         Some("fmt") => fmt::run(&root, args.iter().any(|a| a == "--check")),
         Some("wasm") => wasm(),
         Some("licenses") => licenses(),
+        Some("sbom") => sbom::generate(&root),
         Some("version") => version(&root, args.get(1).map(String::as_str), args.get(2).map(String::as_str)),
         Some("pending") => pending(&root, args.iter().any(|a| a == "--count")),
         Some("secrets") => secrets::secrets(&root, args.iter().any(|a| a == "--history")),
@@ -74,7 +76,7 @@ fn main() -> ExitCode {
         }
         _ => {
             eprintln!(
-                "usage: cargo xtask <layers | locks | status | i18n-coverage | fmt [--check] | tools [--check] | wasm | licenses | schemas [--check] | pending [--count] | secrets [--history] | ci | version [set X.Y.Z] | ico <out.ico> <png>...>"
+                "usage: cargo xtask <layers | locks | status | i18n-coverage | fmt [--check] | tools [--check] | wasm | licenses | sbom | schemas [--check] | pending [--count] | secrets [--history] | ci | version [set X.Y.Z] | ico <out.ico> <png>...>"
             );
             false
         }
