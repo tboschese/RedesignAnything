@@ -237,7 +237,7 @@ pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
         details: json!({}),
     });
 
-    // Functional proxy: mock banner + primary Button present ⇒ button path exists; zero oracles tracked.
+    // Functional proxy + quality runners (oracle static eval, optional Playwright/axe reports).
     let app_tsx = fs::read_to_string(ws.app_dir().join("src/App.tsx")).unwrap_or_default();
     let button_works = app_tsx.contains("<Button") && !app_tsx.contains("TODO_BROKEN_BUTTON");
     let preview = pkg.is_file() && ws.app_dir().join("src/main.tsx").is_file();
@@ -253,20 +253,53 @@ pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
         }
         .into(),
         summary: format!("oracles_proxy={oracle_total} button_works={button_works}"),
-        details: json!({"note":"Playwright/axe land as separate runners; native gate uses scaffold smoke."}),
+        details: json!({"note":"Complement with functional_scenarios + playwright quality runners."}),
     });
 
-    checks.push(CheckResult {
-        id: "accessibility".into(),
-        status: "not_evaluated".into(),
-        summary: "axe-core not run in this native gate; do not claim WCAG certification".into(),
-        details: json!({"wcag_certified": false}),
-    });
+    let mut a11y_critical_fail = false;
+    let mut scenario_passed = 0u32;
+    let mut scenario_total = 0u32;
+    match super::redesign_quality::run_quality(ws, None) {
+        Ok(qcs) => {
+            for qc in qcs {
+                if qc.id == "functional_scenarios" {
+                    if let Some(evals) = qc.details.get("evals").and_then(|e| e.as_array()) {
+                        scenario_total = evals.len() as u32;
+                        scenario_passed = evals.iter().filter(|e| e.get("status").and_then(|s| s.as_str()) == Some("pass")).count() as u32;
+                    }
+                }
+                if qc.id == "accessibility" && qc.status == "fail" {
+                    a11y_critical_fail = true;
+                }
+                checks.push(CheckResult {
+                    id: qc.id,
+                    status: qc.status,
+                    summary: qc.summary,
+                    details: qc.details,
+                });
+            }
+        }
+        Err(e) => {
+            checks.push(CheckResult {
+                id: "quality_runners".into(),
+                status: "fail".into(),
+                summary: format!("quality runners error (fail-closed): {e}"),
+                details: json!({}),
+            });
+        }
+    }
 
-    // Simulate error/timeout handling contract in the report notes (unit-tested separately).
+    let critical_total = if scenario_total > 0 { scenario_total } else { oracle_total };
+    let critical_passed = if scenario_total > 0 {
+        scenario_passed
+    } else if button_works {
+        oracle_total
+    } else {
+        0
+    };
     let functional = FunctionalSummary {
-        critical_scenarios_total: oracle_total,
-        critical_scenarios_passed: if button_works { oracle_total } else { 0 },
+        critical_scenarios_total: critical_total,
+        critical_scenarios_passed: critical_passed,
         button_works,
     };
     let inp = CheckInputs {
@@ -275,7 +308,7 @@ pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
         build_status: build,
         ds_status: ds,
         functional,
-        a11y_critical_fail: false,
+        a11y_critical_fail,
         secrets_exported: secrets,
         critic_says_ready: false,
     };

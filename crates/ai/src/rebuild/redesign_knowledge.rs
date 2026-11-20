@@ -266,6 +266,58 @@ pub fn bundled_catalog() -> Vec<KnowledgePack> {
                 ),
             ],
         ),
+        pack(
+            "multi-step-journeys",
+            "0.1.0",
+            &["enterprise", "journey"],
+            &["journey", "wizard", "states", "multi-step"],
+            &[
+                "Multi-screen task flows with saved progress and role-dependent steps",
+                "Do not collapse every multi-step journey into one infinite scroll without evidence",
+            ],
+            &[
+                rule(
+                    "preserve-step-outcomes",
+                    "heuristic",
+                    "Each observed step needs a destination or an approved exception; do not drop intermediate confirmations.",
+                    &["journey", "traceability", "states"],
+                    &["Skip confirmation steps to shorten the happy path"],
+                ),
+                rule(
+                    "role-gated-steps",
+                    "heuristic",
+                    "Steps visible only to some roles must stay gated; unknowns about permissions remain unknown.",
+                    &["journey", "roles", "permissions"],
+                    &["Show every step to every role for simplicity"],
+                ),
+            ],
+        ),
+        pack(
+            "empty-and-error-states",
+            "0.1.0",
+            &["enterprise", "content"],
+            &["empty-state", "errors", "recovery"],
+            &[
+                "Screens that must explain empty lists, failed submits, and recovery",
+                "Do not replace actionable empty states with decorative illustrations alone",
+            ],
+            &[
+                rule(
+                    "empty-state-next-action",
+                    "heuristic",
+                    "Empty and error regions should name what happened and the next safe action, using observed copy when available.",
+                    &["empty-state", "errors", "content"],
+                    &["Blank white space with no recovery path"],
+                ),
+                rule(
+                    "permission-denied-honest",
+                    "heuristic",
+                    "Permission failures stay explicit; do not fake success or invent alternate APIs.",
+                    &["errors", "permissions", "honesty"],
+                    &["Silently hide the control and claim the task succeeded"],
+                ),
+            ],
+        ),
     ]
 }
 

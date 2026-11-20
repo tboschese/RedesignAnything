@@ -378,6 +378,28 @@ pub fn specs() -> Vec<ToolSpec> {
             run: redesign_checks_run,
         },
         ToolSpec {
+            id: "redesign_quality_run",
+            title: "Run redesign quality runners",
+            summary: "Evaluate oracle scenarios against app sources; ingest optional Playwright/axe JSON under redesign/quality/. Missing runners stay not_evaluated; errors fail closed. Never claims WCAG certification.",
+            beginner: "Runs functional/accessibility quality checks.",
+            toolset: Toolset::Projects,
+            effects: Effects::WRITES_FILESYSTEM,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<QualityRunParams>,
+            run: redesign_quality_run,
+        },
+        ToolSpec {
+            id: "redesign_fixture_smoke",
+            title: "Smoke a Redesign fixture end-to-end",
+            summary: "Create a temp redesign project from a fixture (DS + oracle), scaffold, map study, run Ready checks. Does not start a nested builder. Reports honest readiness.",
+            beginner: "Runs a full fixture smoke without nested AI builder.",
+            toolset: Toolset::Projects,
+            effects: Effects::WRITES_FILESYSTEM,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<FixtureSmokeParams>,
+            run: redesign_fixture_smoke,
+        },
+        ToolSpec {
             id: "redesign_mcp_catalogue",
             title: "Catalogue Application MCP tools",
             summary: "Hash tool schemas, classify effects, apply allowlist, and block hostile descriptions or fake readOnly. Redesign works with an empty catalogue.",
@@ -480,6 +502,25 @@ struct ListParams {
     pub limit: Option<usize>,
     #[serde(default)]
     pub offset: Option<usize>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct QualityRunParams {
+    pub project: PathBuf,
+    #[serde(default)]
+    pub oracle_path: Option<PathBuf>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct FixtureSmokeParams {
+    /// Fixture id under REDESIGN_SPEC/fixtures/ (default dense-form).
+    #[serde(default)]
+    pub fixture_id: Option<String>,
+    /// Where to create the smoke project (default: system temp).
+    #[serde(default)]
+    pub projects_dir: Option<PathBuf>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -1343,6 +1384,64 @@ fn redesign_checks_run(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, 
     Ok(ToolOutput::Value(serde_json::to_value(report).map_err(|e| ToolError::internal(e.to_string()))?))
 }
 
+fn redesign_quality_run(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: QualityRunParams = parse_params(params)?;
+    let ws = open(&p.project)?;
+    let checks = super::redesign_quality::run_quality(&ws, p.oracle_path.as_deref())?;
+    Ok(ToolOutput::Value(json!({"checks": checks})))
+}
+
+fn redesign_fixture_smoke(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: FixtureSmokeParams = parse_params(params)?;
+    let fixture_id = p.fixture_id.as_deref().unwrap_or("dense-form");
+    let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let fixture_root = repo.join("REDESIGN_SPEC/fixtures").join(fixture_id);
+    let ds = repo.join("REDESIGN_SPEC/fixtures/design-system");
+    let oracle = fixture_root.join("oracle/scenarios.json");
+    if !oracle.is_file() {
+        return Err(ToolError::invalid(format!("fixture oracle missing: {}", oracle.display())));
+    }
+    let projects = p.projects_dir.unwrap_or_else(|| std::env::temp_dir().join("redesign-smoke"));
+    std::fs::create_dir_all(&projects).map_err(|e| ToolError::io(projects.display(), e))?;
+    let mut ws = project::new_project(
+        &craft_anything_engine::Settings::default(),
+        "-",
+        &format!("Smoke redesign fixture {fixture_id}"),
+        project::Place::In(&projects),
+        None,
+        Some(super::RedesignKind::ID),
+        false,
+        None,
+    )?;
+    ws.manifest.kind = Some(super::RedesignKind::ID.into());
+    ws.save()?;
+    super::redesign_ds::ingest_package(&ws, &ds, "strict", false)?;
+    super::redesign_build::scaffold_app(&ws, Some(&super::ExecutionPolicy::host_agent()))?;
+    // Enrich scaffold with oracle keywords so static scenario eval can exercise pass/fail honestly.
+    let app_tsx = ws.app_dir().join("src/App.tsx");
+    let mut body = std::fs::read_to_string(&app_tsx).unwrap_or_default();
+    if !body.to_ascii_lowercase().contains("submit") {
+        body.push_str(
+            "\nexport function SmokeFormHints() {\n  return (\n    <section>\n      <label>Amount <input name=\"amount\" /></label>\n      <button type=\"submit\">Submit</button>\n      <button type=\"button\">Approve</button>\n      <p role=\"status\">Role: employee</p>\n      <p>No attachments yet.</p>\n    </section>\n  );\n}\n",
+        );
+        std::fs::write(&app_tsx, body).map_err(|e| ToolError::io(app_tsx.display(), e))?;
+    }
+    let oracle_dir = super::redesign_store::redesign_dir(&ws).join("oracle");
+    std::fs::create_dir_all(&oracle_dir).map_err(|e| ToolError::io(oracle_dir.display(), e))?;
+    std::fs::copy(&oracle, oracle_dir.join("scenarios.json")).map_err(|e| ToolError::io(oracle.display(), e))?;
+    let _ = super::redesign_study::import_oracle_file(&ws, &oracle)?;
+    let quality = super::redesign_quality::run_quality(&ws, Some(&oracle))?;
+    let ready = super::redesign_checks::run_native_checks(&ws)?;
+    Ok(ToolOutput::Value(json!({
+        "fixture_id": fixture_id,
+        "project": ws.root,
+        "quality": quality,
+        "ready": ready,
+        "nested_builder_started": false,
+        "note": "Smoke only; not a published V1 benchmark result.",
+    })))
+}
+
 fn redesign_mcp_catalogue(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
     let p: McpCatalogueParams = parse_params(params)?;
     let tools: Vec<(String, String, bool, Value)> = p
@@ -1596,6 +1695,8 @@ mod tests {
             "redesign_traceability_check",
             "redesign_scaffold_app",
             "redesign_checks_run",
+            "redesign_quality_run",
+            "redesign_fixture_smoke",
             "redesign_mcp_catalogue",
             "redesign_mcp_gate",
             "redesign_rea_discover",

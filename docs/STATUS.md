@@ -2,7 +2,7 @@
 
 ## Redesign Anything — fork status (2026-11-20)
 
-**PR-01..PR-11 on main; PR-12 checklist only.** Upstream pin `827be601e781daea91ce2013fa0f64d658abd028`. Native `redesign-ready` check is registered on `RedesignKind` (with `BuildCheck`, no pixel gate). Desktop labels prefer persisted `manifest.kind`. Docs: PR01–PR12 under `docs/`. **V1 is not released** — installers, SBOM, published benchmarks, and live REA sidecar remain open.
+**PR-01..PR-11 on main; quality runners + fixture smoke in progress; PR-12 checklist open.** Upstream pin `827be601e781…`. See [`V1_GAP.md`](V1_GAP.md). Native `redesign-ready` + oracle/Playwright/axe report ingestion. **V1 is not released.**
 
 ---
 
