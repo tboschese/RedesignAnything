@@ -399,6 +399,28 @@ pub fn specs() -> Vec<ToolSpec> {
             input_schema: schema_of::<McpGateParams>,
             run: redesign_mcp_gate,
         },
+        ToolSpec {
+            id: "redesign_rea_discover",
+            title: "Discover REA Deep availability",
+            summary: "Probe Node/REA availability. Missing REA falls back to lean redesign. Does not start REA.",
+            beginner: "Checks whether REA Deep can be used.",
+            toolset: Toolset::Projects,
+            effects: Effects::READ_ONLY,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<ReaDiscoverParams>,
+            run: redesign_rea_discover,
+        },
+        ToolSpec {
+            id: "redesign_rea_request",
+            title: "Request a gated REA Deep call",
+            summary: "Consent + deep profile + budget required; Clean Room always blocks. Records reason and evidence-gain intent for first-batch ops only.",
+            beginner: "Asks to run one REA Deep operation under budget.",
+            toolset: Toolset::Projects,
+            effects: Effects::READ_ONLY,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<ReaRequestParams>,
+            run: redesign_rea_request,
+        },
     ]
 }
 
@@ -447,6 +469,40 @@ struct ListParams {
     pub limit: Option<usize>,
     #[serde(default)]
     pub offset: Option<usize>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct ReaDiscoverParams {
+    #[serde(default)]
+    pub node_ok: Option<bool>,
+    #[serde(default)]
+    pub rea_present: Option<bool>,
+    #[serde(default)]
+    pub rea_version: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct ReaRequestParams {
+    pub operation: String,
+    pub reason: String,
+    #[serde(default)]
+    pub consent_granted: Option<bool>,
+    #[serde(default)]
+    pub clean_room: Option<bool>,
+    #[serde(default)]
+    pub deep_profile: Option<bool>,
+    #[serde(default)]
+    pub budget_calls: Option<u32>,
+    #[serde(default)]
+    pub node_ok: Option<bool>,
+    #[serde(default)]
+    pub rea_present: Option<bool>,
+    #[serde(default)]
+    pub rea_version: Option<String>,
+    #[serde(default)]
+    pub calls_already_used: Option<u32>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -1292,6 +1348,37 @@ fn redesign_mcp_gate(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, To
     Ok(ToolOutput::Value(serde_json::to_value(decision).map_err(|e| ToolError::internal(e.to_string()))?))
 }
 
+fn redesign_rea_discover(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: ReaDiscoverParams = parse_params(params)?;
+    let d = super::redesign_rea::discover(
+        p.node_ok.unwrap_or(false),
+        p.rea_present.unwrap_or(false),
+        p.rea_version,
+    );
+    Ok(ToolOutput::Value(json!({
+        "discovery": d,
+        "allowed_operations": super::redesign_rea::allowed_operations(),
+    })))
+}
+
+fn redesign_rea_request(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: ReaRequestParams = parse_params(params)?;
+    let discovery = super::redesign_rea::discover(
+        p.node_ok.unwrap_or(false),
+        p.rea_present.unwrap_or(false),
+        p.rea_version.clone(),
+    );
+    let mut session = super::redesign_rea::ReaSession::new(
+        p.consent_granted.unwrap_or(false),
+        p.clean_room.unwrap_or(false),
+        p.deep_profile.unwrap_or(false),
+        p.budget_calls.unwrap_or(3),
+    );
+    session.calls_used = p.calls_already_used.unwrap_or(0);
+    let rec = super::redesign_rea::request_call(&mut session, &discovery, &p.operation, &p.reason)?;
+    Ok(ToolOutput::Value(json!({"record": rec, "session": session, "discovery": discovery})))
+}
+
 fn redesign_ds_ingest(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
     let p: DsIngestParams = parse_params(params)?;
     let ws = open(&p.project)?;
@@ -1484,6 +1571,8 @@ mod tests {
             "redesign_checks_run",
             "redesign_mcp_catalogue",
             "redesign_mcp_gate",
+            "redesign_rea_discover",
+            "redesign_rea_request",
         ] {
             assert!(e.registry().get(id).is_some(), "{id}");
         }
