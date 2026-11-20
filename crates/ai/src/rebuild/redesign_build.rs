@@ -35,11 +35,8 @@ pub fn preflight(ws: &Workspace, policy: Option<&ExecutionPolicy>) -> Result<(),
         Err(e) if e.code == ErrorCode::NotFound => {
             // If caller previously set expectation of strict via store note — require registry.
             // Default for redesign scaffold: require registry file for safety (fail closed).
-            Err(ToolError::new(
-                ErrorCode::FeatureMissing,
-                "strict design system registry missing; run redesign_ds_ingest before scaffold",
-            )
-            .with_details(json!({"code":"ds_registry_required"})))
+            Err(ToolError::new(ErrorCode::FeatureMissing, "strict design system registry missing; run redesign_ds_ingest before scaffold")
+                .with_details(json!({"code":"ds_registry_required"})))
         }
         Err(e) => Err(e),
     }
@@ -86,10 +83,7 @@ fn pascal_case(slug: &str) -> String {
 }
 
 /// Prefer plan `target_route` mappings; fall back to capability `original_routes`.
-fn collect_scaffold_routes(
-    caps: &[redesign_store::Capability],
-    plan: Option<&redesign_plan::TransformationPlan>,
-) -> Vec<ScaffoldRoute> {
+fn collect_scaffold_routes(caps: &[redesign_store::Capability], plan: Option<&redesign_plan::TransformationPlan>) -> Vec<ScaffoldRoute> {
     let mut routes: Vec<ScaffoldRoute> = Vec::new();
     let mut seen = std::collections::BTreeSet::new();
 
@@ -125,11 +119,7 @@ fn collect_scaffold_routes(
 
     if routes.is_empty() {
         for c in caps {
-            let path = c
-                .original_routes
-                .first()
-                .cloned()
-                .unwrap_or_else(|| format!("/{}", c.id));
+            let path = c.original_routes.first().cloned().unwrap_or_else(|| format!("/{}", c.id));
             if !seen.insert(path.clone()) {
                 continue;
             }
@@ -283,12 +273,7 @@ createRoot(document.getElementById("root")!).render(
 "#,
     )?;
 
-    let button_import = reg
-        .components
-        .iter()
-        .find(|c| c.export_name == "Button")
-        .map(|c| c.import_path.clone())
-        .unwrap_or_else(|| reg.package_name.clone());
+    let button_import = reg.components.iter().find(|c| c.export_name == "Button").map(|c| c.import_path.clone()).unwrap_or_else(|| reg.package_name.clone());
 
     let routes_json = serde_json::to_string_pretty(
         &routes
@@ -307,14 +292,19 @@ createRoot(document.getElementById("root")!).render(
     )
     .unwrap_or_else(|_| "[]".into());
 
-    let caps_json = serde_json::to_string_pretty(&caps.iter().map(|c| {
-        json!({
-            "capability_id": c.id,
-            "title": c.title,
-            "routes": c.original_routes,
-            "actions": c.actions,
-        })
-    }).collect::<Vec<_>>())
+    let caps_json = serde_json::to_string_pretty(
+        &caps
+            .iter()
+            .map(|c| {
+                json!({
+                    "capability_id": c.id,
+                    "title": c.title,
+                    "routes": c.original_routes,
+                    "actions": c.actions,
+                })
+            })
+            .collect::<Vec<_>>(),
+    )
     .unwrap_or_else(|_| "[]".into());
 
     write(
@@ -345,17 +335,8 @@ export const ROUTES = {routes} as const;
 
     // One page module per route (journey states as local UI toggles — simulated).
     for r in &routes {
-        let states_lit = r
-            .states
-            .iter()
-            .map(|s| format!("\"{s}\""))
-            .collect::<Vec<_>>()
-            .join(", ");
-        let initial = if r.states.iter().any(|s| s == "default") {
-            "default"
-        } else {
-            r.states.first().map(String::as_str).unwrap_or("default")
-        };
+        let states_lit = r.states.iter().map(|s| format!("\"{s}\"")).collect::<Vec<_>>().join(", ");
+        let initial = if r.states.iter().any(|s| s == "default") { "default" } else { r.states.first().map(String::as_str).unwrap_or("default") };
         write(
             &app.join(format!("src/routes/{}.tsx", r.slug)),
             &format!(
@@ -414,22 +395,9 @@ export function {component}() {{
         )?;
     }
 
-    let imports = routes
-        .iter()
-        .map(|r| format!("import {{ {} }} from \"./routes/{}\";", r.component_name, r.slug))
-        .collect::<Vec<_>>()
-        .join("\n");
-    let cases = routes
-        .iter()
-        .map(|r| {
-            format!(
-                "    case \"{path}\":\n      return <{comp} />;",
-                path = r.path,
-                comp = r.component_name
-            )
-        })
-        .collect::<Vec<_>>()
-        .join("\n");
+    let imports = routes.iter().map(|r| format!("import {{ {} }} from \"./routes/{}\";", r.component_name, r.slug)).collect::<Vec<_>>().join("\n");
+    let cases =
+        routes.iter().map(|r| format!("    case \"{path}\":\n      return <{comp} />;", path = r.path, comp = r.component_name)).collect::<Vec<_>>().join("\n");
     let default_path = routes.first().map(|r| r.path.as_str()).unwrap_or("/");
 
     write(
@@ -540,10 +508,7 @@ Continue edits in the host agent; do not call `rebuild_start` under `host_agent`
     });
     redesign_store::ensure(ws)?;
     let refs_path = redesign_store::redesign_dir(ws).join("scaffold_refs.json");
-    craft_anything_engine::project::write_atomic(
-        &refs_path,
-        serde_json::to_vec_pretty(&refs).map_err(|e| ToolError::internal(e.to_string()))?.as_slice(),
-    )?;
+    craft_anything_engine::project::write_atomic(&refs_path, serde_json::to_vec_pretty(&refs).map_err(|e| ToolError::internal(e.to_string()))?.as_slice())?;
 
     Ok(json!({
         "app": app.display().to_string(),
@@ -573,10 +538,7 @@ mod tests {
     use std::path::PathBuf;
 
     fn fixture_ds() -> PathBuf {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../REDESIGN_SPEC/fixtures/design-system")
-            .canonicalize()
-            .unwrap()
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../REDESIGN_SPEC/fixtures/design-system").canonicalize().unwrap()
     }
 
     #[test]
@@ -647,11 +609,7 @@ mod tests {
         ws.manifest.kind = Some("redesign".into());
         ws.save().unwrap();
         redesign_ds::ingest_package(&ws, &fixture_ds(), "strict", false).unwrap();
-        for (id, title, route) in [
-            ("cap_start", "Start", "/start"),
-            ("cap_review", "Review", "/review"),
-            ("cap_done", "Done", "/done"),
-        ] {
+        for (id, title, route) in [("cap_start", "Start", "/start"), ("cap_review", "Review", "/review"), ("cap_done", "Done", "/done")] {
             redesign_store::put_capability(
                 &ws,
                 redesign_store::Capability {
@@ -680,10 +638,7 @@ mod tests {
         assert!(app.contains("StartPage"));
         assert!(app.contains("ReviewPage"));
         assert!(app.contains("hashchange"));
-        let refs: Value = serde_json::from_slice(
-            &fs::read(redesign_store::redesign_dir(&ws).join("scaffold_refs.json")).unwrap(),
-        )
-        .unwrap();
+        let refs: Value = serde_json::from_slice(&fs::read(redesign_store::redesign_dir(&ws).join("scaffold_refs.json")).unwrap()).unwrap();
         assert_eq!(refs["routes"].as_array().unwrap().len(), 3);
     }
 
@@ -764,11 +719,7 @@ mod tests {
             notes: vec![],
         };
         redesign_store::ensure(&ws).unwrap();
-        craft_anything_engine::project::write_atomic(
-            &redesign_plan::plan_path(&ws),
-            serde_json::to_vec_pretty(&plan).unwrap().as_slice(),
-        )
-        .unwrap();
+        craft_anything_engine::project::write_atomic(&redesign_plan::plan_path(&ws), serde_json::to_vec_pretty(&plan).unwrap().as_slice()).unwrap();
 
         let out = scaffold_app(&ws, None).unwrap();
         assert_eq!(out["routes_generated"], 2);

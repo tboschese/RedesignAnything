@@ -8,17 +8,11 @@ use std::path::Path;
 use std::process::Command;
 
 pub fn generate(root: &Path) -> bool {
-    let out = Command::new("cargo")
-        .args(["metadata", "--format-version", "1", "--locked"])
-        .current_dir(root)
-        .output();
+    let out = Command::new("cargo").args(["metadata", "--format-version", "1", "--locked"]).current_dir(root).output();
     let out = match out {
         Ok(o) if o.status.success() => o,
         Ok(o) => {
-            eprintln!(
-                "sbom: cargo metadata failed: {}",
-                String::from_utf8_lossy(&o.stderr)
-            );
+            eprintln!("sbom: cargo metadata failed: {}", String::from_utf8_lossy(&o.stderr));
             return false;
         }
         Err(e) => {
@@ -40,11 +34,7 @@ pub fn generate(root: &Path) -> bool {
     for p in &packages {
         let name = p.get("name").and_then(|v| v.as_str()).unwrap_or("?");
         let version = p.get("version").and_then(|v| v.as_str()).unwrap_or("?");
-        let license = p
-            .get("license")
-            .and_then(|v| v.as_str())
-            .unwrap_or("UNKNOWN")
-            .to_string();
+        let license = p.get("license").and_then(|v| v.as_str()).unwrap_or("UNKNOWN").to_string();
         let purl = format!("pkg:cargo/{name}@{version}");
         components.push(json!({
             "type": "library",
@@ -53,10 +43,7 @@ pub fn generate(root: &Path) -> bool {
             "purl": purl,
             "licenses": [{ "expression": license }],
         }));
-        by_license
-            .entry(license)
-            .or_default()
-            .push(format!("{name}@{version}"));
+        by_license.entry(license).or_default().push(format!("{name}@{version}"));
     }
     components.sort_by(|a, b| {
         let an = a.get("name").and_then(|v| v.as_str()).unwrap_or("");

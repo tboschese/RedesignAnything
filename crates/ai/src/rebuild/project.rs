@@ -137,14 +137,6 @@ pub fn new_project(
             }
         }
     };
-    apply_new_project_fields(
-        &mut ws,
-        attached,
-        stack.map(|s| s.name.as_str()),
-        kind_id,
-        settings.assets.budget(),
-        generate_assets,
-        builder,
-    )?;
+    apply_new_project_fields(&mut ws, attached, stack.map(|s| s.name.as_str()), kind_id, settings.assets.budget(), generate_assets, builder)?;
     Ok(ws)
 }

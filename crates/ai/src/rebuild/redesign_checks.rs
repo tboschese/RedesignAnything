@@ -90,7 +90,9 @@ pub struct FunctionalSummary {
 
 /// Pure gates from CONTRACTS.md / IMPLEMENTATION_PLAN — unavailable ≠ zero tokens; critic ≠ Ready.
 pub fn concept_ready(inp: &CheckInputs) -> bool {
-    inp.security_ok && inp.preview_available && !matches!(inp.build_status, CheckExec::Error | CheckExec::Timeout)
+    inp.security_ok
+        && inp.preview_available
+        && !matches!(inp.build_status, CheckExec::Error | CheckExec::Timeout)
         && inp.build_status != CheckExec::Fail
         && !inp.secrets_exported
 }
@@ -123,10 +125,7 @@ pub fn primary_action_present(app_tsx: &str) -> bool {
     if app_tsx.contains("TODO_BROKEN_BUTTON") {
         return false;
     }
-    app_tsx.contains("<Button")
-        || app_tsx.contains("<button")
-        || app_tsx.contains("role=\"button\"")
-        || app_tsx.contains("role='button'")
+    app_tsx.contains("<Button") || app_tsx.contains("<button") || app_tsx.contains("role=\"button\"") || app_tsx.contains("role='button'")
 }
 
 pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
@@ -144,11 +143,7 @@ pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
     checks.push(CheckResult {
         id: "build_scaffold".into(),
         status: build.as_status().into(),
-        summary: if build.is_pass() {
-            "app/package.json present".into()
-        } else {
-            "app scaffold missing package.json".into()
-        },
+        summary: if build.is_pass() { "app/package.json present".into() } else { "app scaffold missing package.json".into() },
         details: json!({}),
     });
 
@@ -168,11 +163,7 @@ pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
                 summary: format!("DS policy={} status={}", reg.policy, report.status),
                 details: serde_json::to_value(&report).unwrap_or(json!({})),
             });
-            if reg.policy == "strict" && st != CheckExec::Pass {
-                CheckExec::Fail
-            } else {
-                st
-            }
+            if reg.policy == "strict" && st != CheckExec::Pass { CheckExec::Fail } else { st }
         }
         Err(_) => {
             checks.push(CheckResult {
@@ -198,12 +189,7 @@ pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
     let oracle_total = coverage.covered + coverage.partial; // treat mapped caps as scenarios proxy
     checks.push(CheckResult {
         id: "coverage_honesty".into(),
-        status: if coverage.percent_claimed == Some(100.0) && coverage.unknown > 0 {
-            "fail"
-        } else {
-            "pass"
-        }
-        .into(),
+        status: if coverage.percent_claimed == Some(100.0) && coverage.unknown > 0 { "fail" } else { "pass" }.into(),
         summary: format!("unknowns={} percent_claimed={:?}", coverage.unknown, coverage.percent_claimed),
         details: serde_json::to_value(&coverage).unwrap_or(json!({})),
     });
@@ -251,11 +237,7 @@ pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
                 summary: "no transformation plan".into(),
                 details: json!({}),
             });
-            (
-                "not_evaluated",
-                caps.iter().filter(|c| c.criticality == "critical" || c.criticality == "high").count() as u32,
-                false,
-            )
+            ("not_evaluated", caps.iter().filter(|c| c.criticality == "critical" || c.criticality == "high").count() as u32, false)
         }
     };
 
@@ -264,11 +246,7 @@ pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
     checks.push(CheckResult {
         id: "security_secrets".into(),
         status: if secrets { "fail" } else { "pass" }.into(),
-        summary: if secrets {
-            "possible secret material in app/".into()
-        } else {
-            "no obvious secrets in scanned app sources".into()
-        },
+        summary: if secrets { "possible secret material in app/".into() } else { "no obvious secrets in scanned app sources".into() },
         details: json!({}),
     });
 
@@ -309,12 +287,7 @@ pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
                 if qc.id == "accessibility" && qc.status == "fail" {
                     a11y_critical_fail = true;
                 }
-                checks.push(CheckResult {
-                    id: qc.id,
-                    status: qc.status,
-                    summary: qc.summary,
-                    details: qc.details,
-                });
+                checks.push(CheckResult { id: qc.id, status: qc.status, summary: qc.summary, details: qc.details });
             }
         }
         Err(e) => {
@@ -335,11 +308,7 @@ pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
     } else {
         0
     };
-    let functional = FunctionalSummary {
-        critical_scenarios_total: critical_total,
-        critical_scenarios_passed: critical_passed,
-        button_works,
-    };
+    let functional = FunctionalSummary { critical_scenarios_total: critical_total, critical_scenarios_passed: critical_passed, button_works };
     let inp = CheckInputs {
         preview_available: preview,
         security_ok: !secrets,
@@ -368,10 +337,7 @@ pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
 
     redesign_store::ensure(ws)?;
     let path = redesign_store::redesign_dir(ws).join(CHECKS_FILE);
-    craft_anything_engine::project::write_atomic(
-        &path,
-        serde_json::to_vec_pretty(&report).map_err(|e| ToolError::internal(e.to_string()))?.as_slice(),
-    )?;
+    craft_anything_engine::project::write_atomic(&path, serde_json::to_vec_pretty(&report).map_err(|e| ToolError::internal(e.to_string()))?.as_slice())?;
     Ok(report)
 }
 
@@ -410,10 +376,7 @@ mod tests {
     use std::path::PathBuf;
 
     fn fixture_ds() -> PathBuf {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../REDESIGN_SPEC/fixtures/design-system")
-            .canonicalize()
-            .unwrap()
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../REDESIGN_SPEC/fixtures/design-system").canonicalize().unwrap()
     }
 
     #[test]
@@ -431,11 +394,7 @@ mod tests {
             security_ok: true,
             build_status: CheckExec::Pass,
             ds_status: CheckExec::Pass,
-            functional: FunctionalSummary {
-                critical_scenarios_total: 0,
-                critical_scenarios_passed: 0,
-                button_works: true,
-            },
+            functional: FunctionalSummary { critical_scenarios_total: 0, critical_scenarios_passed: 0, button_works: true },
             ..Default::default()
         };
         assert!(concept_ready(&inp));
@@ -449,11 +408,7 @@ mod tests {
             security_ok: true,
             build_status: CheckExec::Pass,
             ds_status: CheckExec::Pass,
-            functional: FunctionalSummary {
-                critical_scenarios_total: 2,
-                critical_scenarios_passed: 2,
-                button_works: false,
-            },
+            functional: FunctionalSummary { critical_scenarios_total: 2, critical_scenarios_passed: 2, button_works: false },
             ..Default::default()
         };
         assert!(!prototype_ready(&inp, 0));
@@ -461,13 +416,7 @@ mod tests {
 
     #[test]
     fn critic_alone_does_not_promote_ready() {
-        let inp = CheckInputs {
-            preview_available: false,
-            security_ok: false,
-            build_status: CheckExec::Fail,
-            critic_says_ready: true,
-            ..Default::default()
-        };
+        let inp = CheckInputs { preview_available: false, security_ok: false, build_status: CheckExec::Fail, critic_says_ready: true, ..Default::default() };
         assert!(!concept_ready(&inp));
         assert!(!prototype_ready(&inp, 0));
     }
@@ -479,11 +428,7 @@ mod tests {
             security_ok: true,
             build_status: CheckExec::Pass,
             ds_status: CheckExec::Pass,
-            functional: FunctionalSummary {
-                critical_scenarios_total: 1,
-                critical_scenarios_passed: 1,
-                button_works: true,
-            },
+            functional: FunctionalSummary { critical_scenarios_total: 1, critical_scenarios_passed: 1, button_works: true },
             a11y_critical_fail: true,
             ..Default::default()
         };
@@ -554,11 +499,7 @@ mod tests {
             security_ok: true,
             build_status: CheckExec::Pass,
             ds_status: CheckExec::Pass,
-            functional: FunctionalSummary {
-                critical_scenarios_total: 2,
-                critical_scenarios_passed: 2,
-                button_works: true,
-            },
+            functional: FunctionalSummary { critical_scenarios_total: 2, critical_scenarios_passed: 2, button_works: true },
             ..Default::default()
         };
         assert!(prototype_ready(&inp, 0));

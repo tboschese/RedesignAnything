@@ -97,11 +97,7 @@ pub fn plan_path(ws: &Workspace) -> PathBuf {
 
 /// Classify feasibility from declared backend contracts / atomicity hints.
 /// Does **not** invent endpoints — missing atomic ops ⇒ `backend_change_required`.
-pub fn classify_feasibility(
-    needs_atomic_backend: bool,
-    has_known_backend_contract: bool,
-    orchestration_possible: bool,
-) -> (&'static str, Vec<String>) {
+pub fn classify_feasibility(needs_atomic_backend: bool, has_known_backend_contract: bool, orchestration_possible: bool) -> (&'static str, Vec<String>) {
     if needs_atomic_backend && !has_known_backend_contract {
         (
             "backend_change_required",
@@ -121,10 +117,7 @@ pub fn classify_feasibility(
     } else if !needs_atomic_backend {
         ("ui_only", vec!["Change stays in presentation/interaction without new contracts.".into()])
     } else {
-        (
-            "not_determined",
-            vec!["Insufficient evidence to classify; gather contracts or approve exception.".into()],
-        )
+        ("not_determined", vec!["Insufficient evidence to classify; gather contracts or approve exception.".into()])
     }
 }
 
@@ -137,15 +130,8 @@ pub fn propose_decision(
     dependencies: &[String],
     evidence_ids: &[String],
 ) -> DesignDecision {
-    let options: Vec<DecisionOption> = critic
-        .options
-        .iter()
-        .map(|o| DecisionOption {
-            id: o.id.clone(),
-            description: o.description.clone(),
-            risks: o.trade_offs.clone(),
-        })
-        .collect();
+    let options: Vec<DecisionOption> =
+        critic.options.iter().map(|o| DecisionOption { id: o.id.clone(), description: o.description.clone(), risks: o.trade_offs.clone() }).collect();
     // Default choice stays keep_as_is until a human/host agent chooses otherwise.
     let chosen = options
         .iter()
@@ -245,12 +231,7 @@ pub fn approve_decision(ws: &Workspace, decision_id: &str, approval_evidence_id:
 }
 
 /// Build a transformation plan from capabilities + decisions. Does not invent routes.
-pub fn build_plan(
-    ws: &Workspace,
-    mode: &str,
-    mappings: Vec<PlanMapping>,
-    unknowns: Vec<String>,
-) -> Result<TransformationPlan, ToolError> {
+pub fn build_plan(ws: &Workspace, mode: &str, mappings: Vec<PlanMapping>, unknowns: Vec<String>) -> Result<TransformationPlan, ToolError> {
     redesign_store::ensure(ws)?;
     let decisions = list_decisions(ws)?;
     let plan = TransformationPlan {
@@ -294,16 +275,10 @@ pub fn backend_contracts_clear(plan: &TransformationPlan) -> (bool, Vec<String>)
     for m in &plan.mappings {
         match m.feasibility.as_str() {
             "backend_change_required" => {
-                blocking.push(format!(
-                    "{}: backend_change_required (approved gap ≠ known contract)",
-                    m.capability_id
-                ));
+                blocking.push(format!("{}: backend_change_required (approved gap ≠ known contract)", m.capability_id));
             }
             "not_determined" if !m.exception_approved => {
-                blocking.push(format!(
-                    "{}: not_determined without exception_approved",
-                    m.capability_id
-                ));
+                blocking.push(format!("{}: not_determined without exception_approved", m.capability_id));
             }
             _ => {}
         }
@@ -498,14 +473,7 @@ mod tests {
         let d = tempfile::tempdir().unwrap();
         let ws = Workspace::create(d.path(), "Plan", "p", TargetRef::None).unwrap();
         let critic = redesign_knowledge::critic("x", &[]);
-        let dec = propose_decision(
-            "x",
-            &["cap_wayback".into()],
-            &critic,
-            "backend_change_required",
-            &["snapshot api".into()],
-            &[],
-        );
+        let dec = propose_decision("x", &["cap_wayback".into()], &critic, "backend_change_required", &["snapshot api".into()], &[]);
         save_decision(&ws, &dec).unwrap();
         approve_decision(&ws, &dec.id, "ev_ok").unwrap();
         let plan = build_plan(
@@ -533,22 +501,12 @@ mod tests {
 
     #[test]
     fn diagnose_keeps_keep_as_is_and_no_fake_endpoint() {
-        let v = diagnose(
-            "combine three approval screens into one submit",
-            &["form".into()],
-            &["cap_a".into(), "cap_b".into(), "cap_c".into()],
-            true,
-            false,
-            false,
-        )
-        .unwrap();
+        let v =
+            diagnose("combine three approval screens into one submit", &["form".into()], &["cap_a".into(), "cap_b".into(), "cap_c".into()], true, false, false)
+                .unwrap();
         assert_eq!(v["feasibility"], "backend_change_required");
         let blob = v.to_string();
         assert!(!blob.to_ascii_lowercase().contains("https://api.invented"));
-        assert!(v["proposed_decision"]["options"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|o| o["id"] == "keep_as_is"));
+        assert!(v["proposed_decision"]["options"].as_array().unwrap().iter().any(|o| o["id"] == "keep_as_is"));
     }
 }

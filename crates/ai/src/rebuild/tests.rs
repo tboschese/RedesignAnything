@@ -4023,7 +4023,8 @@ fn a_project_in_a_picked_folder_tells_the_builder_what_its_files_are() {
     assert!(b.contains("already has their files (index.html)") && b.contains("use the workspace folder itself (./)") && b.contains("craft.json"), "{b}");
 
     let start = folder("start");
-    let ws = project::new_project(&settings, "-", "A site like this", project::Place::At(&start, Some(ExistingFiles::StartFrom)), None, None, false, None).unwrap();
+    let ws =
+        project::new_project(&settings, "-", "A site like this", project::Place::At(&start, Some(ExistingFiles::StartFrom)), None, None, false, None).unwrap();
     let b = brief(&ws, "website", false, false, None, false, None);
     assert!(b.contains("which already had these files: index.html") && b.contains("bring into app/"), "{b}");
     assert!(!b.contains("use the workspace folder itself"));

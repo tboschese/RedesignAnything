@@ -11,13 +11,7 @@ use super::redesign_checks::ReadyReport;
 use super::redesign_quality::QualityCheck;
 use super::redesign_store;
 
-pub fn write_reports(
-    ws: &Workspace,
-    fixture_id: Option<&str>,
-    ready: &ReadyReport,
-    quality: &[QualityCheck],
-    extra: &Value,
-) -> Result<Value, ToolError> {
+pub fn write_reports(ws: &Workspace, fixture_id: Option<&str>, ready: &ReadyReport, quality: &[QualityCheck], extra: &Value) -> Result<Value, ToolError> {
     redesign_store::ensure(ws)?;
     let dir = redesign_store::redesign_dir(ws).join("report");
     fs::create_dir_all(&dir).map_err(|e| ToolError::io(dir.display(), e))?;
@@ -55,9 +49,7 @@ pub fn write_reports(
         ready.concept_ready, ready.prototype_ready, ready.engineering_ready
     ));
     md.push_str("## Preview\n\n");
-    md.push_str(&format!(
-        "- Scaffold app directory: `{app_rel}` (open with Vite after `npm install` in that folder)\n"
-    ));
+    md.push_str(&format!("- Scaffold app directory: `{app_rel}` (open with Vite after `npm install` in that folder)\n"));
     md.push_str("- Hash routes are listed below; this report does not start a browser.\n");
     if routes.is_empty() {
         md.push_str("- No `src/routes/*.tsx` pages found.\n");
@@ -118,20 +110,14 @@ pub fn write_reports(
 </html>
 "#,
         root = html_escape(&ws.root.display().to_string()),
-        fixture = fixture_id
-            .map(|f| format!(" · Fixture: <code>{}</code>", html_escape(f)))
-            .unwrap_or_default(),
+        fixture = fixture_id.map(|f| format!(" · Fixture: <code>{}</code>", html_escape(f))).unwrap_or_default(),
         maturity = html_escape(maturity),
         gate = if gate_pass { "pass" } else { "fail" },
         gate_class = if gate_pass { "pass" } else { "fail" },
         routes_html = if routes.is_empty() {
             "<li><em>No route pages</em></li>".into()
         } else {
-            routes
-                .iter()
-                .map(|r| format!("<li><code>{}</code></li>", html_escape(r)))
-                .collect::<Vec<_>>()
-                .join("")
+            routes.iter().map(|r| format!("<li><code>{}</code></li>", html_escape(r))).collect::<Vec<_>>().join("")
         },
         ready_html = ready
             .checks
@@ -177,19 +163,13 @@ pub fn write_reports(
         "extra": extra,
     });
     let index_path = dir.join("index.json");
-    craft_anything_engine::project::write_atomic(
-        &index_path,
-        serde_json::to_vec_pretty(&index).map_err(|e| ToolError::internal(e.to_string()))?.as_slice(),
-    )?;
+    craft_anything_engine::project::write_atomic(&index_path, serde_json::to_vec_pretty(&index).map_err(|e| ToolError::internal(e.to_string()))?.as_slice())?;
 
     Ok(index)
 }
 
 fn rel(ws: &Workspace, path: &PathBuf) -> String {
-    path.strip_prefix(&ws.root)
-        .unwrap_or(path)
-        .display()
-        .to_string()
+    path.strip_prefix(&ws.root).unwrap_or(path).display().to_string()
 }
 
 fn status_class(status: &str) -> &'static str {
@@ -202,17 +182,14 @@ fn status_class(status: &str) -> &'static str {
 }
 
 fn html_escape(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
+    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use craft_anything_engine::workspace::{TargetRef, Workspace};
     use crate::rebuild::redesign_checks::{CheckResult, ReadyReport};
+    use craft_anything_engine::workspace::{TargetRef, Workspace};
 
     #[test]
     fn writes_md_and_html() {
@@ -226,12 +203,7 @@ mod tests {
             concept_ready: true,
             prototype_ready: false,
             engineering_ready: false,
-            checks: vec![CheckResult {
-                id: "build_scaffold".into(),
-                status: "pass".into(),
-                summary: "ok".into(),
-                details: json!({}),
-            }],
+            checks: vec![CheckResult { id: "build_scaffold".into(), status: "pass".into(), summary: "ok".into(), details: json!({}) }],
             notes: vec!["native".into()],
         };
         let out = write_reports(&ws, Some("dense-form"), &ready, &[], &json!({})).unwrap();

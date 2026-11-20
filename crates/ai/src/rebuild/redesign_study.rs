@@ -37,17 +37,10 @@ pub fn import_oracle(ws: &Workspace, oracle: &Value) -> Result<Value, ToolError>
     let mut preserved_caps = 0u32;
     if let Some(scenarios) = oracle.get("scenarios").and_then(|s| s.as_array()) {
         for (i, sc) in scenarios.iter().enumerate() {
-            let cap_id = sc
-                .get("capability_id")
-                .and_then(|x| x.as_str())
-                .map(str::to_string)
-                .unwrap_or_else(|| format!("cap_{fixture_id}_{i}"));
+            let cap_id = sc.get("capability_id").and_then(|x| x.as_str()).map(str::to_string).unwrap_or_else(|| format!("cap_{fixture_id}_{i}"));
             let scen_id = sc.get("id").and_then(|x| x.as_str()).unwrap_or("scenario");
-            let then = sc
-                .get("then")
-                .and_then(|t| t.as_array())
-                .map(|a| a.iter().filter_map(|x| x.as_str()).collect::<Vec<_>>().join("; "))
-                .unwrap_or_default();
+            let then =
+                sc.get("then").and_then(|t| t.as_array()).map(|a| a.iter().filter_map(|x| x.as_str()).collect::<Vec<_>>().join("; ")).unwrap_or_default();
             let ev_id = format!("ev_{scen_id}");
             let source = match sc.get("assertion_source").and_then(|x| x.as_str()) {
                 Some("observed") => "observed",
@@ -101,11 +94,8 @@ pub fn import_oracle(ws: &Workspace, oracle: &Value) -> Result<Value, ToolError>
             imported_caps += 1;
         }
     }
-    let unknowns: Vec<String> = oracle
-        .get("unknowns")
-        .and_then(|u| u.as_array())
-        .map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect())
-        .unwrap_or_default();
+    let unknowns: Vec<String> =
+        oracle.get("unknowns").and_then(|u| u.as_array()).map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect()).unwrap_or_default();
     // Preserve intentional unknowns as a capability gap record (normal criticality:
     // unknowns are tracked gaps, not blocking destinations by themselves).
     if !unknowns.is_empty() {
@@ -162,9 +152,7 @@ fn put_capability_preserving_richer(ws: &Workspace, incoming: Capability) -> Res
     if let Some(existing) = redesign_store::get_capability(ws, &incoming.id)? {
         let existing_rank = knowledge_rank(&existing.knowledge_status);
         let incoming_rank = knowledge_rank(&incoming.knowledge_status);
-        if existing_rank > incoming_rank
-            || (existing_rank == incoming_rank && existing.task.len() > incoming.task.len())
-        {
+        if existing_rank > incoming_rank || (existing_rank == incoming_rank && existing.task.len() > incoming.task.len()) {
             let mut merged = existing;
             merge_unique(&mut merged.source_refs, &incoming.source_refs);
             merge_unique(&mut merged.unknowns, &incoming.unknowns);
@@ -301,9 +289,9 @@ pub fn coverage_of(ws: &Workspace) -> Result<CoverageReport, ToolError> {
 
 #[cfg(test)]
 mod tests {
+    use super::website::{ROUTES_FILE, Route};
     use super::*;
     use craft_anything_engine::workspace::TargetRef;
-    use super::website::{Route, ROUTES_FILE};
 
     #[test]
     fn oracle_import_keeps_unknowns_and_never_claims_100() {

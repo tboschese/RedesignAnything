@@ -1099,7 +1099,16 @@ fn rebuild_start(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolErr
                 (None, Some(d)) => project::Place::In(d),
                 (None, None) => project::Place::Projects,
             };
-            let ws = project::new_project(&ctx.session.settings, target, &p.request, place, p.build_with.as_deref(), p.kind.as_deref(), p.generate_assets, p.backend.as_deref())?;
+            let ws = project::new_project(
+                &ctx.session.settings,
+                target,
+                &p.request,
+                place,
+                p.build_with.as_deref(),
+                p.kind.as_deref(),
+                p.generate_assets,
+                p.backend.as_deref(),
+            )?;
             if p.project_folder.is_some() || matches!(place, project::Place::At(..)) {
                 ctx.session.remember_project(&ws.root)?;
             }
@@ -1265,16 +1274,7 @@ fn redesign_project_init(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput,
         (None, Some(d)) => project::Place::In(d),
         (None, None) => project::Place::Projects,
     };
-    let ws = project::new_project(
-        &ctx.session.settings,
-        target,
-        &p.request,
-        place,
-        p.build_with.as_deref(),
-        Some(super::RedesignKind::ID),
-        false,
-        None,
-    )?;
+    let ws = project::new_project(&ctx.session.settings, target, &p.request, place, p.build_with.as_deref(), Some(super::RedesignKind::ID), false, None)?;
     let _ = super::redesign_store::ensure(&ws)?;
     if p.project_folder.is_some() {
         ctx.session.remember_project(&ws.root)?;
@@ -1504,13 +1504,7 @@ fn redesign_fixture_smoke(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutpu
     let _ = super::redesign_study::import_oracle_file(&ws, &oracle)?;
     let quality = super::redesign_quality::run_quality(&ws, Some(&oracle))?;
     let ready = super::redesign_checks::run_native_checks(&ws)?;
-    let report = super::redesign_report::write_reports(
-        &ws,
-        Some(fixture_id),
-        &ready,
-        &quality,
-        &json!({"nested_builder_started": false}),
-    )?;
+    let report = super::redesign_report::write_reports(&ws, Some(fixture_id), &ready, &quality, &json!({"nested_builder_started": false}))?;
     Ok(ToolOutput::Value(json!({
         "fixture_id": fixture_id,
         "project": ws.root,
@@ -1529,11 +1523,8 @@ fn redesign_fixture_smoke(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutpu
 
 fn redesign_mcp_catalogue(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
     let p: McpCatalogueParams = parse_params(params)?;
-    let tools: Vec<(String, String, bool, Value)> = p
-        .tools
-        .into_iter()
-        .map(|t| (t.name, t.description, t.declared_read_only.unwrap_or(false), t.schema.unwrap_or(json!({}))))
-        .collect();
+    let tools: Vec<(String, String, bool, Value)> =
+        p.tools.into_iter().map(|t| (t.name, t.description, t.declared_read_only.unwrap_or(false), t.schema.unwrap_or(json!({})))).collect();
     let profile = super::redesign_mcp_trust::catalogue_tools(&tools, &p.allowlist);
     let summary = super::redesign_mcp_trust::profile_summary(&profile);
     Ok(ToolOutput::Value(json!({"profile": profile, "summary": summary})))
@@ -1541,12 +1532,7 @@ fn redesign_mcp_catalogue(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutpu
 
 fn redesign_mcp_gate(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
     let p: McpGateParams = parse_params(params)?;
-    let decision = super::redesign_mcp_trust::gate_call(
-        &p.profile,
-        &p.tool,
-        &p.body.unwrap_or(json!({})),
-        p.previous_schema_hash.as_deref(),
-    )?;
+    let decision = super::redesign_mcp_trust::gate_call(&p.profile, &p.tool, &p.body.unwrap_or(json!({})), p.previous_schema_hash.as_deref())?;
     Ok(ToolOutput::Value(serde_json::to_value(decision).map_err(|e| ToolError::internal(e.to_string()))?))
 }
 
@@ -1567,24 +1553,15 @@ fn redesign_benchmark_dry_run(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolO
 fn redesign_benchmark_publish(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
     let p: BenchmarkPublishParams = parse_params(params)?;
     let fixture_id = p.fixture_id.as_deref().unwrap_or("dense-form");
-    let notes = p.arm_c_notes.unwrap_or_else(|| {
-        vec![
-            "automated fixture smoke / lean path".into(),
-            "human_blind_eval=unavailable".into(),
-        ]
-    });
+    let notes = p.arm_c_notes.unwrap_or_else(|| vec!["automated fixture smoke / lean path".into(), "human_blind_eval=unavailable".into()]);
     let run = super::redesign_benchmark::publish_template(fixture_id, p.arm_c_wall_ms, notes);
     for arm in &run.arms {
         super::redesign_benchmark::validate_arm(arm).map_err(ToolError::invalid)?;
     }
-    let out_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../REDESIGN_SPEC/benchmark/published");
+    let out_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../REDESIGN_SPEC/benchmark/published");
     std::fs::create_dir_all(&out_dir).map_err(|e| ToolError::io(out_dir.display(), e))?;
     let json_path = out_dir.join("RESULTS.json");
-    craft_anything_engine::project::write_atomic(
-        &json_path,
-        serde_json::to_vec_pretty(&run).map_err(|e| ToolError::internal(e.to_string()))?.as_slice(),
-    )?;
+    craft_anything_engine::project::write_atomic(&json_path, serde_json::to_vec_pretty(&run).map_err(|e| ToolError::internal(e.to_string()))?.as_slice())?;
     let md = format!(
         "# Benchmark publish — First public release package\n\n\
          - Fixture: `{fixture_id}`\n\
@@ -1610,11 +1587,7 @@ fn redesign_rea_discover(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput
     let d = if p.probe_host.unwrap_or(false) || (p.node_ok.is_none() && p.rea_present.is_none()) {
         super::redesign_rea::discover_host()
     } else {
-        super::redesign_rea::discover(
-            p.node_ok.unwrap_or(false),
-            p.rea_present.unwrap_or(false),
-            p.rea_version,
-        )
+        super::redesign_rea::discover(p.node_ok.unwrap_or(false), p.rea_present.unwrap_or(false), p.rea_version)
     };
     Ok(ToolOutput::Value(json!({
         "discovery": d,
@@ -1627,11 +1600,7 @@ fn redesign_rea_request(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput,
     let discovery = if p.probe_host.unwrap_or(false) || (p.node_ok.is_none() && p.rea_present.is_none()) {
         super::redesign_rea::discover_host()
     } else {
-        super::redesign_rea::discover(
-            p.node_ok.unwrap_or(false),
-            p.rea_present.unwrap_or(false),
-            p.rea_version.clone(),
-        )
+        super::redesign_rea::discover(p.node_ok.unwrap_or(false), p.rea_present.unwrap_or(false), p.rea_version.clone())
     };
     let mut session = super::redesign_rea::ReaSession::new(
         p.consent_granted.unwrap_or(false),
@@ -1655,14 +1624,7 @@ fn redesign_rea_run(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, Too
         p.budget_calls.unwrap_or(3),
     );
     session.calls_used = p.calls_already_used.unwrap_or(0);
-    let result = super::redesign_rea::run_live(
-        &ws,
-        &mut session,
-        &discovery,
-        &p.operation,
-        &p.reason,
-        &p.input,
-    )?;
+    let result = super::redesign_rea::run_live(&ws, &mut session, &discovery, &p.operation, &p.reason, &p.input)?;
     Ok(ToolOutput::Value(serde_json::to_value(result).map_err(|e| ToolError::internal(e.to_string()))?))
 }
 
@@ -1686,11 +1648,8 @@ fn redesign_ds_check(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, To
     let p: DsCheckParams = parse_params(params)?;
     let ws = open(&p.project)?;
     let reg = super::redesign_ds::load_registry(&ws)?;
-    let sources: Vec<(String, String)> = if let Some(list) = p.sources {
-        list.into_iter().map(|s| (s.path, s.content)).collect()
-    } else {
-        scan_app_sources(&ws)?
-    };
+    let sources: Vec<(String, String)> =
+        if let Some(list) = p.sources { list.into_iter().map(|s| (s.path, s.content)).collect() } else { scan_app_sources(&ws)? };
     let report = super::redesign_ds::check_sources(&reg, &sources, p.required_package_version.as_deref());
     Ok(ToolOutput::Value(serde_json::to_value(report).map_err(|e| ToolError::internal(e.to_string()))?))
 }
@@ -1724,23 +1683,13 @@ fn scan_app_sources(ws: &Workspace) -> Result<Vec<(String, String)>, ToolError> 
 fn redesign_knowledge_retrieve(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
     let p: KnowledgeRetrieveParams = parse_params(params)?;
     let limit = p.limit.unwrap_or(super::redesign_knowledge::RETRIEVE_MAX);
-    Ok(ToolOutput::Value(super::redesign_knowledge::retrieve_report(
-        &p.query,
-        &p.tags,
-        limit,
-        &p.pack_paths,
-    )?))
+    Ok(ToolOutput::Value(super::redesign_knowledge::retrieve_report(&p.query, &p.tags, limit, &p.pack_paths)?))
 }
 
 fn redesign_critic_recommend(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
     let p: CriticParams = parse_params(params)?;
     let limit = p.limit.unwrap_or(super::redesign_knowledge::RETRIEVE_MAX);
-    Ok(ToolOutput::Value(super::redesign_knowledge::critic_report(
-        &p.problem,
-        &p.tags,
-        limit,
-        &p.pack_paths,
-    )?))
+    Ok(ToolOutput::Value(super::redesign_knowledge::critic_report(&p.problem, &p.tags, limit, &p.pack_paths)?))
 }
 
 fn redesign_study_map(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
@@ -1910,9 +1859,7 @@ mod tests {
         assert!(kinds["result"]["kinds"].as_array().unwrap().iter().any(|k| k == "redesign"), "{kinds}");
         // host_agent refuses nested rebuild_start without handoff.
         e.session().ext.insert(std::sync::Arc::new(super::super::ExecutionPolicy::host_agent()));
-        let conflict = e
-            .call("rebuild_start", json!({"request": "x", "target": "-", "projects_dir": d.path()}), ok())
-            .unwrap_err();
+        let conflict = e.call("rebuild_start", json!({"request": "x", "target": "-", "projects_dir": d.path()}), ok()).unwrap_err();
         assert!(conflict.message.contains("controller_conflict"), "{}", conflict.message);
     }
 

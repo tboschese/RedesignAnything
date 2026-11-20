@@ -40,11 +40,7 @@ impl TargetKind for RedesignKind {
 
     /// Explicit markers only. Ordinary phrases like "redesign this page" must not win over website.
     fn detect(&self, cx: &DetectCx) -> Option<u32> {
-        if cx.says(&[" kind=redesign ", " [kind=redesign] ", " mode=redesign "]) {
-            Some(200)
-        } else {
-            None
-        }
+        if cx.says(&[" kind=redesign ", " [kind=redesign] ", " mode=redesign "]) { Some(200) } else { None }
     }
 
     fn default_stack(&self, _cx: &DetectCx) -> &'static str {
@@ -120,23 +116,15 @@ pub fn ready_result_from_report(round: u32, report: &crate::rebuild::redesign_ch
         }
     }
     claims.push(Claim::new("concept_ready", report.concept_ready, "security/preview/build gate"));
-    claims.push(Claim::new(
-        "prototype_ready",
-        report.prototype_ready,
-        "needs oracles + traceability; not a visual likeness score",
-    ));
-    claims.push(Claim::new(
-        "engineering_ready",
-        report.engineering_ready,
-        "prototype + approved backend deps",
-    ));
+    claims.push(Claim::new("prototype_ready", report.prototype_ready, "needs oracles + traceability; not a visual likeness score"));
+    claims.push(Claim::new("engineering_ready", report.engineering_ready, "prototype + approved backend deps"));
 
     // Fail closed on security / strict DS / missing scaffold. Prototype maturity is reported
     // as claims so early scaffolds are not stuck in endless refine for missing oracles.
-    let blocker = report.checks.iter().any(|c| {
-        matches!(c.id.as_str(), "security_secrets" | "design_system" | "build_scaffold")
-            && matches!(c.status.as_str(), "fail" | "blocked")
-    });
+    let blocker = report
+        .checks
+        .iter()
+        .any(|c| matches!(c.id.as_str(), "security_secrets" | "design_system" | "build_scaffold") && matches!(c.status.as_str(), "fail" | "blocked"));
     let note = format!(
         "concept={} prototype={} engineering={}; native Ready (no PluginJudge, no pixel gate)",
         report.concept_ready, report.prototype_ready, report.engineering_ready
@@ -157,12 +145,7 @@ impl Check for RedesignReadyCheck {
     fn can_refine(&self, result: &CheckResult) -> bool {
         // Only ask the builder to fix code-addressable blockers (secrets, DS, scaffold).
         // Missing oracles / prototype maturity are not refined by inventing evidence.
-        result.claims.iter().any(|c| {
-            !c.passed
-                && (c.title.contains("security")
-                    || c.title.contains("design_system")
-                    || c.title.contains("build_scaffold"))
-        })
+        result.claims.iter().any(|c| !c.passed && (c.title.contains("security") || c.title.contains("design_system") || c.title.contains("build_scaffold")))
     }
 
     fn run(&self, cx: &mut CheckCx) -> Result<CheckResult, ToolError> {
@@ -200,10 +183,7 @@ mod tests {
         let mut ws = Workspace::create(d.path(), "R", "kind=redesign", TargetRef::None).unwrap();
         ws.manifest.kind = Some("redesign".into());
         ws.save().unwrap();
-        let fixture = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../REDESIGN_SPEC/fixtures/design-system")
-            .canonicalize()
-            .unwrap();
+        let fixture = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../REDESIGN_SPEC/fixtures/design-system").canonicalize().unwrap();
         crate::rebuild::redesign_ds::ingest_package(&ws, &fixture, "strict", false).unwrap();
         crate::rebuild::redesign_build::scaffold_app(&ws, None).unwrap();
         std::fs::write(ws.app_dir().join("src/App.tsx"), "const aws_secret_access_key = \"x\";\n").unwrap();
@@ -223,10 +203,7 @@ mod tests {
         let mut ws = Workspace::create(d.path(), "R", "kind=redesign", TargetRef::None).unwrap();
         ws.manifest.kind = Some("redesign".into());
         ws.save().unwrap();
-        let fixture = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../REDESIGN_SPEC/fixtures/design-system")
-            .canonicalize()
-            .unwrap();
+        let fixture = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../REDESIGN_SPEC/fixtures/design-system").canonicalize().unwrap();
         crate::rebuild::redesign_ds::ingest_package(&ws, &fixture, "strict", false).unwrap();
         crate::rebuild::redesign_build::scaffold_app(&ws, None).unwrap();
 

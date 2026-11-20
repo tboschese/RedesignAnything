@@ -75,8 +75,7 @@ use brief::*;
 pub use execution::{Controller, ExecutionPolicy, Profile as ExecutionProfile};
 pub use kinds::{
     AppKind, BriefCx, BuildCheck, Check, CheckCx, CheckStop, DetectCx, GameKind, KindRegistry, KindWords, MechanicsCheck, RedesignKind, RedesignReadyCheck,
-    TargetKind,
-    WebVisualCheck, WebsiteKind,
+    TargetKind, WebVisualCheck, WebsiteKind,
 };
 pub use locate::game_folder;
 use locate::*;

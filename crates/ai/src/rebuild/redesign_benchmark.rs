@@ -16,14 +16,7 @@ pub struct UsageAccounting {
 
 impl UsageAccounting {
     pub fn unavailable() -> Self {
-        Self {
-            quality: "unavailable".into(),
-            input_tokens: None,
-            output_tokens: None,
-            cache_tokens: None,
-            tool_calls: None,
-            wall_ms: None,
-        }
+        Self { quality: "unavailable".into(), input_tokens: None, output_tokens: None, cache_tokens: None, tool_calls: None, wall_ms: None }
     }
 }
 
@@ -60,11 +53,7 @@ pub fn arm_label(arm: &str) -> &'static str {
 }
 
 /// Build a run record. Pass measured usage only when actually observed; otherwise unavailable.
-pub fn build_run(
-    upstream_pin: &str,
-    environment: Value,
-    arms: Vec<BenchmarkArmResult>,
-) -> BenchmarkRun {
+pub fn build_run(upstream_pin: &str, environment: Value, arms: Vec<BenchmarkArmResult>) -> BenchmarkRun {
     BenchmarkRun {
         schema_version: "1.0.0".into(),
         upstream_pin: upstream_pin.into(),
@@ -124,22 +113,13 @@ pub fn dry_run_template(fixture_id: &str) -> BenchmarkRun {
             "arch": std::env::consts::ARCH,
             "status": "dry_run",
         }),
-        vec![
-            mk("A", "craft_runner"),
-            mk("B", "craft_runner"),
-            mk("C", "host_agent"),
-            mk("D", "host_agent"),
-        ],
+        vec![mk("A", "craft_runner"), mk("B", "craft_runner"), mk("C", "host_agent"), mk("D", "host_agent")],
     )
 }
 
 /// Publishable run record for First public release packaging.
 /// Human blind scores stay `unavailable` — never invent KPIs or “gain vs B”.
-pub fn publish_template(
-    fixture_id: &str,
-    arm_c_wall_ms: Option<u64>,
-    arm_c_quality_notes: Vec<String>,
-) -> BenchmarkRun {
+pub fn publish_template(fixture_id: &str, arm_c_wall_ms: Option<u64>, arm_c_quality_notes: Vec<String>) -> BenchmarkRun {
     let mut run = dry_run_template(fixture_id);
     run.environment = json!({
         "os": std::env::consts::OS,
@@ -148,26 +128,16 @@ pub fn publish_template(
         "human_blind_eval": "unavailable",
         "impact_verdict": "unevaluated",
     });
-    run.notes.push(
-        "Human A/B/C blind evaluation is unavailable in this publish; do not claim gain vs arm B."
-            .into(),
-    );
-    run.notes.push(
-        "Arm C may include automated fixture smoke wall time only; tokens remain unavailable without host telemetry."
-            .into(),
-    );
+    run.notes.push("Human A/B/C blind evaluation is unavailable in this publish; do not claim gain vs arm B.".into());
+    run.notes.push("Arm C may include automated fixture smoke wall time only; tokens remain unavailable without host telemetry.".into());
     for arm in &mut run.arms {
         match arm.arm.as_str() {
             "C" => {
                 arm.quality_notes = arm_c_quality_notes.clone();
                 if arm.quality_notes.is_empty() {
-                    arm.quality_notes
-                        .push("automated fixture path executed or scheduled".into());
+                    arm.quality_notes.push("automated fixture path executed or scheduled".into());
                 }
-                arm.limitations = vec![
-                    "human_blind_score=unavailable".into(),
-                    "no claim of superiority vs B".into(),
-                ];
+                arm.limitations = vec!["human_blind_score=unavailable".into(), "no claim of superiority vs B".into()];
                 if let Some(ms) = arm_c_wall_ms {
                     arm.usage = UsageAccounting {
                         quality: "estimated".into(),
@@ -180,16 +150,10 @@ pub fn publish_template(
                 }
             }
             "D" => {
-                arm.limitations = vec![
-                    "optional REA Deep — fixture adapter available; not required for lean".into(),
-                    "human_blind_score=unavailable".into(),
-                ];
+                arm.limitations = vec!["optional REA Deep — fixture adapter available; not required for lean".into(), "human_blind_score=unavailable".into()];
             }
             _ => {
-                arm.limitations = vec![
-                    "arm not re-executed in this publish; usage unavailable".into(),
-                    "human_blind_score=unavailable".into(),
-                ];
+                arm.limitations = vec!["arm not re-executed in this publish; usage unavailable".into(), "human_blind_score=unavailable".into()];
             }
         }
     }

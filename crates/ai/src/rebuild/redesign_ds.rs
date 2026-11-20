@@ -70,11 +70,7 @@ pub struct LayoutCliStatus {
 
 impl Default for LayoutCliStatus {
     fn default() -> Self {
-        Self {
-            available: false,
-            mode: "degraded".into(),
-            note: "Layout CLI MCP not configured; local registry compliance still applies.".into(),
-        }
+        Self { available: false, mode: "degraded".into(), note: "Layout CLI MCP not configured; local registry compliance still applies.".into() }
     }
 }
 
@@ -135,12 +131,7 @@ pub fn load_registry(ws: &Workspace) -> Result<DesignSystemRegistry, ToolError> 
 }
 
 /// Ingest a React/TS package directory (package.json + exports). Missing Storybook is fine.
-pub fn ingest_package(
-    ws: &Workspace,
-    package_dir: &Path,
-    policy: &str,
-    layout_available: bool,
-) -> Result<DesignSystemRegistry, ToolError> {
+pub fn ingest_package(ws: &Workspace, package_dir: &Path, policy: &str, layout_available: bool) -> Result<DesignSystemRegistry, ToolError> {
     if policy != "strict" && policy != "advisory" {
         return Err(ToolError::invalid("policy must be strict or advisory"));
     }
@@ -248,11 +239,7 @@ pub fn ingest_package(
         tokens,
         approved_overrides: vec![],
         layout_cli: if layout_available {
-            LayoutCliStatus {
-                available: true,
-                mode: "connected".into(),
-                note: "Layout CLI MCP available; local compliance remains authoritative.".into(),
-            }
+            LayoutCliStatus { available: true, mode: "connected".into(), note: "Layout CLI MCP available; local compliance remains authoritative.".into() }
         } else {
             LayoutCliStatus {
                 available: false,
@@ -271,11 +258,7 @@ pub fn ingest_package(
 }
 
 fn infer_props_from_source(package_dir: &Path, rel: &str, export_name: &str) -> Option<Value> {
-    let path = if rel.is_empty() {
-        package_dir.join(format!("src/{export_name}.tsx"))
-    } else {
-        package_dir.join(rel.trim_start_matches("./"))
-    };
+    let path = if rel.is_empty() { package_dir.join(format!("src/{export_name}.tsx")) } else { package_dir.join(rel.trim_start_matches("./")) };
     let src = fs::read_to_string(path).ok()?;
     let mut props = serde_json::Map::new();
     // Very small heuristic: capture `name?:` / `name:` from type blocks.
@@ -291,11 +274,7 @@ fn infer_props_from_source(package_dir: &Path, rel: &str, export_name: &str) -> 
                             let p = p.trim();
                             let start = p.find('"')?;
                             let end = p.rfind('"')?;
-                            if end > start {
-                                Some(p[start + 1..end].to_string())
-                            } else {
-                                None
-                            }
+                            if end > start { Some(p[start + 1..end].to_string()) } else { None }
                         })
                         .collect();
                     if !enums.is_empty() {
@@ -307,43 +286,25 @@ fn infer_props_from_source(package_dir: &Path, rel: &str, export_name: &str) -> 
             }
         }
     }
-    if props.is_empty() {
-        None
-    } else {
-        Some(Value::Object(props))
-    }
+    if props.is_empty() { None } else { Some(Value::Object(props)) }
 }
 
 /// Check generated app sources against the registry. Local checks are authoritative.
-pub fn check_sources(
-    reg: &DesignSystemRegistry,
-    sources: &[(String, String)],
-    required_package_version: Option<&str>,
-) -> ComplianceReport {
+pub fn check_sources(reg: &DesignSystemRegistry, sources: &[(String, String)], required_package_version: Option<&str>) -> ComplianceReport {
     let mut findings = Vec::new();
     let allowed_imports: HashSet<String> = reg
         .components
         .iter()
         .filter(|c| c.allowed)
         .flat_map(|c| {
-            [
-                c.import_path.clone(),
-                c.package_name.clone(),
-                format!("{}/{}", c.package_name, c.export_name),
-                format!("{}./{}", c.package_name, c.export_name),
-            ]
+            [c.import_path.clone(), c.package_name.clone(), format!("{}/{}", c.package_name, c.export_name), format!("{}./{}", c.package_name, c.export_name)]
         })
         .collect();
     let prop_map: HashMap<String, HashSet<String>> = reg
         .components
         .iter()
         .map(|c| {
-            let keys = c
-                .props_schema
-                .as_ref()
-                .and_then(|v| v.as_object())
-                .map(|o| o.keys().cloned().collect::<HashSet<_>>())
-                .unwrap_or_default();
+            let keys = c.props_schema.as_ref().and_then(|v| v.as_object()).map(|o| o.keys().cloned().collect::<HashSet<_>>()).unwrap_or_default();
             (c.export_name.clone(), keys)
         })
         .collect();
@@ -458,10 +419,7 @@ fn jsx_props_for(src: &str, component: &str) -> Vec<String> {
         let attrs = &chunk[..end];
         for part in attrs.split_whitespace() {
             let name = part.split('=').next().unwrap_or("").trim().trim_start_matches('{').trim_start_matches('/');
-            if !name.is_empty()
-                && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
-                && name != component
-            {
+            if !name.is_empty() && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') && name != component {
                 props.push(name.to_string());
             }
         }
@@ -491,11 +449,7 @@ fn hex_color_literals(src: &str) -> bool {
 /// Probe Layout CLI without trusting it for pass/fail.
 pub fn layout_cli_probe(available: bool) -> LayoutCliStatus {
     if available {
-        LayoutCliStatus {
-            available: true,
-            mode: "connected".into(),
-            note: "Layout provider reachable; still verify with local registry checks.".into(),
-        }
+        LayoutCliStatus { available: true, mode: "connected".into(), note: "Layout provider reachable; still verify with local registry checks.".into() }
     } else {
         LayoutCliStatus::default()
     }
@@ -507,10 +461,7 @@ mod tests {
     use craft_anything_engine::workspace::{TargetRef, Workspace};
 
     fn fixture_ds() -> PathBuf {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../REDESIGN_SPEC/fixtures/design-system")
-            .canonicalize()
-            .expect("fixture design-system path")
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../REDESIGN_SPEC/fixtures/design-system").canonicalize().expect("fixture design-system path")
     }
 
     #[test]
@@ -582,14 +533,7 @@ export function App() { return <FakeWidget />; }
         assert_eq!(report.status, "fail");
 
         reg.policy = "advisory".into();
-        let soft = check_sources(
-            &reg,
-            &[(
-                "app/App.tsx".into(),
-                "const c = \"#ffffff\";\n".into(),
-            )],
-            None,
-        );
+        let soft = check_sources(&reg, &[("app/App.tsx".into(), "const c = \"#ffffff\";\n".into())], None);
         assert!(soft.findings.iter().any(|f| f.code == "hardcoded_color" && f.severity == "warn"));
         assert_ne!(soft.status, "fail");
     }
@@ -610,14 +554,7 @@ export function App() { return <FakeWidget />; }
         let ws = Workspace::create(d.path(), "DsDemo", "ds", TargetRef::None).unwrap();
         let mut reg = ingest_package(&ws, &fixture_ds(), "strict", false).unwrap();
         reg.layout_cli = layout_cli_probe(false);
-        let r = check_sources(
-            &reg,
-            &[(
-                "app/x.tsx".into(),
-                "import { X } from \"@evil/ds\";\nconst c='#000';\n".into(),
-            )],
-            None,
-        );
+        let r = check_sources(&reg, &[("app/x.tsx".into(), "import { X } from \"@evil/ds\";\nconst c='#000';\n".into())], None);
         assert_eq!(r.status, "fail");
         assert!(!r.layout_cli.available);
         assert!(r.notes.iter().any(|n| n.contains("never masks")));

@@ -63,21 +63,11 @@ pub fn probe_command(program: &str, args: &[&str], timeout: Duration) -> Result<
     if !which_exists(program) {
         return Ok(false);
     }
-    match Process::new(program)
-        .args(args)
-        .timeout(timeout)
-        .stdout_cap(4 * 1024)
-        .stderr_cap(4 * 1024)
-        .run()
-    {
+    match Process::new(program).args(args).timeout(timeout).stdout_cap(4 * 1024).stderr_cap(4 * 1024).run() {
         Ok(out) => Ok(out.success),
         Err(e) => {
             let msg = e.message.to_ascii_lowercase();
-            if msg.contains("timeout") || msg.contains("timed out") || msg.contains("was stopped") {
-                Err("timeout".into())
-            } else {
-                Err(e.message)
-            }
+            if msg.contains("timeout") || msg.contains("timed out") || msg.contains("was stopped") { Err("timeout".into()) } else { Err(e.message) }
         }
     }
 }
@@ -112,11 +102,8 @@ pub fn evaluate_oracle(ws: &Workspace, oracle: &Value) -> Result<(QualityCheck, 
         let id = sc.get("id").and_then(|x| x.as_str()).unwrap_or("scenario").to_string();
         let cap = sc.get("capability_id").and_then(|x| x.as_str()).unwrap_or("").to_string();
         let executable = sc.get("executable").and_then(|x| x.as_bool()).unwrap_or(true);
-        let thens: Vec<String> = sc
-            .get("then")
-            .and_then(|t| t.as_array())
-            .map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect())
-            .unwrap_or_default();
+        let thens: Vec<String> =
+            sc.get("then").and_then(|t| t.as_array()).map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect()).unwrap_or_default();
 
         if !executable {
             evals.push(ScenarioEval {
@@ -146,20 +133,10 @@ pub fn evaluate_oracle(ws: &Workspace, oracle: &Value) -> Result<(QualityCheck, 
         }
         if ok {
             passed += 1;
-            evals.push(ScenarioEval {
-                scenario_id: id,
-                capability_id: cap,
-                status: "pass".into(),
-                notes,
-            });
+            evals.push(ScenarioEval { scenario_id: id, capability_id: cap, status: "pass".into(), notes });
         } else {
             failed += 1;
-            evals.push(ScenarioEval {
-                scenario_id: id,
-                capability_id: cap,
-                status: "fail".into(),
-                notes,
-            });
+            evals.push(ScenarioEval { scenario_id: id, capability_id: cap, status: "fail".into(), notes });
         }
     }
 
@@ -307,20 +284,10 @@ pub fn axe_check(ws: &Workspace) -> QualityCheck {
 
 fn ingest_runner_report(id: &str, path: &Path) -> QualityCheck {
     let Ok(bytes) = fs::read(path) else {
-        return QualityCheck {
-            id: id.into(),
-            status: "fail".into(),
-            summary: format!("could not read {}", path.display()),
-            details: json!({}),
-        };
+        return QualityCheck { id: id.into(), status: "fail".into(), summary: format!("could not read {}", path.display()), details: json!({}) };
     };
     let Ok(v) = serde_json::from_slice::<Value>(&bytes) else {
-        return QualityCheck {
-            id: id.into(),
-            status: "fail".into(),
-            summary: "runner report is not valid JSON (fail-closed)".into(),
-            details: json!({}),
-        };
+        return QualityCheck { id: id.into(), status: "fail".into(), summary: "runner report is not valid JSON (fail-closed)".into(), details: json!({}) };
     };
     // Convention: { "status": "pass"|"fail"|"error"|"timeout", "failed": n, ... }
     let status = v.get("status").and_then(|s| s.as_str()).unwrap_or("");
@@ -333,12 +300,7 @@ fn ingest_runner_report(id: &str, path: &Path) -> QualityCheck {
         "" if failed == 0 && v.get("passed").and_then(|n| n.as_u64()).unwrap_or(0) > 0 => "pass",
         _ => "fail", // unknown shape → fail closed
     };
-    QualityCheck {
-        id: id.into(),
-        status: mapped.into(),
-        summary: format!("ingested {} status={status} failed={failed}", path.display()),
-        details: v,
-    }
+    QualityCheck { id: id.into(), status: mapped.into(), summary: format!("ingested {} status={status} failed={failed}", path.display()), details: v }
 }
 
 /// Ensure quality dir exists for host agents to drop reports.
@@ -439,11 +401,7 @@ mod tests {
         let d = tempfile::tempdir().unwrap();
         let ws = Workspace::create(d.path(), "Q", "q", TargetRef::None).unwrap();
         std::fs::create_dir_all(ws.app_dir().join("src")).unwrap();
-        std::fs::write(
-            ws.app_dir().join("src/App.tsx"),
-            "export function App(){ return <button>Donate</button> }\n",
-        )
-        .unwrap();
+        std::fs::write(ws.app_dir().join("src/App.tsx"), "export function App(){ return <button>Donate</button> }\n").unwrap();
         let oracle = json!({
             "scenarios": [{
                 "id": "donate",
