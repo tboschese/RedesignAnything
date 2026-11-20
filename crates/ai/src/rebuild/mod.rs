@@ -64,6 +64,7 @@ pub mod redesign_rea;
 pub mod redesign_report;
 pub mod redesign_store;
 pub mod redesign_study;
+pub mod redesign_variants;
 pub mod runs;
 pub mod self_check;
 pub mod stacks;

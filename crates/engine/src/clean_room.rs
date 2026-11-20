@@ -89,6 +89,8 @@ pub const TOOLS: &[&str] = &[
     "redesign_identity_record",
     "redesign_identity_show",
     "redesign_modes_list",
+    "redesign_variants_create",
+    "redesign_variants_show",
     "redesign_knowledge_retrieve",
     "redesign_critic_recommend",
     "redesign_ds_ingest",
