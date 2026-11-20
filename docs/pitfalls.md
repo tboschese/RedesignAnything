@@ -1350,3 +1350,8 @@ passed after a human approved the gap, but Ready treated that as `backend_deps_a
 Engineering Ready now requires `backend_contracts_clear`: no plan mapping may still list
 `backend_change_required` (and `not_determined` needs `exception_approved`). An approved gap is
 not a known contract.
+
+**Host-agent Study hit `consent_required` on `web_site_open`.** Redesign formalization can
+map an oracle and host evidence without a Craft capture, but a real `web_site_capture` needs
+operator approval first. Do not invent a capture folder that claims Craft provenance; label
+host stubs clearly and replace them after consent.
