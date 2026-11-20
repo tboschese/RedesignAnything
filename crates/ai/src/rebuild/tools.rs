@@ -157,6 +157,39 @@ pub fn specs() -> Vec<ToolSpec> {
             input_schema: schema_of::<EmptyParams>,
             run: redesign_kinds_list,
         },
+        ToolSpec {
+            id: "redesign_store_show",
+            title: "Show redesign store",
+            summary: "Show the versioned redesign/ store for a project: envelope, evidence records and capabilities. Creates an empty store if missing.",
+            beginner: "Shows redesign evidence kept with the project.",
+            toolset: Toolset::Projects,
+            effects: Effects::WRITES_FILESYSTEM,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<ProjectParams>,
+            run: redesign_store_show,
+        },
+        ToolSpec {
+            id: "redesign_evidence_put",
+            title: "Put redesign evidence",
+            summary: "Write one EvidenceRecord into redesign/evidence/. Ids must be ev_…; summaries must not look like secrets.",
+            beginner: "Saves a piece of redesign evidence.",
+            toolset: Toolset::Projects,
+            effects: Effects::WRITES_FILESYSTEM,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<EvidencePutParams>,
+            run: redesign_evidence_put,
+        },
+        ToolSpec {
+            id: "redesign_capability_put",
+            title: "Put redesign capability",
+            summary: "Write one Capability into redesign/capabilities/. Ids must be cap_…; unknowns are preserved.",
+            beginner: "Saves a redesign capability.",
+            toolset: Toolset::Projects,
+            effects: Effects::WRITES_FILESYSTEM,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<CapabilityPutParams>,
+            run: redesign_capability_put,
+        },
     ]
 }
 
@@ -181,6 +214,20 @@ struct RedesignInitParams {
     /// Optional stack override; default is React + TypeScript (Vite).
     #[serde(default)]
     pub build_with: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct EvidencePutParams {
+    pub project: PathBuf,
+    pub record: super::redesign_store::EvidenceRecord,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct CapabilityPutParams {
+    pub project: PathBuf,
+    pub capability: super::redesign_store::Capability,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -652,6 +699,7 @@ fn redesign_project_init(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput,
         false,
         None,
     )?;
+    let _ = super::redesign_store::ensure(&ws)?;
     if p.project_folder.is_some() {
         ctx.session.remember_project(&ws.root)?;
     }
@@ -710,6 +758,26 @@ fn redesign_kinds_list(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, 
         "redesign_default_stack": super::RedesignKind::DEFAULT_STACK,
         "explicit_selection": "pass kind=redesign to redesign_project_init, rebuild_start, or craft-anything-cli rebuild --kind redesign"
     })))
+}
+
+fn redesign_store_show(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: ProjectParams = parse_params(params)?;
+    let ws = open(&p.project)?;
+    Ok(ToolOutput::Value(super::redesign_store::show(&ws)?))
+}
+
+fn redesign_evidence_put(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: EvidencePutParams = parse_params(params)?;
+    let ws = open(&p.project)?;
+    let env = super::redesign_store::put_evidence(&ws, p.record)?;
+    Ok(ToolOutput::Value(json!({"envelope": env})))
+}
+
+fn redesign_capability_put(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: CapabilityPutParams = parse_params(params)?;
+    let ws = open(&p.project)?;
+    let env = super::redesign_store::put_capability(&ws, p.capability)?;
+    Ok(ToolOutput::Value(json!({"envelope": env})))
 }
 
 /// Why `rebuild_check` got no report: a run took the check and it is still going (a step may be
@@ -791,6 +859,9 @@ mod tests {
             "redesign_project_init",
             "redesign_project_show",
             "redesign_kinds_list",
+            "redesign_store_show",
+            "redesign_evidence_put",
+            "redesign_capability_put",
         ] {
             assert!(e.registry().get(id).is_some(), "{id}");
         }

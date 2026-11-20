@@ -1091,6 +1091,7 @@ pub const OWN_NAMES: &[&str] = &[
     "reference",
     "attachments",
     "investigation.cany",
+    "redesign",
     crate::pins::PINNED,
 ];
 
