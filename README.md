@@ -121,6 +121,12 @@ MCP: the same `redesign_*` tool set via `craft-anything-cli mcp` (see `AGENTS.md
 
 ---
 
+## Status
+
+In development; nothing is published yet. The redesign flow (Study → Critic → Plan → Build → Checks → Ready) runs end to end on fixtures and on host-agent test runs; what each area can do is in the table below, and what is still open is in [`docs/V1_GAP.md`](docs/V1_GAP.md) and [`docs/STATUS.md`](docs/STATUS.md).
+
+---
+
 ## What already exists in this fork
 
 | Area | State |
