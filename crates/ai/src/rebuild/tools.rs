@@ -377,6 +377,28 @@ pub fn specs() -> Vec<ToolSpec> {
             input_schema: schema_of::<ProjectParams>,
             run: redesign_checks_run,
         },
+        ToolSpec {
+            id: "redesign_mcp_catalogue",
+            title: "Catalogue Application MCP tools",
+            summary: "Hash tool schemas, classify effects, apply allowlist, and block hostile descriptions or fake readOnly. Redesign works with an empty catalogue.",
+            beginner: "Reviews tools from an application MCP.",
+            toolset: Toolset::Projects,
+            effects: Effects::READ_ONLY,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<McpCatalogueParams>,
+            run: redesign_mcp_catalogue,
+        },
+        ToolSpec {
+            id: "redesign_mcp_gate",
+            title: "Gate an Application MCP call",
+            summary: "Allow or block a tool call given a catalogue profile; refuses secret-looking bodies and schema changes without reapproval.",
+            beginner: "Checks whether an MCP tool call is allowed.",
+            toolset: Toolset::Projects,
+            effects: Effects::READ_ONLY,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<McpGateParams>,
+            run: redesign_mcp_gate,
+        },
     ]
 }
 
@@ -425,6 +447,37 @@ struct ListParams {
     pub limit: Option<usize>,
     #[serde(default)]
     pub offset: Option<usize>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct McpToolIn {
+    pub name: String,
+    pub description: String,
+    #[serde(default)]
+    pub declared_read_only: Option<bool>,
+    #[serde(default)]
+    pub schema: Option<Value>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct McpCatalogueParams {
+    #[serde(default)]
+    pub tools: Vec<McpToolIn>,
+    #[serde(default)]
+    pub allowlist: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct McpGateParams {
+    pub profile: super::redesign_mcp_trust::ApplicationMcpProfile,
+    pub tool: String,
+    #[serde(default)]
+    pub body: Option<Value>,
+    #[serde(default)]
+    pub previous_schema_hash: Option<String>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -1216,6 +1269,29 @@ fn redesign_checks_run(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, 
     Ok(ToolOutput::Value(serde_json::to_value(report).map_err(|e| ToolError::internal(e.to_string()))?))
 }
 
+fn redesign_mcp_catalogue(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: McpCatalogueParams = parse_params(params)?;
+    let tools: Vec<(String, String, bool, Value)> = p
+        .tools
+        .into_iter()
+        .map(|t| (t.name, t.description, t.declared_read_only.unwrap_or(false), t.schema.unwrap_or(json!({}))))
+        .collect();
+    let profile = super::redesign_mcp_trust::catalogue_tools(&tools, &p.allowlist);
+    let summary = super::redesign_mcp_trust::profile_summary(&profile);
+    Ok(ToolOutput::Value(json!({"profile": profile, "summary": summary})))
+}
+
+fn redesign_mcp_gate(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: McpGateParams = parse_params(params)?;
+    let decision = super::redesign_mcp_trust::gate_call(
+        &p.profile,
+        &p.tool,
+        &p.body.unwrap_or(json!({})),
+        p.previous_schema_hash.as_deref(),
+    )?;
+    Ok(ToolOutput::Value(serde_json::to_value(decision).map_err(|e| ToolError::internal(e.to_string()))?))
+}
+
 fn redesign_ds_ingest(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
     let p: DsIngestParams = parse_params(params)?;
     let ws = open(&p.project)?;
@@ -1406,6 +1482,8 @@ mod tests {
             "redesign_traceability_check",
             "redesign_scaffold_app",
             "redesign_checks_run",
+            "redesign_mcp_catalogue",
+            "redesign_mcp_gate",
         ] {
             assert!(e.registry().get(id).is_some(), "{id}");
         }

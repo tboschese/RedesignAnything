@@ -100,6 +100,8 @@ pub const TOOLS: &[&str] = &[
     "redesign_traceability_check",
     "redesign_scaffold_app",
     "redesign_checks_run",
+    "redesign_mcp_catalogue",
+    "redesign_mcp_gate",
     // The builder's own project.
     "build_files_list",
     "build_file_read",

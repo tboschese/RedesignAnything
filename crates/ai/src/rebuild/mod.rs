@@ -54,6 +54,7 @@ pub mod redesign_build;
 pub mod redesign_checks;
 pub mod redesign_ds;
 pub mod redesign_knowledge;
+pub mod redesign_mcp_trust;
 pub mod redesign_plan;
 pub mod redesign_store;
 pub mod redesign_study;
