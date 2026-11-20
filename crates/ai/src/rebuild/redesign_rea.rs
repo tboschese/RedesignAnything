@@ -144,10 +144,10 @@ pub fn resolve_adapter() -> (Option<PathBuf>, &'static str) {
         }
     }
     let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../REDESIGN_SPEC/fixtures/rea-live/adapter.mjs");
-    if let Ok(canon) = fixture.canonicalize() {
-        if canon.is_file() {
-            return (Some(canon), "fixture");
-        }
+    if let Ok(canon) = fixture.canonicalize()
+        && canon.is_file()
+    {
+        return (Some(canon), "fixture");
     }
     if fixture.is_file() {
         return (Some(fixture), "fixture");

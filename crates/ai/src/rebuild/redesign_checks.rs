@@ -45,22 +45,17 @@ pub struct CheckInputs {
     pub critic_says_ready: bool, // must never alone promote Ready
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum CheckExec {
     Pass,
     Fail,
     Warn,
+    #[default]
     NotEvaluated,
     Blocked,
     /// Tool/check error or timeout — must NOT count as pass.
     Error,
     Timeout,
-}
-
-impl Default for CheckExec {
-    fn default() -> Self {
-        Self::NotEvaluated
-    }
 }
 
 impl CheckExec {
@@ -278,11 +273,11 @@ pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
     match super::redesign_quality::run_quality(ws, None) {
         Ok(qcs) => {
             for qc in qcs {
-                if qc.id == "functional_scenarios" {
-                    if let Some(evals) = qc.details.get("evals").and_then(|e| e.as_array()) {
-                        scenario_total = evals.len() as u32;
-                        scenario_passed = evals.iter().filter(|e| e.get("status").and_then(|s| s.as_str()) == Some("pass")).count() as u32;
-                    }
+                if qc.id == "functional_scenarios"
+                    && let Some(evals) = qc.details.get("evals").and_then(|e| e.as_array())
+                {
+                    scenario_total = evals.len() as u32;
+                    scenario_passed = evals.iter().filter(|e| e.get("status").and_then(|s| s.as_str()) == Some("pass")).count() as u32;
                 }
                 if qc.id == "accessibility" && qc.status == "fail" {
                     a11y_critical_fail = true;

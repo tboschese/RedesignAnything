@@ -120,15 +120,15 @@ pub fn gate_call(profile: &ApplicationMcpProfile, tool: &str, body: &Value, prev
         reasons.push(entry.block_reason.clone().unwrap_or_else(|| "not_allowlisted".into()));
         return Ok(TrustDecision { tool: tool.into(), allowed: false, knowledge_status: "blocked".into(), reasons });
     }
-    if let Some(prev) = previous_schema_hash {
-        if prev != entry.schema_hash {
-            return Ok(TrustDecision {
-                tool: tool.into(),
-                allowed: false,
-                knowledge_status: "blocked".into(),
-                reasons: vec!["schema_changed_requires_reapproval".into()],
-            });
-        }
+    if let Some(prev) = previous_schema_hash
+        && prev != entry.schema_hash
+    {
+        return Ok(TrustDecision {
+            tool: tool.into(),
+            allowed: false,
+            knowledge_status: "blocked".into(),
+            reasons: vec!["schema_changed_requires_reapproval".into()],
+        });
     }
     let body_s = body.to_string();
     if body_s.contains("sk-") || body_s.to_ascii_lowercase().contains("bearer ") || body_s.contains("BEGIN PRIVATE KEY") {
@@ -184,8 +184,11 @@ fn which_node() -> bool {
     false
 }
 
+/// One fixture catalogue tool: name, description, read-only flag and input schema.
+pub type FixtureTool = (String, String, bool, Value);
+
 /// Load catalogue.json next to the fixture server (no process required).
-pub fn load_fixture_catalogue_file() -> Result<(Vec<(String, String, bool, Value)>, Vec<String>), ToolError> {
+pub fn load_fixture_catalogue_file() -> Result<(Vec<FixtureTool>, Vec<String>), ToolError> {
     let path = fixture_server_path().parent().map(|p| p.join("catalogue.json")).ok_or_else(|| ToolError::invalid("fixture catalogue path"))?;
     let bytes = fs::read(&path).map_err(|e| ToolError::io(path.display(), e))?;
     let v: Value = serde_json::from_slice(&bytes).map_err(|e| ToolError::invalid(format!("catalogue json: {e}")))?;

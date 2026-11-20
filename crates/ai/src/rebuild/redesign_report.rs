@@ -5,7 +5,7 @@ use craft_anything_engine::workspace::Workspace;
 use craft_anything_evidence::ToolError;
 use serde_json::{Value, json};
 use std::fs;
-use std::path::PathBuf;
+use std::path::Path;
 
 use super::redesign_checks::ReadyReport;
 use super::redesign_quality::QualityCheck;
@@ -168,7 +168,7 @@ pub fn write_reports(ws: &Workspace, fixture_id: Option<&str>, ready: &ReadyRepo
     Ok(index)
 }
 
-fn rel(ws: &Workspace, path: &PathBuf) -> String {
+fn rel(ws: &Workspace, path: &Path) -> String {
     path.strip_prefix(&ws.root).unwrap_or(path).display().to_string()
 }
 

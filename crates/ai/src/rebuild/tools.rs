@@ -1104,10 +1104,12 @@ fn rebuild_start(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolErr
                 target,
                 &p.request,
                 place,
-                p.build_with.as_deref(),
-                p.kind.as_deref(),
-                p.generate_assets,
-                p.backend.as_deref(),
+                project::NewProjectOpts {
+                    build_with: p.build_with.as_deref(),
+                    kind: p.kind.as_deref(),
+                    generate_assets: p.generate_assets,
+                    builder: p.backend.as_deref(),
+                },
             )?;
             if p.project_folder.is_some() || matches!(place, project::Place::At(..)) {
                 ctx.session.remember_project(&ws.root)?;
@@ -1274,7 +1276,8 @@ fn redesign_project_init(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput,
         (None, Some(d)) => project::Place::In(d),
         (None, None) => project::Place::Projects,
     };
-    let ws = project::new_project(&ctx.session.settings, target, &p.request, place, p.build_with.as_deref(), Some(super::RedesignKind::ID), false, None)?;
+    let opts = project::NewProjectOpts { build_with: p.build_with.as_deref(), kind: Some(super::RedesignKind::ID), ..Default::default() };
+    let ws = project::new_project(&ctx.session.settings, target, &p.request, place, opts)?;
     let _ = super::redesign_store::ensure(&ws)?;
     if p.project_folder.is_some() {
         ctx.session.remember_project(&ws.root)?;
@@ -1480,10 +1483,7 @@ fn redesign_fixture_smoke(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutpu
         "-",
         &format!("Smoke redesign fixture {fixture_id}"),
         project::Place::In(&projects),
-        None,
-        Some(super::RedesignKind::ID),
-        false,
-        None,
+        project::NewProjectOpts { kind: Some(super::RedesignKind::ID), ..Default::default() },
     )?;
     ws.manifest.kind = Some(super::RedesignKind::ID.into());
     ws.save()?;
@@ -1666,12 +1666,12 @@ fn scan_app_sources(ws: &Workspace) -> Result<Vec<(String, String)>, ToolError> 
             let path = ent.path();
             if path.is_dir() {
                 walk(&path, root, out)?;
-            } else if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                if matches!(ext, "ts" | "tsx" | "js" | "jsx" | "css") {
-                    let rel = path.strip_prefix(root).unwrap_or(&path).display().to_string();
-                    let content = std::fs::read_to_string(&path).map_err(|e| ToolError::io(path.display(), e))?;
-                    out.push((rel, content));
-                }
+            } else if let Some(ext) = path.extension().and_then(|e| e.to_str())
+                && matches!(ext, "ts" | "tsx" | "js" | "jsx" | "css")
+            {
+                let rel = path.strip_prefix(root).unwrap_or(&path).display().to_string();
+                let content = std::fs::read_to_string(&path).map_err(|e| ToolError::io(path.display(), e))?;
+                out.push((rel, content));
             }
         }
         Ok(())

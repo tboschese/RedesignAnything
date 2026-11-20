@@ -154,10 +154,12 @@ fn run(cli: &Cli, a: &RebuildArgs) -> Result<bool, ToolError> {
                 &a.target,
                 &a.request,
                 place,
-                a.build_with.as_deref(),
-                a.kind.as_deref(),
-                a.generate_assets,
-                a.backend.as_deref(),
+                rebuild::project::NewProjectOpts {
+                    build_with: a.build_with.as_deref(),
+                    kind: a.kind.as_deref(),
+                    generate_assets: a.generate_assets,
+                    builder: a.backend.as_deref(),
+                },
             )?;
             if folder.is_some() {
                 engine.session().remember_project(&ws.root)?;

@@ -161,10 +161,10 @@ pub fn evaluate_oracle(ws: &Workspace, oracle: &Value) -> Result<(QualityCheck, 
 fn then_to_hint(then: &str) -> String {
     let t = then.to_ascii_lowercase();
     // Prefer an explicit quoted phrase when authors put one in the "then" clause.
-    if let Some(q) = first_quoted_phrase(then) {
-        if q.chars().count() >= 3 {
-            return q;
-        }
+    if let Some(q) = first_quoted_phrase(then)
+        && q.chars().count() >= 3
+    {
+        return q;
     }
     // Conservative keyword extraction — longer / more specific needles first.
     // Not a full test runner; missing hints stay fail/not_evaluated.
@@ -223,13 +223,13 @@ fn read_app_blob(ws: &Workspace) -> String {
     }
     // Also scan routes/
     let routes = app.join("src/routes");
-    if routes.is_dir() {
-        if let Ok(rd) = fs::read_dir(&routes) {
-            for ent in rd.flatten() {
-                if let Ok(s) = fs::read_to_string(ent.path()) {
-                    out.push_str(&s);
-                    out.push('\n');
-                }
+    if routes.is_dir()
+        && let Ok(rd) = fs::read_dir(&routes)
+    {
+        for ent in rd.flatten() {
+            if let Ok(s) = fs::read_to_string(ent.path()) {
+                out.push_str(&s);
+                out.push('\n');
             }
         }
     }

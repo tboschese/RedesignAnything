@@ -309,15 +309,15 @@ pub fn check_sources(reg: &DesignSystemRegistry, sources: &[(String, String)], r
         })
         .collect();
 
-    if let Some(need) = required_package_version {
-        if need != reg.package_version {
-            findings.push(ComplianceFinding {
-                code: "package_version_mismatch".into(),
-                severity: "error".into(),
-                message: format!("registry has {}@{}, required {}", reg.package_name, reg.package_version, need),
-                path: None,
-            });
-        }
+    if let Some(need) = required_package_version
+        && need != reg.package_version
+    {
+        findings.push(ComplianceFinding {
+            code: "package_version_mismatch".into(),
+            severity: "error".into(),
+            message: format!("registry has {}@{}, required {}", reg.package_name, reg.package_version, need),
+            path: None,
+        });
     }
 
     for (path, src) in sources {
@@ -399,12 +399,12 @@ fn import_captures(src: &str) -> Vec<String> {
     let mut out = Vec::new();
     for line in src.lines() {
         let t = line.trim();
-        if let Some(rest) = t.strip_prefix("import ") {
-            if let Some(from) = rest.split(" from ").nth(1) {
-                let s = from.trim().trim_end_matches(';').trim().trim_matches('"').trim_matches('\'').trim_matches('`');
-                if !s.is_empty() {
-                    out.push(s.to_string());
-                }
+        if let Some(rest) = t.strip_prefix("import ")
+            && let Some(from) = rest.split(" from ").nth(1)
+        {
+            let s = from.trim().trim_end_matches(';').trim().trim_matches('"').trim_matches('\'').trim_matches('`');
+            if !s.is_empty() {
+                out.push(s.to_string());
             }
         }
     }

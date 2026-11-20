@@ -445,10 +445,7 @@ fn rule_blocked_by_query(rule: &UxRule, query: &str) -> bool {
         }
     }
     // Task saying "keep table / no cards" blocks card-default style rules.
-    if rule.tags.iter().any(|t| t == "cards") && (q.contains("keep table") || q.contains("no card")) {
-        return true;
-    }
-    false
+    rule.tags.iter().any(|t| t == "cards") && (q.contains("keep table") || q.contains("no card"))
 }
 
 fn tokenize(s: &str) -> HashSet<String> {

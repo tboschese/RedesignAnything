@@ -71,10 +71,8 @@ pub fn validate_arm(arm: &BenchmarkArmResult) -> Result<(), String> {
     if !matches!(arm.arm.as_str(), "A" | "B" | "C" | "D") {
         return Err(format!("unknown arm {}", arm.arm));
     }
-    if arm.usage.quality == "unavailable" {
-        if arm.usage.input_tokens.is_some() || arm.usage.output_tokens.is_some() {
-            return Err("unavailable usage must not carry token counts".into());
-        }
+    if arm.usage.quality == "unavailable" && (arm.usage.input_tokens.is_some() || arm.usage.output_tokens.is_some()) {
+        return Err("unavailable usage must not carry token counts".into());
     }
     if arm.usage.quality == "unavailable" {
         // Treating unavailable as zero is forbidden in claims.
