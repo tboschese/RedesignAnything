@@ -1355,3 +1355,9 @@ not a known contract.
 map an oracle and host evidence without a Craft capture, but a real `web_site_capture` needs
 operator approval first. Do not invent a capture folder that claims Craft provenance; label
 host stubs clearly and replace them after consent.
+
+**Lit / shadow DOM left `web_site_capture` outline and links empty.** archive.org’s home is
+mostly custom elements; the blueprint script only walks light-DOM `querySelectorAll`, so
+`outline`/`links`/`headings` can be zero while screenshots and `page.html` are still real.
+Do not treat an empty outline as “the page has no UI”; prefer screenshots and declare the
+structure gap until capture pierces open shadow roots.
