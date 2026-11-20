@@ -3782,6 +3782,23 @@ fn a_later_request_is_reminded_only_when_nothing_was_decompiled() {
 }
 
 #[test]
+fn a_redesign_brief_follows_its_mode_instead_of_asking_for_an_exact_match() {
+    use super::redesign_mode::RedesignMode;
+    let d = tempfile::tempdir().unwrap();
+    let mut ws = Workspace::create(d.path(), "r", "kind=redesign", TargetRef::Website { url: "https://example.com".into() }).unwrap();
+    ws.manifest.kind = Some("redesign".into());
+    ws.save().unwrap();
+    for deep in [false, true] {
+        let b = brief(&ws, "redesign", deep, false, None, false, None);
+        assert!(!b.contains("Match it exactly"), "deep={deep}: {b}");
+        assert!(b.contains(RedesignMode::Redesign.capture_guidance()), "no plan yet, so the default mode; deep={deep}: {b}");
+    }
+    super::redesign_plan::build_plan(&ws, "refresh", vec![], vec![]).unwrap();
+    let tidy = brief(&ws, "redesign", false, false, None, false, None);
+    assert!(tidy.contains(RedesignMode::Refresh.capture_guidance()) && !tidy.contains(RedesignMode::Redesign.capture_guidance()), "{tidy}");
+}
+
+#[test]
 fn every_kind_leads_tests_its_own_build_and_keeps_its_unknowns() {
     let d = tempfile::tempdir().unwrap();
     let web = TargetRef::Website { url: "https://example.com".into() };

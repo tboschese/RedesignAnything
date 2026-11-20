@@ -55,6 +55,11 @@ impl TargetKind for RedesignKind {
         false
     }
 
+    /// A redesign never rebuilds the original pixel for pixel; how close it stays depends on the mode.
+    fn capture_guidance(&self, cx: &BriefCx) -> Option<String> {
+        Some(crate::rebuild::redesign_mode::RedesignMode::of(cx.ws).capture_guidance().into())
+    }
+
     fn brief_sections(&self, cx: &BriefCx) -> Vec<String> {
         let mut out = vec![REDESIGN_BRIEF.into()];
         // Compact redesign refs — pass by path, do not dump full stores into the prompt.

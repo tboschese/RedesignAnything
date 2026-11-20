@@ -21,6 +21,7 @@ type RuleId = `rule_${string}`;
 type ScenarioId = `scenario_${string}`;
 
 type CaptureMode = 'clean_room' | 'deep';
+// refresh: organize each screen, same blocks/journeys/look · redesign (default): reorganize journeys · reimagine: new flows.
 type RedesignMode = 'refresh' | 'redesign' | 'reimagine';
 type SourceAuthority = 'craft' | 'rea' | 'app_mcp' | 'user' | 'source_repo' | 'test';
 type KnowledgeStatus = 'observed' | 'declared' | 'inferred' | 'unknown' | 'validated' | 'refuted';

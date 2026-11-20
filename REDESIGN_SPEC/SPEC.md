@@ -32,7 +32,7 @@
 - **Agent-first is P0:** the product must be operable by a coding agent with only the repository, CLI/MCP and documentation, without the desktop UI; a documented adoption path from a GitHub URL, re-runnable setup and environment diagnostics. Do not assume that providing a URL automatically installs tools.
 - **Economical execution is P0:** `lean` mode as default, single orchestration (host agent **or** Craft runner), knowledge/DS on demand, opt-in Deep/REA tools, verifiable call limits and honest telemetry. See `COST_AND_EXECUTION.md`.
 - Capture/study, evidence, journeys, states, inferred rules and gaps using Craft; REA and application MCP optional.
-- Modes: `refresh` (visual, minimal functional change), `redesign` (reorganizes the journey with traceability), `reimagine` (proposes new flows and flags backend dependencies).
+- Modes: `refresh` (organizes each screen: hierarchy, grouping, spacing and legibility, with the same blocks in the same places, the same journeys and the same look), `redesign` (reorganizes the journey with traceability; the default), `reimagine` (proposes new flows and flags backend dependencies). The plan records one mode; `mode_scope` compares the plan with it and warns when the plan goes out of scope. An unknown mode is refused.
 - Local, versioned UX knowledge; Design Decision Engine, Critic; Corporate DS Registry with `strict` and `advisory`.
 - React + TypeScript generation, Vite by default, synthetic mocks/data and real DS components.
 - Objective checks: build, DS, known journeys, automated accessibility, technical/security risk and a coverage report.

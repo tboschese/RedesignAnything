@@ -1,8 +1,9 @@
-//! How far a redesign may go. The plan's `mode` is one of three scopes, from the spec:
-//! `refresh` tidies each screen and keeps journeys, navigation and style; `redesign` may
-//! reorganise journeys with traceability; `reimagine` may propose new flows and pages and must
-//! flag what would need backend work. `mode_scope` checks the plan against its mode. It is
-//! advisory, like the identity checks: it never feeds the Ready gates.
+//! How far a redesign may go. The plan's `mode` is one of three scopes:
+//! `refresh` organises each screen (hierarchy, grouping, spacing, legibility) with the same blocks
+//! in the same places, the same journeys and the same look; `redesign` may reorganise journeys
+//! with traceability; `reimagine` may propose new flows and pages and must flag what would need
+//! backend work. `mode_scope` compares the plan with its mode. It is advisory: it reports `warn`,
+//! never `fail`, because a failed row would fail the kind's Ready check.
 //!
 //! The mode ids are stored values; what users see is `label()`, in our own words.
 
@@ -43,12 +44,12 @@ impl RedesignMode {
         }
     }
 
-    /// User-visible name.
+    /// User-visible name: a plain description, checked in docs/feature-names.md.
     pub fn label(self) -> &'static str {
         match self {
-            Self::Refresh => "Tidy up",
-            Self::Redesign => "Redesign",
-            Self::Reimagine => "Rethink",
+            Self::Refresh => "Organize screens",
+            Self::Redesign => "Redesign journeys",
+            Self::Reimagine => "New flows",
         }
     }
 
@@ -63,19 +64,42 @@ impl RedesignMode {
     pub fn scope(self) -> &'static str {
         match self {
             Self::Refresh => {
-                "Tidy each screen: clearer hierarchy, grouping, spacing and legibility. Keep every route, journey and \
-                 the navigation; keep the visual identity (no trait is replaced); no backend changes."
+                "Organise each screen: clearer hierarchy, grouping, spacing and legibility, with the same blocks in \
+                 the same places. Keep every route, journey and the navigation; keep the look (no identity trait is \
+                 replaced); no backend changes."
             }
             Self::Redesign => {
                 "Reorganise journeys and navigation where evidence supports it, each change traced to a decision. \
-                 Kept traits evolve within their style."
+                 The look follows redesign/identity.json: kept traits evolve within their style."
             }
             Self::Reimagine => {
-                "Rethink flows and pages from the capabilities up: new routes, merged or split screens, new \
-                 navigation. Traits may be replaced with a rationale. Anything that would need backend work is \
-                 flagged as backend_change_required, never invented."
+                "Build new flows and pages from the capabilities up: new routes, merged or split screens, new \
+                 navigation. It changes structure, not character: the look still follows redesign/identity.json. \
+                 Anything that would need backend work is flagged as backend_change_required, never invented."
             }
         }
+    }
+
+    /// What the builder does with the original's capture; replaces the website kind's "match it exactly".
+    pub fn capture_guidance(self) -> &'static str {
+        match self {
+            Self::Refresh => {
+                "Keep the original's layout: the same blocks in the same places at every width, with colours, fonts, text \
+                 sizes, padding, gaps, corner radii and content widths taken from capture.json. Change only what makes \
+                 each screen easier to read and use (hierarchy, grouping, spacing, legibility, hit areas, focus), and \
+                 never let the page scroll sideways on a phone."
+            }
+            Self::Redesign | Self::Reimagine => {
+                "The capture is evidence of what the original does and how it looks, not a layout to copy: do not clone \
+                 its pages. Take the look (colours, fonts, shapes) from redesign/identity.json, with exact values from \
+                 capture.json for the traits that are kept, and never let the page scroll sideways on a phone."
+            }
+        }
+    }
+
+    /// The mode of a project's plan; the default when there is no plan yet or its mode can't be read.
+    pub fn of(ws: &Workspace) -> Self {
+        super::redesign_plan::load_plan(ws).ok().and_then(|p| Self::parse(&p.mode).ok()).unwrap_or_default()
     }
 
     /// One line for the builder brief.
@@ -89,8 +113,7 @@ pub fn list() -> Value {
     json!({
         "modes": RedesignMode::ALL.iter().map(|m| json!({"id": m.as_str(), "label": m.label(), "scope": m.scope()})).collect::<Vec<_>>(),
         "default": RedesignMode::default().as_str(),
-        "compare": "A project holds one plan. To compare modes, make one project per mode from the same capture and build each.",
-        "check": "mode_scope (in redesign_checks_run) compares the plan with its mode; it is advisory.",
+        "check": "mode_scope (in redesign_checks_run) compares the plan with its mode. It is advisory: out of scope is a warning.",
     })
 }
 
@@ -127,7 +150,7 @@ pub fn evaluate_scope(caps: &[Capability], plan: Option<&TransformationPlan>, de
     let mode = match RedesignMode::parse(&plan.mode) {
         Ok(m) => m,
         Err(e) => {
-            return CheckResult { id: CHECK_ID.into(), status: "fail".into(), summary: e.message, details: json!({"advisory": true, "note": ADVISORY_NOTE}) };
+            return CheckResult { id: CHECK_ID.into(), status: "warn".into(), summary: e.message, details: json!({"advisory": true, "note": ADVISORY_NOTE}) };
         }
     };
     let moved = moved_routes(caps, plan);
@@ -149,14 +172,14 @@ pub fn evaluate_scope(caps: &[Capability], plan: Option<&TransformationPlan>, de
                 over.push(format!("{} identity trait(s) replaced", replaced.len()));
             }
             if over.is_empty() {
-                ("pass", "tidy-up stays within routes, backend and identity".to_string())
+                ("pass", "stays within the original's routes, backend and identity".to_string())
             } else {
-                ("fail", format!("goes beyond a tidy-up: {}", over.join("; ")))
+                ("warn", format!("goes beyond organizing the screens: {}", over.join("; ")))
             }
         }
         RedesignMode::Redesign => ("pass", format!("{} route move(s), {} divergent decision(s); traceability rules apply", moved.len(), divergent.len())),
         RedesignMode::Reimagine if moved.is_empty() && divergent.is_empty() && replaced.is_empty() => {
-            ("warn", "rethink proposes nothing new: no route moves, divergent decisions or replaced traits".to_string())
+            ("warn", "proposes nothing new: no route moves, divergent decisions or replaced traits".to_string())
         }
         RedesignMode::Reimagine => {
             ("pass", format!("{} route move(s), {} divergent decision(s), {} backend need(s) flagged", moved.len(), divergent.len(), backend.len()))
@@ -279,12 +302,29 @@ mod tests {
         let same = evaluate_scope(&caps, Some(&plan("refresh", "/search/", "ui_only")), &[], None);
         assert_eq!(same.status, "pass", "{same:?}");
         let moved = evaluate_scope(&caps, Some(&plan("refresh", "/find", "ui_only")), &[], None);
-        assert_eq!(moved.status, "fail", "{moved:?}");
+        assert_eq!(moved.status, "warn", "{moved:?}");
         let replaced = evaluate_scope(&caps, Some(&plan("refresh", "/search", "ui_only")), &[], Some(&replaced_trait()));
-        assert_eq!(replaced.status, "fail", "{replaced:?}");
+        assert_eq!(replaced.status, "warn", "{replaced:?}");
         // The same plan is within scope once the mode allows it.
         let redesign = evaluate_scope(&caps, Some(&plan("redesign", "/find", "ui_only")), &[], Some(&replaced_trait()));
         assert_eq!(redesign.status, "pass", "{redesign:?}");
+    }
+
+    #[test]
+    fn an_out_of_scope_plan_warns_without_failing_the_ready_check() {
+        let caps = [cap("cap_search", "/search")];
+        let out_of_scope = evaluate_scope(&caps, Some(&plan("refresh", "/find", "backend_change_required")), &[], Some(&replaced_trait()));
+        let report = crate::rebuild::redesign_checks::ReadyReport {
+            concept_ready: true,
+            prototype_ready: true,
+            engineering_ready: true,
+            checks: vec![out_of_scope],
+            notes: vec![],
+        };
+        let ready = crate::rebuild::kinds::redesign::ready_result_from_report(1, &report);
+        let row = ready.claims.iter().find(|c| c.title.contains(CHECK_ID)).expect("mode_scope is reported");
+        assert!(row.passed, "advisory: {row:?}");
+        assert!(row.title.contains("warn"), "and still visible as a warning: {row:?}");
     }
 
     #[test]
@@ -300,6 +340,6 @@ mod tests {
     fn an_unknown_mode_is_refused() {
         assert!(RedesignMode::parse("overhaul").is_err());
         let r = evaluate_scope(&[], Some(&plan("overhaul", "/", "ui_only")), &[], None);
-        assert_eq!(r.status, "fail", "{r:?}");
+        assert_eq!(r.status, "warn", "{r:?}");
     }
 }
