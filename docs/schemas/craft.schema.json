@@ -101,6 +101,13 @@
       "type": "boolean",
       "default": false
     },
+    "kind": {
+      "description": "When set, this project is that kind (`redesign`, …) instead of detecting from the request.\nAbsent on older craft.json files (read as none).",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "last_reply": {
       "description": "The agent's last plain-words summary, shown when the project is reopened.",
       "type": "string",
@@ -139,13 +146,6 @@
       "description": "The stack chosen for the build (\"React + TypeScript (Vite)\", \"Rust + Bevy\"…).",
       "type": "string",
       "default": ""
-    },
-    "kind": {
-      "description": "When set, this project is that kind (`redesign`, …) instead of detecting from the request. Absent on older craft.json files (read as none).",
-      "type": [
-        "string",
-        "null"
-      ]
     },
     "start_files": {
       "description": "The names in the person's folder when the project started there (at most\n[`START_FILES_SHOWN`]), so the builder knows what to start from.",

@@ -46,13 +46,7 @@ pub struct ExecutionState {
 
 impl Default for ExecutionState {
     fn default() -> Self {
-        Self {
-            controller: "host_agent".into(),
-            profile: "lean".into(),
-            allow_nested_builder: false,
-            budgets: json!({}),
-            usage: UsageState::default(),
-        }
+        Self { controller: "host_agent".into(), profile: "lean".into(), allow_nested_builder: false, budgets: json!({}), usage: UsageState::default() }
     }
 }
 
@@ -67,13 +61,7 @@ pub struct UsageState {
 
 impl Default for UsageState {
     fn default() -> Self {
-        Self {
-            accounting_quality: "unavailable".into(),
-            tool_calls: 0,
-            input_tokens_reported: None,
-            output_tokens_reported: None,
-            tokens_estimated: None,
-        }
+        Self { accounting_quality: "unavailable".into(), tool_calls: 0, input_tokens_reported: None, output_tokens_reported: None, tokens_estimated: None }
     }
 }
 
@@ -181,14 +169,8 @@ fn bump(ws: &Workspace) -> Result<StoreEnvelope, ToolError> {
 }
 
 fn validate_id(prefix: &str, id: &str) -> Result<(), ToolError> {
-    let ok = id.starts_with(prefix)
-        && id.len() > prefix.len()
-        && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-');
-    if ok {
-        Ok(())
-    } else {
-        Err(ToolError::invalid(format!("id {id:?} must match {prefix}<alnum/_/->")))
-    }
+    let ok = id.starts_with(prefix) && id.len() > prefix.len() && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-');
+    if ok { Ok(()) } else { Err(ToolError::invalid(format!("id {id:?} must match {prefix}<alnum/_/->"))) }
 }
 
 /// Resolve `name` under `dir` without leaving it (no `..`, no absolute, no symlink escape).
@@ -259,6 +241,19 @@ pub fn put_capability(ws: &Workspace, cap: Capability) -> Result<StoreEnvelope, 
     let path = safe_child(&capabilities_dir(&root), &format!("{}.json", cap.id))?;
     write_record(&path, &cap)?;
     bump(ws)
+}
+
+/// Load one capability by id, if present.
+pub fn get_capability(ws: &Workspace, id: &str) -> Result<Option<Capability>, ToolError> {
+    validate_id("cap_", id)?;
+    let path = safe_child(&capabilities_dir(&redesign_dir(ws)), &format!("{id}.json"))?;
+    if !path.is_file() {
+        return Ok(None);
+    }
+    reject_symlink(&path)?;
+    let bytes = fs::read(&path).map_err(|e| ToolError::io(path.display(), e))?;
+    let cap: Capability = serde_json::from_slice(&bytes).map_err(|e| ToolError::invalid(format!("{}: {e}", path.display())))?;
+    Ok(Some(cap))
 }
 
 pub fn list_evidence(ws: &Workspace) -> Result<Vec<EvidenceRecord>, ToolError> {
@@ -362,44 +357,48 @@ mod tests {
     #[test]
     fn rejects_bad_id_and_secretish_summary() {
         let (_d, ws) = ws();
-        assert!(put_evidence(
-            &ws,
-            EvidenceRecord {
-                id: "bad".into(),
-                source: "test".into(),
-                source_operation: "x".into(),
-                subject: "s".into(),
-                kind: "ui".into(),
-                status: "observed".into(),
-                scope: json!({}),
-                locator: None,
-                digest: None,
-                observed_at: "t".into(),
-                limitations: vec![],
-                sensitivity: "public".into(),
-                summary: "ok".into(),
-            },
-        )
-        .is_err());
-        assert!(put_evidence(
-            &ws,
-            EvidenceRecord {
-                id: "ev_ok".into(),
-                source: "test".into(),
-                source_operation: "x".into(),
-                subject: "s".into(),
-                kind: "ui".into(),
-                status: "observed".into(),
-                scope: json!({}),
-                locator: None,
-                digest: None,
-                observed_at: "t".into(),
-                limitations: vec![],
-                sensitivity: "public".into(),
-                summary: "Authorization: Bearer secret".into(),
-            },
-        )
-        .is_err());
+        assert!(
+            put_evidence(
+                &ws,
+                EvidenceRecord {
+                    id: "bad".into(),
+                    source: "test".into(),
+                    source_operation: "x".into(),
+                    subject: "s".into(),
+                    kind: "ui".into(),
+                    status: "observed".into(),
+                    scope: json!({}),
+                    locator: None,
+                    digest: None,
+                    observed_at: "t".into(),
+                    limitations: vec![],
+                    sensitivity: "public".into(),
+                    summary: "ok".into(),
+                },
+            )
+            .is_err()
+        );
+        assert!(
+            put_evidence(
+                &ws,
+                EvidenceRecord {
+                    id: "ev_ok".into(),
+                    source: "test".into(),
+                    source_operation: "x".into(),
+                    subject: "s".into(),
+                    kind: "ui".into(),
+                    status: "observed".into(),
+                    scope: json!({}),
+                    locator: None,
+                    digest: None,
+                    observed_at: "t".into(),
+                    limitations: vec![],
+                    sensitivity: "public".into(),
+                    summary: "Authorization: Bearer secret".into(),
+                },
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -433,10 +432,7 @@ mod tests {
             )
             .unwrap_err();
             let code = err.details.as_ref().and_then(|d| d.get("code").and_then(|c| c.as_str()));
-            assert!(
-                err.message.contains("symlink") || err.message.contains("escapes") || matches!(code, Some("symlink_refused" | "path_escape")),
-                "{err:?}"
-            );
+            assert!(err.message.contains("symlink") || err.message.contains("escapes") || matches!(code, Some("symlink_refused" | "path_escape")), "{err:?}");
         }
     }
 }

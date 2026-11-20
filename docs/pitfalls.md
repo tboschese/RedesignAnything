@@ -1337,3 +1337,27 @@ exclusive-creation checks after selecting a name.
 then a fixed number of frames left the next action outside the settled layout. Wait for the
 background operation to finish and run immediate repaints after scrolling before clicking;
 otherwise a missed click looks like a backend mutation that never completed.
+
+**Oracle import wiped a richer host Study capability.** `redesign_study_map` rewrote the same
+`cap_*` id from a thinner scenario stub (`declared` / short task), so observed criticality and
+unknowns disappeared. Preserve when the existing `knowledge_status` ranks higher (or equal with a
+longer task); merge `source_refs` / `unknowns`. Static oracle hints that only know form keywords
+also fail closed on library/Wayback journeys — extend `then_to_hint`, and treat native `<button>`
+as a valid functional smoke signal, not only DS `<Button>`.
+
+**Approving `backend_change_required` unlocked Engineering Ready.** Traceability correctly
+passed after a human approved the gap, but Ready treated that as `backend_deps_approved`.
+Engineering Ready now requires `backend_contracts_clear`: no plan mapping may still list
+`backend_change_required` (and `not_determined` needs `exception_approved`). An approved gap is
+not a known contract.
+
+**Host-agent Study hit `consent_required` on `web_site_open`.** Redesign formalization can
+map an oracle and host evidence without a Craft capture, but a real `web_site_capture` needs
+operator approval first. Do not invent a capture folder that claims Craft provenance; label
+host stubs clearly and replace them after consent.
+
+**Lit / shadow DOM left `web_site_capture` outline and links empty.** archive.org’s home is
+mostly custom elements; the blueprint script only walks light-DOM `querySelectorAll`, so
+`outline`/`links`/`headings` can be zero while screenshots and `page.html` are still real.
+Do not treat an empty outline as “the page has no UI”; prefer screenshots and declare the
+structure gap until capture pierces open shadow roots.

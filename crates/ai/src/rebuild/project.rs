@@ -96,20 +96,24 @@ pub fn apply_new_project_fields(
     })
 }
 
+/// What the person picked for a new project besides what it is about and where it goes.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct NewProjectOpts<'a> {
+    /// The stack the person picked.
+    pub build_with: Option<&'a str>,
+    /// The project kind id.
+    pub kind: Option<&'a str>,
+    /// The person lets the builder generate pictures and 3D models.
+    pub generate_assets: bool,
+    /// The builder the person picked.
+    pub builder: Option<&'a str>,
+}
+
 /// A new project for `request` about `target` (a web address, an absolute path, or `-` for none),
-/// at `place`, with the stack the person
-/// picked (`build_with`), the asset budget from settings, and `generate_assets`: the person lets the
-/// builder generate pictures and 3D models.
-pub fn new_project(
-    settings: &Settings,
-    target: &str,
-    request: &str,
-    place: Place,
-    build_with: Option<&str>,
-    kind: Option<&str>,
-    generate_assets: bool,
-    builder: Option<&str>,
-) -> Result<Workspace, ToolError> {
+/// at `place`, with the stack the person picked (`opts.build_with`), the asset budget from
+/// settings, and `opts.generate_assets`: the person lets the builder generate pictures and 3D models.
+pub fn new_project(settings: &Settings, target: &str, request: &str, place: Place, opts: NewProjectOpts) -> Result<Workspace, ToolError> {
+    let NewProjectOpts { build_with, kind, generate_assets, builder } = opts;
     let kinds = KindRegistry::built_in();
     let kind_id = kind.map(|k| parse_kind(&kinds, k)).transpose()?;
     let stack = match build_with {
@@ -137,14 +141,6 @@ pub fn new_project(
             }
         }
     };
-    apply_new_project_fields(
-        &mut ws,
-        attached,
-        stack.map(|s| s.name.as_str()),
-        kind_id,
-        settings.assets.budget(),
-        generate_assets,
-        builder,
-    )?;
+    apply_new_project_fields(&mut ws, attached, stack.map(|s| s.name.as_str()), kind_id, settings.assets.budget(), generate_assets, builder)?;
     Ok(ws)
 }

@@ -56,18 +56,15 @@ impl ExecutionPolicy {
     /// Refuse nested `rebuild_start` when the host agent is in control.
     pub fn guard_rebuild_start(&self, handoff_to_craft_runner: bool) -> Result<(), ToolError> {
         if self.controller == Controller::HostAgent && !self.allow_nested_builder && !handoff_to_craft_runner {
-            return Err(ToolError::new(
-                ErrorCode::BadInput,
-                "controller_conflict: host_agent is in control; rebuild_start would nest a second builder.",
-            )
-            .with_remediation(
-                "Keep control in the host agent (use redesign_project_init / study tools), or pass handoff_to_craft_runner=true after explicit consent.",
-            )
-            .with_details(json!({
-                "code": "controller_conflict",
-                "controller": "host_agent",
-                "allow_nested_builder": false
-            })));
+            return Err(ToolError::new(ErrorCode::BadInput, "controller_conflict: host_agent is in control; rebuild_start would nest a second builder.")
+                .with_remediation(
+                    "Keep control in the host agent (use redesign_project_init / study tools), or pass handoff_to_craft_runner=true after explicit consent.",
+                )
+                .with_details(json!({
+                    "code": "controller_conflict",
+                    "controller": "host_agent",
+                    "allow_nested_builder": false
+                })));
         }
         Ok(())
     }
