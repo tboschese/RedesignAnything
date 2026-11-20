@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0.0",
+  "id": "enterprise-data-tables",
+  "version": "0.1.0",
+  "license": "MIT",
+  "source_url": "https://github.com/tboschese/RedesignAnything",
+  "source_revision": "bundled",
+  "domain_tags": ["enterprise", "data-intensive"],
+  "task_tags": ["table", "filtering", "bulk-action", "density"],
+  "applicability": [
+    "Dense operational tables with recurring users deciding across many rows"
+  ],
+  "contraindications": [
+    "Do not convert operational tables into cards without productivity evidence"
+  ],
+  "rules": [
+    {
+      "id": "dense-table-preserve-scan",
+      "kind": "heuristic",
+      "recommendation": "Keep scanable row density; prefer column priority and sticky keys over card grids for bulk decisions.",
+      "tags": ["table", "density", "scan"],
+      "evidence_requirements": ["task_context"],
+      "test_methods": ["task_success", "review"],
+      "contraindications": ["Prefer cards for every row"]
+    },
+    {
+      "id": "table-filters-visible",
+      "kind": "heuristic",
+      "recommendation": "Surface primary filters and active filter chips near the table; do not hide all filters behind a single opaque modal.",
+      "tags": ["table", "filtering", "discoverability"],
+      "evidence_requirements": ["task_context"],
+      "test_methods": ["task_success", "review"],
+      "contraindications": ["Force multi-step wizard for every filter change"]
+    }
+  ]
+}

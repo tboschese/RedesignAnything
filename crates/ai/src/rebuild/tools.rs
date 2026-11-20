@@ -223,6 +223,28 @@ pub fn specs() -> Vec<ToolSpec> {
             input_schema: schema_of::<StudyMapParams>,
             run: redesign_study_map,
         },
+        ToolSpec {
+            id: "redesign_knowledge_retrieve",
+            title: "Retrieve UX knowledge rules",
+            summary: "Local tag+text retrieval over licensed UX knowledge packs. Returns 3–8 rules with source ids; never injects a whole pack. No embeddings required.",
+            beginner: "Finds a few relevant UX rules for the current task.",
+            toolset: Toolset::Projects,
+            effects: Effects::READ_ONLY,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<KnowledgeRetrieveParams>,
+            run: redesign_knowledge_retrieve,
+        },
+        ToolSpec {
+            id: "redesign_critic_recommend",
+            title: "Design Critic recommendations",
+            summary: "Generate at least three redesign options for a screen/task, always including keep_as_is, with trade-offs and cited pack rule ids. Heuristics only — not certification.",
+            beginner: "Suggests redesign options including leaving the screen as it is.",
+            toolset: Toolset::Projects,
+            effects: Effects::READ_ONLY,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<CriticParams>,
+            run: redesign_critic_recommend,
+        },
     ]
 }
 
@@ -271,6 +293,34 @@ struct ListParams {
     pub limit: Option<usize>,
     #[serde(default)]
     pub offset: Option<usize>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct KnowledgeRetrieveParams {
+    /// Task or screen description to match against packs.
+    pub query: String,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    /// Desired rule count (clamped to 3–8).
+    #[serde(default)]
+    pub limit: Option<usize>,
+    /// Optional extra pack JSON files (must include version + allowed license).
+    #[serde(default)]
+    pub pack_paths: Vec<PathBuf>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct CriticParams {
+    /// Problem statement for the screen or task.
+    pub problem: String,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default)]
+    pub limit: Option<usize>,
+    #[serde(default)]
+    pub pack_paths: Vec<PathBuf>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -860,6 +910,28 @@ fn redesign_coverage_show(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutpu
     Ok(ToolOutput::Value(serde_json::to_value(super::redesign_study::coverage_of(&ws)?).map_err(|e| ToolError::internal(e.to_string()))?))
 }
 
+fn redesign_knowledge_retrieve(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: KnowledgeRetrieveParams = parse_params(params)?;
+    let limit = p.limit.unwrap_or(super::redesign_knowledge::RETRIEVE_MAX);
+    Ok(ToolOutput::Value(super::redesign_knowledge::retrieve_report(
+        &p.query,
+        &p.tags,
+        limit,
+        &p.pack_paths,
+    )?))
+}
+
+fn redesign_critic_recommend(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: CriticParams = parse_params(params)?;
+    let limit = p.limit.unwrap_or(super::redesign_knowledge::RETRIEVE_MAX);
+    Ok(ToolOutput::Value(super::redesign_knowledge::critic_report(
+        &p.problem,
+        &p.tags,
+        limit,
+        &p.pack_paths,
+    )?))
+}
+
 fn redesign_study_map(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
     let p: StudyMapParams = parse_params(params)?;
     let ws = open(&p.project)?;
@@ -959,6 +1031,8 @@ mod tests {
             "redesign_capabilities_list",
             "redesign_coverage_show",
             "redesign_study_map",
+            "redesign_knowledge_retrieve",
+            "redesign_critic_recommend",
         ] {
             assert!(e.registry().get(id).is_some(), "{id}");
         }
