@@ -1,0 +1,65 @@
+{
+  "fixture_id": "multi-step-journey",
+  "oracle_author": "Thiago Boschese",
+  "captured_at": "2026-11-20T00:00:00Z",
+  "oracle_type": "human_confirmed",
+  "environment_fingerprint": "static-html-js; no backend",
+  "scenarios": [
+    {
+      "id": "scenario_journey_profile_gate",
+      "capability_id": "cap_journey_profile_validation",
+      "profile": "admin",
+      "fixture_id": "multi-step-journey",
+      "given": ["On step 1 with empty fields"],
+      "when": ["Click Continue"],
+      "then": ["Error shown", "Remain on step 1"],
+      "assertion_source": "user_approved",
+      "evidence_ids": ["ev_journey_rule_1"],
+      "safe_execution_target": "generated_mock",
+      "executable": true
+    },
+    {
+      "id": "scenario_journey_permission_denied",
+      "capability_id": "cap_journey_permission",
+      "profile": "admin",
+      "fixture_id": "multi-step-journey",
+      "given": ["Open /?denied=1", "Complete valid Profile"],
+      "when": ["On Workspace click Continue with valid fields"],
+      "then": ["Error 'You do not have permission to create a workspace.'", "Remain on step 2"],
+      "assertion_source": "user_approved",
+      "evidence_ids": ["ev_journey_rule_2"],
+      "safe_execution_target": "generated_mock",
+      "executable": true
+    },
+    {
+      "id": "scenario_journey_back_preserves_profile",
+      "capability_id": "cap_journey_back_preserve",
+      "profile": "admin",
+      "fixture_id": "multi-step-journey",
+      "given": ["Complete Profile with name and email", "Advance to Workspace"],
+      "when": ["Click Back"],
+      "then": ["Profile inputs still contain the entered name and email"],
+      "assertion_source": "user_approved",
+      "evidence_ids": ["ev_journey_rule_3"],
+      "safe_execution_target": "generated_mock",
+      "executable": true
+    },
+    {
+      "id": "scenario_journey_confirm_success",
+      "capability_id": "cap_journey_confirm",
+      "profile": "admin",
+      "fixture_id": "multi-step-journey",
+      "given": ["Open / without denied=1", "Complete Profile and Workspace with valid data"],
+      "when": ["On Review click Confirm"],
+      "then": ["Status text equals 'Workspace ready.'"],
+      "assertion_source": "user_approved",
+      "evidence_ids": ["ev_journey_rule_4"],
+      "safe_execution_target": "generated_mock",
+      "executable": true
+    }
+  ],
+  "unknowns": [
+    "Billing webhook after Confirm",
+    "SSO identity provider mapping"
+  ]
+}

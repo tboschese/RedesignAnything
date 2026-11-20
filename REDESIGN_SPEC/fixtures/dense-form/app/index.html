@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Expense Claim — dense-form fixture</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to main</a>
+  <header class="app-bar">
+    <p class="product">Acme Expenses</p>
+    <p id="role-label" class="meta">Role: Employee</p>
+  </header>
+  <main id="main">
+    <h1>New expense claim</h1>
+    <p class="lede">Submit a claim for reimbursement. Fields marked required must be valid before submit.</p>
+
+    <form id="claim-form" novalidate>
+      <fieldset>
+        <legend>Claim details</legend>
+        <div class="grid">
+          <label>Amount (USD) *
+            <input id="amount" name="amount" type="number" min="0.01" max="10000" step="0.01" required />
+          </label>
+          <label>Currency
+            <select id="currency" name="currency" disabled>
+              <option selected>USD</option>
+            </select>
+          </label>
+          <label>Category *
+            <select id="category" name="category" required>
+              <option value="">Select…</option>
+              <option value="travel">Travel</option>
+              <option value="meals">Meals</option>
+              <option value="software">Software</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+          <label>Date *
+            <input id="date" name="date" type="date" required />
+          </label>
+          <label class="span-2">Merchant
+            <input id="merchant" name="merchant" type="text" maxlength="80" />
+          </label>
+          <label class="span-2">Business purpose
+            <textarea id="purpose" name="purpose" rows="3" maxlength="500"></textarea>
+          </label>
+          <label>Cost center
+            <input id="cost-center" name="costCenter" type="text" maxlength="32" />
+          </label>
+          <label>Project code
+            <input id="project" name="project" type="text" maxlength="32" />
+          </label>
+          <label>Billable
+            <input id="billable" name="billable" type="checkbox" />
+          </label>
+          <label>Client code
+            <input id="client" name="client" type="text" maxlength="32" />
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Attachments</legend>
+        <p id="attachments-empty" class="empty">No attachments yet.</p>
+        <label class="file">Add receipt
+          <input id="receipt" name="receipt" type="file" accept="image/*,.pdf" />
+        </label>
+      </fieldset>
+
+      <p id="form-error" class="error" hidden role="alert"></p>
+      <p id="form-success" class="success" hidden role="status"></p>
+
+      <div class="actions">
+        <button type="submit" id="submit" disabled>Submit claim</button>
+        <button type="button" id="approve" hidden>Approve</button>
+      </div>
+    </form>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

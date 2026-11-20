@@ -35,6 +35,8 @@ Registrar limiares numéricos, número de tarefas, tamanho da amostra, critério
 
 Antes da primeira execução, criar um `BENCHMARK_RUN_PLAN` versionado com: conjunto e quantidade de fixtures; pelo menos uma tarefa densa e uma jornada com estados; critérios de inclusão; número de repetições por braço; configuração do agente/modelo; ordem de execução e aleatorização quando possível; orçamento igual; rubrica cega; critérios de desempate; métricas primárias; tamanho mínimo de efeito e limites de regressão funcional **numéricos definidos antes de observar resultados**. Não inventar thresholds nesta documentação.
 
+**Slice 0 pré-registro:** [`benchmark/BENCHMARK_RUN_PLAN.md`](benchmark/BENCHMARK_RUN_PLAN.md) (congelado em 2026-11-20; execução ainda não iniciada). Fixtures: [`fixtures/`](fixtures/).
+
 Amostras pequenas podem orientar decisões de engenharia, mas não autorizam generalização estatística. Separar resultados exploratórios de confirmatórios. Registrar todas as falhas, retries, outliers, versões, prompts, mudanças de ambiente, tokens unavailable e conflitos de interesse de avaliadores. Nenhum LLM pode aprovar sozinho a própria saída.
 
 Oráculos independentes e dados sintéticos devem ser congelados antes de executar A/B/C; consultar `ORACLE_POLICY.md`. A baseline B deve receber instruções UX fortes, sem enfraquecimento artificial. Se C não superar B de maneira útil, preferir a solução mais simples.

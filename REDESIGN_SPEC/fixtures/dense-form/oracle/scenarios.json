@@ -1,0 +1,81 @@
+{
+  "fixture_id": "dense-form",
+  "oracle_author": "Thiago Boschese",
+  "captured_at": "2026-11-20T00:00:00Z",
+  "oracle_type": "human_confirmed",
+  "environment_fingerprint": "static-html-js; no backend",
+  "scenarios": [
+    {
+      "id": "scenario_dense_amount_bounds",
+      "capability_id": "cap_dense_amount_validation",
+      "profile": "employee",
+      "fixture_id": "dense-form",
+      "given": ["Employee opens / without role query", "Amount empty"],
+      "when": ["Enter amount 0", "Enter amount 10000.01", "Enter amount 42"],
+      "then": [
+        "Submit remains disabled for 0 and 10000.01 when other required fields valid only if amount invalid",
+        "Amount 42 is accepted by client validation"
+      ],
+      "assertion_source": "user_approved",
+      "evidence_ids": ["ev_dense_manifest_rule_1"],
+      "safe_execution_target": "generated_mock",
+      "executable": true
+    },
+    {
+      "id": "scenario_dense_submit_gate",
+      "capability_id": "cap_dense_submit_enablement",
+      "profile": "employee",
+      "fixture_id": "dense-form",
+      "given": ["Form freshly loaded"],
+      "when": ["Fill amount, category, and date with valid values"],
+      "then": ["Submit becomes enabled only when all three are valid"],
+      "assertion_source": "user_approved",
+      "evidence_ids": ["ev_dense_manifest_rule_3"],
+      "safe_execution_target": "generated_mock",
+      "executable": true
+    },
+    {
+      "id": "scenario_dense_approver_button",
+      "capability_id": "cap_dense_role_approve",
+      "profile": "approver",
+      "fixture_id": "dense-form",
+      "given": ["Open /?role=approver"],
+      "when": ["Inspect actions"],
+      "then": ["Approve button is visible", "Role label shows Approver"],
+      "assertion_source": "user_approved",
+      "evidence_ids": ["ev_dense_manifest_rule_4"],
+      "safe_execution_target": "generated_mock",
+      "executable": true
+    },
+    {
+      "id": "scenario_dense_employee_no_approve",
+      "capability_id": "cap_dense_role_approve",
+      "profile": "employee",
+      "fixture_id": "dense-form",
+      "given": ["Open / without role=approver"],
+      "when": ["Inspect actions"],
+      "then": ["Approve button is not visible"],
+      "assertion_source": "user_approved",
+      "evidence_ids": ["ev_dense_manifest_rule_4"],
+      "safe_execution_target": "generated_mock",
+      "executable": true
+    },
+    {
+      "id": "scenario_dense_attachments_empty",
+      "capability_id": "cap_dense_attachments_empty",
+      "profile": "employee",
+      "fixture_id": "dense-form",
+      "given": ["No file selected"],
+      "when": ["Read attachments region"],
+      "then": ["Copy equals 'No attachments yet.'"],
+      "assertion_source": "user_approved",
+      "evidence_ids": ["ev_dense_manifest_rule_5"],
+      "safe_execution_target": "generated_mock",
+      "executable": true
+    }
+  ],
+  "unknowns": [
+    "Server duplicate-claim policy",
+    "Tax calculation formula"
+  ]
+}

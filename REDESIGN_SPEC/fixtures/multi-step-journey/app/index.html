@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Workspace setup — multi-step-journey fixture</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <p class="product">Acme Admin</p>
+    <ol class="steps" aria-label="Progress">
+      <li id="step-ind-1" class="active">1. Profile</li>
+      <li id="step-ind-2">2. Workspace</li>
+      <li id="step-ind-3">3. Review</li>
+    </ol>
+  </header>
+  <main>
+    <section id="step-1" class="panel">
+      <h1>Your profile</h1>
+      <label>Full name *
+        <input id="full-name" type="text" autocomplete="name" />
+      </label>
+      <label>Work email *
+        <input id="email" type="email" autocomplete="email" />
+      </label>
+      <p id="err-1" class="error" hidden role="alert"></p>
+      <button type="button" id="next-1">Continue</button>
+    </section>
+
+    <section id="step-2" class="panel" hidden>
+      <h1>Workspace</h1>
+      <label>Workspace name *
+        <input id="ws-name" type="text" />
+      </label>
+      <label>Plan *
+        <select id="plan">
+          <option value="">Select…</option>
+          <option value="starter">Starter</option>
+          <option value="team">Team</option>
+        </select>
+      </label>
+      <p id="err-2" class="error" hidden role="alert"></p>
+      <div class="row">
+        <button type="button" id="back-2">Back</button>
+        <button type="button" id="next-2">Continue</button>
+      </div>
+    </section>
+
+    <section id="step-3" class="panel" hidden>
+      <h1>Review</h1>
+      <dl>
+        <dt>Name</dt><dd id="sum-name"></dd>
+        <dt>Email</dt><dd id="sum-email"></dd>
+        <dt>Workspace</dt><dd id="sum-ws"></dd>
+        <dt>Plan</dt><dd id="sum-plan"></dd>
+      </dl>
+      <p id="success" class="success" hidden role="status"></p>
+      <div class="row">
+        <button type="button" id="back-3">Back</button>
+        <button type="button" id="confirm">Confirm</button>
+      </div>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
