@@ -60,6 +60,14 @@ impl TargetKind for RedesignKind {
 
     fn brief_sections(&self, cx: &BriefCx) -> Vec<String> {
         let mut out = vec![REDESIGN_BRIEF.into()];
+        // Compact redesign refs — pass by path, do not dump full stores into the prompt.
+        out.push(
+            "Redesign workspace refs (read these files; do not invent contracts): redesign/store.json, \
+             redesign/capabilities/, redesign/decisions/, redesign/design_system.json, \
+             redesign/transformation_plan.json, redesign/scaffold_refs.json. \
+             Prefer redesign_scaffold_app under host_agent instead of nested rebuild_start."
+                .into(),
+        );
         // Reuse website capture notes when Study photographed the target.
         let routes = website::routes(cx.ws);
         if !routes.is_empty() {

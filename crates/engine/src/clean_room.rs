@@ -98,6 +98,7 @@ pub const TOOLS: &[&str] = &[
     "redesign_plan_build",
     "redesign_plan_show",
     "redesign_traceability_check",
+    "redesign_scaffold_app",
     // The builder's own project.
     "build_files_list",
     "build_file_read",

@@ -355,6 +355,17 @@ pub fn specs() -> Vec<ToolSpec> {
             input_schema: schema_of::<ProjectParams>,
             run: redesign_traceability_check,
         },
+        ToolSpec {
+            id: "redesign_scaffold_app",
+            title: "Scaffold redesign React app",
+            summary: "Write a React+TypeScript (Vite) app under app/ with simulated mocks and DS import paths. Does not start Craft's nested builder. Requires redesign/design_system.json.",
+            beginner: "Creates the redesign app folder with mock data.",
+            toolset: Toolset::Projects,
+            effects: Effects::WRITES_FILESYSTEM,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<ProjectParams>,
+            run: redesign_scaffold_app,
+        },
     ]
 }
 
@@ -1180,6 +1191,13 @@ fn redesign_traceability_check(_ctx: &mut Ctx<'_>, params: Value) -> Result<Tool
     Ok(ToolOutput::Value(serde_json::to_value(report).map_err(|e| ToolError::internal(e.to_string()))?))
 }
 
+fn redesign_scaffold_app(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: ProjectParams = parse_params(params)?;
+    let ws = open(&p.project)?;
+    let policy = ctx.session.ext.get::<super::ExecutionPolicy>().as_deref().cloned();
+    Ok(ToolOutput::Value(super::redesign_build::scaffold_app(&ws, policy.as_ref())?))
+}
+
 fn redesign_ds_ingest(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
     let p: DsIngestParams = parse_params(params)?;
     let ws = open(&p.project)?;
@@ -1368,6 +1386,7 @@ mod tests {
             "redesign_plan_build",
             "redesign_plan_show",
             "redesign_traceability_check",
+            "redesign_scaffold_app",
         ] {
             assert!(e.registry().get(id).is_some(), "{id}");
         }
