@@ -7,8 +7,8 @@
 
 ## Gates
 
-- **concept_ready** — security ok + preview + build not failed/errored
-- **prototype_ready** — concept + build/DS pass + ≥1 critical oracle passed + button works + no unmapped critical + no critical a11y fail
+- **concept_ready** — security ok + preview + build not failed/errored + `identity_essence` not failed (PR-14)
+- **prototype_ready** — concept + build/DS pass + ≥1 critical oracle passed + button works + no unmapped critical + no critical a11y fail + `identity_drift` not failed (PR-14)
 - **engineering_ready** — prototype + approved backend deps + no secrets
 
 ## Guarantees tested

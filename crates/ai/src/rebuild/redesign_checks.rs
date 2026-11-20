@@ -43,6 +43,10 @@ pub struct CheckInputs {
     pub a11y_critical_fail: bool,
     pub secrets_exported: bool,
     pub critic_says_ready: bool, // must never alone promote Ready
+    /// The plan would lose the target's essence (`identity_essence` failed): blocks every gate.
+    pub essence_lost: bool,
+    /// The app drifted from an intentional kept trait (`identity_drift` failed): blocks Prototype Ready.
+    pub essence_drift: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -90,6 +94,7 @@ pub fn concept_ready(inp: &CheckInputs) -> bool {
         && !matches!(inp.build_status, CheckExec::Error | CheckExec::Timeout)
         && inp.build_status != CheckExec::Fail
         && !inp.secrets_exported
+        && !inp.essence_lost
 }
 
 pub fn prototype_ready(inp: &CheckInputs, unmapped_critical_unapproved: u32) -> bool {
@@ -105,6 +110,7 @@ pub fn prototype_ready(inp: &CheckInputs, unmapped_critical_unapproved: u32) -> 
         && inp.functional.button_works
         && unmapped_critical_unapproved == 0
         && !inp.a11y_critical_fail
+        && !inp.essence_drift
         && !matches!(inp.ds_status, CheckExec::Error | CheckExec::Timeout | CheckExec::Fail | CheckExec::Blocked)
 }
 
@@ -245,8 +251,13 @@ pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
         details: json!({}),
     });
 
-    // Advisory identity checks (drift from kept traits, frozen character). Deliberately not part of CheckInputs.
-    checks.push(super::redesign_identity::drift_check(ws));
+    // The target's essence: losing it in the plan blocks every gate, drifting from it in the app
+    // blocks Prototype Ready. A frozen character (identity_evolution) is advisory.
+    let essence = super::redesign_identity::essence_check(ws);
+    let drift = super::redesign_identity::drift_check(ws);
+    let (essence_lost, essence_drift) = (essence.status == "fail", drift.status == "fail");
+    checks.push(essence);
+    checks.push(drift);
     checks.push(super::redesign_identity::evolution_check(ws));
     // Advisory: does the plan stay within its mode (tidy-up, redesign, rethink)?
     checks.push(super::redesign_mode::scope_check(ws));
@@ -319,6 +330,8 @@ pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
         a11y_critical_fail,
         secrets_exported: secrets,
         critic_says_ready: false,
+        essence_lost,
+        essence_drift,
     };
 
     let report = ReadyReport {
@@ -332,7 +345,7 @@ pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
             "Design Critic recommendations never alone set Ready.".into(),
             "Accessibility not_evaluated ≠ WCAG pass.".into(),
             "Engineering Ready requires no backend_change_required mappings; approving a gap is not a contract.".into(),
-            "identity_drift and identity_evolution are advisory and never change Ready.".into(),
+            "identity_essence failing blocks every gate; identity_drift failing blocks Prototype Ready; identity_evolution is advisory.".into(),
             "mode_scope is advisory and never changes Ready.".into(),
             format!("traceability={trace_status}"),
         ],

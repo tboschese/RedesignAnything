@@ -226,7 +226,7 @@ pub fn specs() -> Vec<ToolSpec> {
         ToolSpec {
             id: "redesign_identity_record",
             title: "Record visual identity traits",
-            summary: "Write look-and-feel traits of the original into redesign/identity.json: category, what was observed, whether it is intentional, and whether the redesign keeps, evolves or replaces it, with optional static checks (fonts, corner radius, shadows, colours). Upserts by trait id unless replace_all. Replacing an intentional trait needs a rationale; an intentional trait left undecided is kept.",
+            summary: "Write look-and-feel traits of the original into redesign/identity.json: category, what was observed, whether it is intentional, and whether the redesign keeps, evolves or replaces it, with optional static checks (fonts, corner radius, shadows, colours). Upserts by trait id unless replace_all. The intentional traits are the target's essence: one left undecided is kept, and replacing one (or no longer calling it intentional) needs a rationale and the operator's approval, recorded with redesign_evidence_put (source \"user\") and passed as approval_evidence_id.",
             beginner: "Saves which parts of the original's look should stay.",
             toolset: Toolset::Projects,
             effects: Effects::WRITES_FILESYSTEM,

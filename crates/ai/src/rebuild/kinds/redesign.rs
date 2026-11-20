@@ -139,10 +139,10 @@ pub fn ready_result_from_report(round: u32, report: &crate::rebuild::redesign_ch
 
     // Fail closed on security / strict DS / missing scaffold. Prototype maturity is reported
     // as claims so early scaffolds are not stuck in endless refine for missing oracles.
-    let blocker = report
-        .checks
-        .iter()
-        .any(|c| matches!(c.id.as_str(), "security_secrets" | "design_system" | "build_scaffold") && matches!(c.status.as_str(), "fail" | "blocked"));
+    let blocker = report.checks.iter().any(|c| {
+        matches!(c.id.as_str(), "security_secrets" | "design_system" | "build_scaffold" | "identity_essence" | "identity_drift")
+            && matches!(c.status.as_str(), "fail" | "blocked")
+    });
     let note = format!(
         "concept={} prototype={} engineering={}; native Ready (no PluginJudge, no pixel gate)",
         report.concept_ready, report.prototype_ready, report.engineering_ready
@@ -161,9 +161,16 @@ impl Check for RedesignReadyCheck {
     }
 
     fn can_refine(&self, result: &CheckResult) -> bool {
-        // Only ask the builder to fix code-addressable blockers (secrets, DS, scaffold).
+        // Only ask the builder to fix code-addressable blockers (secrets, DS, scaffold, identity drift).
         // Missing oracles / prototype maturity are not refined by inventing evidence.
-        result.claims.iter().any(|c| !c.passed && (c.title.contains("security") || c.title.contains("design_system") || c.title.contains("build_scaffold")))
+        // Identity drift is code too: the app's styles left a kept trait.
+        result.claims.iter().any(|c| {
+            !c.passed
+                && (c.title.contains("security")
+                    || c.title.contains("design_system")
+                    || c.title.contains("build_scaffold")
+                    || c.title.contains("identity_drift"))
+        })
     }
 
     fn run(&self, cx: &mut CheckCx) -> Result<CheckResult, ToolError> {

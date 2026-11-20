@@ -1,5 +1,9 @@
 # Changelog — Redesign Anything specification
 
+## Documentation 1.4.3 — 2026-11-20
+
+- `CONTRACTS.md` §7: `conceptReady` requires `identity_essence` not to fail, and `prototypeReady` requires `identity_drift` not to fail. No redesign may lose the target's intentional identity traits without the operator's recorded approval.
+
 ## Documentation 1.4.2 — 2026-11-20
 
 - `SPEC.md` scope: `refresh` now means organizing each screen with the same blocks, journeys and look (it read "visual, minimal functional change"). The plan's mode is validated and compared with the plan by the advisory `mode_scope` check.

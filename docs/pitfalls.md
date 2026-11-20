@@ -1367,9 +1367,15 @@ can't be read: they're counted in `shadow.closed_hosts` and reported as the
 temple, Wayback plaque and dense grid are the product, not leftover chrome. Record them as
 identity traits (`redesign_identity_record`): kept traits constrain style and must say
 `evolve_within` how navigation still gets easier. `identity_drift` warns when the app leaves
-that look; `identity_evolution` warns when nothing evolves. Neither changes Ready. A single
+that look; `identity_evolution` warns when nothing evolves. A single
 max-radius check cannot tell a pill search field from a square card, so don't encode a radius
 cap the original itself breaks.
+
+**A rationale the agent writes itself is not an approval.** Replacing an intentional trait was
+allowed with any rationale, so "new brand" was enough to drop the original's character. It now
+needs the operator's answer recorded as evidence (`source: "user"`), and `identity_essence`
+blocks Ready without it. Drift from an intentional kept trait blocks Prototype Ready, so give a
+kept trait only checks the original itself passes.
 
 **One tall screenshot of a page that draws only what is in view is empty below the window.**
 archive.org's home lists its collections in a virtualised scroller: `captureBeyondViewport` with a

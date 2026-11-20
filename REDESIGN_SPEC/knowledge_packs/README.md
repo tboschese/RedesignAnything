@@ -22,7 +22,7 @@ The bundled catalog lives in `crates/ai/src/rebuild/redesign_knowledge.rs`. Pack
 - `enterprise-data-tables.json`: reference copy of the bundled data-tables pack (the Rust pack is authoritative).
 - `identity-and-character.json`: evolving structure (navigation, journeys) within a product's intentional visual identity (tags `identity`, `brand`, `character`, `legacy-look`, `retro`). Identity constrains style, not structure, and is never a reason for `keep_as_is`. Skipped when the task asks for a rebrand or to replace the look. Bundled from this file.
 
-Visual identity traits themselves are recorded per project with `redesign_identity_record` (each kept trait can say how it evolves in `evolve_within`) and checked by the advisory `identity_drift` and `identity_evolution` checks.
+Visual identity traits themselves are recorded per project with `redesign_identity_record` (each kept trait can say how it evolves in `evolve_within`). The intentional ones are the target's essence: replacing one needs the operator's approval recorded as evidence, `identity_essence` blocks every Ready gate without it, and `identity_drift` blocks Prototype Ready when the app leaves an intentional kept trait. `identity_evolution` is advisory.
 
 ## Retrieval
 
