@@ -257,6 +257,28 @@ pub fn specs() -> Vec<ToolSpec> {
             run: redesign_modes_list,
         },
         ToolSpec {
+            id: "redesign_variants_create",
+            title: "Make one redesign variant per mode",
+            summary: "From a studied redesign project, make one sibling project per mode (all three when modes is empty) so the versions can be compared. A variant carries the capture, evidence, capabilities, identity, design system and oracle, with decisions back as proposals; it does not carry the plan, app, checks or reports. Make variants only when the person asks for more than one version. Refuses a project that is itself a variant, has no capabilities yet, or already has that mode.",
+            beginner: "Makes separate versions of a redesign, one for each depth of change, to compare.",
+            toolset: Toolset::Projects,
+            effects: Effects::WRITES_FILESYSTEM,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<VariantsCreateParams>,
+            run: redesign_variants_create,
+        },
+        ToolSpec {
+            id: "redesign_variants_show",
+            title: "Show redesign variants",
+            summary: "List a project's variants (asked on the source or on any variant) with each one's mode, whether it has a plan and an app, and what its last redesign_checks_run said: the Ready gates, identity_essence, identity_drift and mode_scope. Runs no checks. A listed folder that is not a project pointing back to the source is named under not_found.",
+            beginner: "Shows the versions of a redesign side by side.",
+            toolset: Toolset::Projects,
+            effects: Effects::READ_ONLY,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<ProjectParams>,
+            run: redesign_variants_show,
+        },
+        ToolSpec {
             id: "redesign_knowledge_retrieve",
             title: "Retrieve UX knowledge rules",
             summary: "Local tag+text retrieval over licensed UX knowledge packs. Returns 3–8 rules with source ids; never injects a whole pack. No embeddings required.",
@@ -562,6 +584,16 @@ struct CapabilityPutParams {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
+struct VariantsCreateParams {
+    /// The studied redesign project to make variants from.
+    pub project: PathBuf,
+    /// The modes to make a variant for; all three when empty. See redesign_modes_list.
+    #[serde(default)]
+    pub modes: Vec<super::redesign_mode::RedesignMode>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 struct IdentityRecordParams {
     pub project: PathBuf,
     pub traits: Vec<super::redesign_identity::IdentityTrait>,
@@ -768,7 +800,7 @@ struct DecisionApproveParams {
 #[serde(deny_unknown_fields)]
 struct PlanBuildParams {
     pub project: PathBuf,
-    /// How far the redesign may go; `redesign` when omitted. See redesign_modes_list.
+    /// How far the redesign may go. When omitted: the variant's mode in a variant, else `redesign`. See redesign_modes_list.
     #[serde(default)]
     pub mode: Option<super::redesign_mode::RedesignMode>,
     pub mappings: Vec<super::redesign_plan::PlanMapping>,
@@ -1444,6 +1476,23 @@ fn redesign_modes_list(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, 
     Ok(ToolOutput::Value(super::redesign_mode::list()))
 }
 
+fn redesign_variants_create(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: VariantsCreateParams = parse_params(params)?;
+    let ws = open(&p.project)?;
+    let out = super::redesign_variants::create(&ws, &p.modes)?;
+    // Variants sit beside a project that may be outside the project locations: keep them listed too.
+    for v in out["variants"].as_array().into_iter().flatten().filter_map(|v| v["project"].as_str()) {
+        ctx.session.remember_project(std::path::Path::new(v))?;
+    }
+    Ok(ToolOutput::Value(out))
+}
+
+fn redesign_variants_show(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: ProjectParams = parse_params(params)?;
+    let ws = open(&p.project)?;
+    Ok(ToolOutput::Value(super::redesign_variants::show(&ws)?))
+}
+
 fn redesign_diagnose(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
     let p: DiagnoseParams = parse_params(params)?;
     Ok(ToolOutput::Value(super::redesign_plan::diagnose(
@@ -1489,7 +1538,17 @@ fn redesign_decision_approve(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOu
 fn redesign_plan_build(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
     let p: PlanBuildParams = parse_params(params)?;
     let ws = open(&p.project)?;
-    let plan = super::redesign_plan::build_plan(&ws, p.mode.unwrap_or_default().as_str(), p.mappings, p.unknowns)?;
+    let variant = super::redesign_variants::variant_of(&ws)?.map(|v| v.mode);
+    if let (Some(asked), Some(made_for)) = (p.mode, variant)
+        && asked != made_for
+    {
+        return Err(ToolError::invalid(format!(
+            "this project is the `{}` variant; its plan can't use mode `{}`. Build that mode's plan in its own variant.",
+            made_for.as_str(),
+            asked.as_str()
+        )));
+    }
+    let plan = super::redesign_plan::build_plan(&ws, p.mode.or(variant).unwrap_or_default().as_str(), p.mappings, p.unknowns)?;
     Ok(ToolOutput::Value(serde_json::to_value(plan).map_err(|e| ToolError::internal(e.to_string()))?))
 }
 
@@ -1858,6 +1917,8 @@ mod tests {
             "redesign_identity_record",
             "redesign_identity_show",
             "redesign_modes_list",
+            "redesign_variants_create",
+            "redesign_variants_show",
             "redesign_knowledge_retrieve",
             "redesign_critic_recommend",
             "redesign_ds_ingest",

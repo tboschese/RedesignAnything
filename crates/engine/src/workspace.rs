@@ -80,6 +80,12 @@ fn copy_tree(from: &Path, to: &Path, skip: &dyn Fn(&Path) -> bool, depth: usize)
     Ok(())
 }
 
+/// Copy a folder into another project: files and folders, without links or what a build makes
+/// again (dependencies, compiler output).
+pub fn copy_folder(from: &Path, to: &Path) -> Result<(), ToolError> {
+    copy_tree(from, to, &rebuilt, 0)
+}
+
 /// The current `craft.json` format version. Bumping it means appending a step to [`MANIFEST_STEPS`].
 pub const MANIFEST_VERSION: u32 = 5;
 

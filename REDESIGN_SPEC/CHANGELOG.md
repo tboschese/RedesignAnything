@@ -1,5 +1,9 @@
 # Changelog — Redesign Anything specification
 
+## Documentation 1.4.4 — 2026-11-20
+
+- `SPEC.md` scope: one version by default; on request, one variant project per mode from the same study.
+
 ## Documentation 1.4.3 — 2026-11-20
 
 - `CONTRACTS.md` §7: `conceptReady` requires `identity_essence` not to fail, and `prototypeReady` requires `identity_drift` not to fail. No redesign may lose the target's intentional identity traits without the operator's recorded approval.

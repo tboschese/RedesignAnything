@@ -97,9 +97,13 @@ impl RedesignMode {
         }
     }
 
-    /// The mode of a project's plan; the default when there is no plan yet or its mode can't be read.
+    /// The mode of a project's plan. With no readable plan: the mode a variant was made for, else the default.
     pub fn of(ws: &Workspace) -> Self {
-        super::redesign_plan::load_plan(ws).ok().and_then(|p| Self::parse(&p.mode).ok()).unwrap_or_default()
+        super::redesign_plan::load_plan(ws)
+            .ok()
+            .and_then(|p| Self::parse(&p.mode).ok())
+            .or_else(|| super::redesign_variants::variant_of(ws).ok().flatten().map(|v| v.mode))
+            .unwrap_or_default()
     }
 
     /// One line for the builder brief.
@@ -114,6 +118,7 @@ pub fn list() -> Value {
         "modes": RedesignMode::ALL.iter().map(|m| json!({"id": m.as_str(), "label": m.label(), "scope": m.scope()})).collect::<Vec<_>>(),
         "default": RedesignMode::default().as_str(),
         "check": "mode_scope (in redesign_checks_run) compares the plan with its mode. It is advisory: out of scope is a warning.",
+        "compare": "A project holds one plan and one app. When the person asks for more than one version, redesign_variants_create makes one project per mode from the same study and redesign_variants_show lists them.",
     })
 }
 
