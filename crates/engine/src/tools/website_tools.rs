@@ -857,6 +857,52 @@ const REVEAL_JS: &str = r#"(async () => {
   return y;
 })()"#;
 
+/// The window's height while a page is photographed.
+const VIEW_HEIGHT: u32 = 900;
+/// A full-page picture with more than this share of its height in flat bands is taken again in bands.
+const FLAT_SHARE_SUSPECT: f64 = 0.35;
+
+/// Before photographing in bands, at the top of the page: remember what doesn't scroll with it
+/// (fixed or sticky), with where it is now and its own inline `visibility`.
+const PIN_JS: &str = r#"(() => {
+  const pinned = []; let seen = 0;
+  const go = r => { for (const el of r.querySelectorAll('*')) { if (++seen > 20000) return; const p = getComputedStyle(el).position; if (p === 'fixed' || p === 'sticky') pinned.push({el, y0: el.getBoundingClientRect().top + scrollY, vis: el.style.getPropertyValue('visibility'), pri: el.style.getPropertyPriority('visibility')}); if (el.shadowRoot) go(el.shadowRoot); } };
+  go(document);
+  window.__craftAnythingPinned = pinned;
+  return pinned.length;
+})()"#;
+
+/// Scroll to `__Y__` as a visitor would, let the page draw and its pictures in view load (at most
+/// 1.5 s). What has left the place it had at the
+/// top of the page (it is fixed, or stuck) is hidden for this band, so it is in the picture once.
+/// Returns where the page really scrolled to.
+const BAND_JS: &str = r#"(async () => {
+  const pause = ms => new Promise(r => setTimeout(r, ms));
+  const frame = () => new Promise(r => requestAnimationFrame(() => r()));
+  scrollTo(0, __Y__); await frame(); await pause(150);
+  // Pictures that load as they come into view, in shadow roots too: wait for the ones in this window.
+  const waiting = []; let seen = 0;
+  const go = r => { for (const el of r.querySelectorAll('*')) { if (++seen > 20000) return; if (el.tagName === 'IMG' && !el.complete) { const b = el.getBoundingClientRect(); if (b.bottom > 0 && b.top < innerHeight) waiting.push(new Promise(d => { el.addEventListener('load', d, {once: true}); el.addEventListener('error', d, {once: true}); })); } if (el.shadowRoot) go(el.shadowRoot); } };
+  go(document);
+  if (waiting.length) await Promise.race([Promise.all(waiting), pause(1500)]);
+  for (const p of (window.__craftAnythingPinned || [])) {
+    const moved = scrollY > 0 && Math.abs(p.el.getBoundingClientRect().top + scrollY - p.y0) > 2;
+    if (moved) p.el.style.setProperty('visibility', 'hidden', 'important');
+    else if (p.vis) p.el.style.setProperty('visibility', p.vis, p.pri); else p.el.style.removeProperty('visibility');
+  }
+  await frame();
+  return scrollY;
+})()"#;
+
+/// Put back what [`BAND_JS`] hid, and the page at its top.
+const UNPIN_JS: &str = r#"(async () => {
+  for (const p of (window.__craftAnythingPinned || [])) { if (p.vis) p.el.style.setProperty('visibility', p.vis, p.pri); else p.el.style.removeProperty('visibility'); }
+  delete window.__craftAnythingPinned;
+  scrollTo(0, 0);
+  await new Promise(r => setTimeout(r, 150));
+  return true;
+})()"#;
+
 /// Our read-only layout script, run at every width: the page's width (wider than the window means
 /// it scrolls sideways), heading and text sizes, and each landmark and section's padding, gap,
 /// background, content column and how many items sit side by side.
@@ -1010,6 +1056,7 @@ fn web_site_capture(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, Tool
         })
         .limitations(html_cut(html))
         .limitations(closed_shadow_roots(&blueprint))
+        .limitations(photographed_in_bands(&shots))
         .limitations(site.signed_in.as_deref().map(|s| profile_limitation(Some(s))))
         .limitations(sign_in_page.then(|| if signed_in { Limitation::new("sign_in_ended", SIGN_IN_ENDED) } else { Limitation::new("sign_in_page", SIGN_IN_HINT) }))
         .coverage(Coverage::complete(p.widths.len() as u64))
@@ -1060,6 +1107,60 @@ fn closed_shadow_roots(blueprint: &Value) -> Option<Limitation> {
     })
 }
 
+fn window_picture(client: &mut CdpClient, dl: &Deadline) -> Result<web_common::Image, ToolError> {
+    let shot = client.call("Page.captureScreenshot", json!({"format": "png"}), None, dl)?;
+    let data = shot.get("data").and_then(Value::as_str).ok_or_else(|| ToolError::new(ErrorCode::GarbledOutput, "the browser returned no screenshot"))?;
+    web_common::decode_png(&web_common::b64_decode(data)?)
+}
+
+/// Photograph the page as a visitor scrolling it sees it: one window at a time, the bands stitched
+/// into one picture `height` tall. For a page that draws only what is in view (a virtualised list),
+/// where one tall picture comes out blank. The page is put back as it was, whatever happens.
+fn photograph_in_bands(client: &mut CdpClient, w: u32, height: u64, dl: &Deadline) -> Result<Vec<u8>, ToolError> {
+    let (width, view) = (w as usize, u64::from(VIEW_HEIGHT));
+    if u64::from(w).saturating_mul(height).saturating_mul(4) > web_common::MAX_PIXELS_WORKING_SET {
+        return Err(ToolError::new(ErrorCode::OverLimit, "the page is too large to photograph in bands"));
+    }
+    let _ = eval(client, PIN_JS, dl);
+    let stitch = |client: &mut CdpClient| -> Result<Vec<u8>, ToolError> {
+        let mut rgba = vec![255u8; width * height as usize * 4];
+        let mut top = 0u64;
+        while top < height {
+            let at = eval(client, &BAND_JS.replace("__Y__", &top.to_string()), dl)?.as_f64().unwrap_or(0.0).max(0.0).round() as u64;
+            let img = window_picture(client, dl)?;
+            if img.width != w {
+                return Err(ToolError::new(ErrorCode::GarbledOutput, "the window's picture is not as wide as the window"));
+            }
+            // At the end of the page the window stops short of `top`: the band is lower in its picture.
+            let skip = top.saturating_sub(at);
+            let rows = (height - top).min(view).min(u64::from(img.height).saturating_sub(skip));
+            for row in 0..rows as usize {
+                let (from, to) = ((skip as usize + row) * width * 4, (top as usize + row) * width * 4);
+                rgba[to..to + width * 4].copy_from_slice(&img.rgba[from..from + width * 4]);
+            }
+            top += view;
+        }
+        web_common::encode_png(&web_common::Image { width: w, height: height as u32, rgba })
+    };
+    let picture = stitch(client);
+    let _ = eval(client, UNPIN_JS, dl);
+    picture
+}
+
+fn flat_share(png: &[u8]) -> f64 {
+    web_common::decode_png(png).map(|img| web_common::flat_band_share(&img, 64)).unwrap_or(0.0)
+}
+
+/// Said when a screenshot had to be taken one window at a time.
+fn photographed_in_bands(shots: &[Value]) -> Option<Limitation> {
+    shots.iter().any(|s| s["in_bands"] == true).then(|| {
+        Limitation::new(
+            "photographed_in_bands",
+            "The page draws only what is in view, so a screenshot was taken one window at a time while scrolling and stitched; what doesn't scroll with the page is shown once, where it was at the top.",
+        )
+    })
+}
+
 fn capture_into(ctx: &Ctx<'_>, client: &mut CdpClient, out: &Path, p: &CaptureParams, dl: &Deadline) -> Result<Captured, ToolError> {
     client.call("Page.enable", json!({}), None, dl)?;
     let mut shots = Vec::new();
@@ -1067,7 +1168,7 @@ fn capture_into(ctx: &Ctx<'_>, client: &mut CdpClient, out: &Path, p: &CapturePa
     let mut layouts = Vec::new();
     for (i, &w) in p.widths.iter().enumerate() {
         ctx.report(Some(i as f32 / p.widths.len() as f32), format!("Photographing the page at {w} px…"));
-        set_viewport(client, w, 900, dl)?;
+        set_viewport(client, w, VIEW_HEIGHT, dl)?;
         settle(client, 900)?;
         // A page that can't be scrolled through is still photographed as it is.
         let _ = eval(client, REVEAL_JS, dl);
@@ -1085,17 +1186,35 @@ fn capture_into(ctx: &Ctx<'_>, client: &mut CdpClient, out: &Path, p: &CapturePa
             .unwrap_or(900)
             .clamp(320, u64::from(p.max_height));
         let clip = json!({"format": "png", "captureBeyondViewport": true, "clip": {"x": 0, "y": 0, "width": w, "height": height, "scale": 1}});
-        let photograph = |client: &mut CdpClient| -> Result<Vec<u8>, ToolError> {
+        let whole = |client: &mut CdpClient| -> Result<Vec<u8>, ToolError> {
             let shot = client.call("Page.captureScreenshot", clip.clone(), None, dl)?;
             let data =
                 shot.get("data").and_then(Value::as_str).ok_or_else(|| ToolError::new(ErrorCode::GarbledOutput, "the browser returned no screenshot"))?;
             web_common::b64_decode(data)
         };
-        let bytes = photograph(client)?;
+        let mut bytes = whole(client)?;
+        // One tall picture of a page that draws only what is in view comes out blank where it reached
+        // beyond the window (#8). When it looks like that, photograph it as it is scrolled instead,
+        // and keep that picture if more of it is drawn.
+        let mut in_bands = false;
+        if height > u64::from(VIEW_HEIGHT) {
+            let flat = flat_share(&bytes);
+            if flat > FLAT_SHARE_SUSPECT
+                && let Ok(stitched) = photograph_in_bands(client, w, height, dl)
+                && flat_share(&stitched) < flat
+            {
+                bytes = stitched;
+                in_bands = true;
+            }
+        }
+        let photograph = |client: &mut CdpClient| if in_bands { photograph_in_bands(client, w, height, dl) } else { whole(client) };
         let (pw, ph) = web_common::png_dimensions(&bytes)?;
         let name = format!("screenshot-{w}.png");
         write_new_file(out, std::slice::from_ref(&name), &bytes).map_err(ToolError::invalid)?;
         let mut row = json!({"file": name, "width": pw, "height": ph, "css_width": w, "sha256": sha256_hex(&bytes), "cut": height >= u64::from(p.max_height)});
+        if in_bands {
+            row["in_bands"] = json!(true);
+        }
         if p.noise_pass {
             // The same page twice more, at uneven gaps so something repeating every so often
             // can't look still in both: what changed by itself moves, not the build's fault.
@@ -1848,6 +1967,47 @@ for (const t of tabs) t.onclick = () => tabs.forEach(o => o.setAttribute('aria-s
         assert!(values("backgrounds").contains(&"#f5f2ec".to_string()), "{:?}", values("backgrounds"));
         assert!(values("backgrounds").contains(&"#1e66f580".to_string()), "{:?}", values("backgrounds"));
         assert_eq!(values("text_colors"), ["#2d2b26"]);
+    }
+
+    /// #8: a list that draws only the rows in view is blank beyond the window in one tall picture.
+    /// It is photographed as it is scrolled, and the bar fixed to the window is in the picture once.
+    /// Live (`--ignored`).
+    #[test]
+    #[ignore]
+    fn a_page_that_draws_only_what_is_in_view_is_photographed_as_it_is_scrolled() {
+        let e = serve_and_open(
+            r#"<!doctype html><html><body style="margin:0"><div id="list" style="position:relative;height:5400px"></div>
+<div style="position:fixed;left:0;right:0;bottom:0;height:30px;background:#ff00ff"></div>
+<script>
+const list = document.getElementById('list');
+const draw = () => {
+  list.innerHTML = '';
+  const first = Math.max(0, Math.floor(scrollY / 100) - 1), last = Math.min(53, Math.ceil((scrollY + innerHeight) / 100));
+  for (let i = first; i <= last; i++) {
+    const r = document.createElement('div');
+    r.style.cssText = 'position:absolute;left:0;right:0;height:100px;top:' + i * 100 + 'px;background:repeating-linear-gradient(90deg,#00aa00 0 20px,#0000ff 20px 40px)';
+    list.appendChild(r);
+  }
+};
+addEventListener('scroll', draw); draw();
+</script></body></html>"#,
+        );
+        let cli = || crate::CallOptions::new(crate::Caller::Cli).with_consent(crate::Consent::Granted);
+        let dir = tempfile::tempdir().unwrap();
+        let out = dir.path().join("capture");
+        let v = e.call("web_site_capture", json!({"output_directory": out.display().to_string(), "widths": [1440]}), cli()).unwrap().to_json();
+        assert_eq!(v["result"]["screenshots"][0]["in_bands"], true, "{}", v["result"]["screenshots"]);
+        assert!(v["limitations"].as_array().unwrap().iter().any(|l| l["code"] == "photographed_in_bands"), "{}", v["limitations"]);
+        let shot = web_common::decode_png(&std::fs::read(out.join("screenshot-1440.png")).unwrap()).unwrap();
+        let at = |x: u32, y: u32| shot.rgba.get(((y * shot.width + x) * 4) as usize..((y * shot.width + x) * 4 + 3) as usize).unwrap().to_vec();
+        for y in [450, 2750, 5250] {
+            assert_ne!(at(10, y), [255, 255, 255], "the rows at {y} px are in the picture");
+        }
+        let bar_rows = (0..shot.height).filter(|y| at(10, *y) == [255, 0, 255]).count();
+        assert!((1..=30).contains(&bar_rows), "the fixed bar is in the picture once, not in every band: {bar_rows} rows");
+        // The page is left as it was: at its top, with the bar showing.
+        let after = e.call("web_page_show", json!({}), cli());
+        assert!(after.is_ok(), "the page still answers after the capture");
     }
 
     /// Components (Lit and the like) keep their content in shadow roots: open ones are read, and a
