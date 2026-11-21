@@ -1,5 +1,9 @@
 # Changelog — Redesign Anything specification
 
+## Documentation 1.5.2 — 2026-11-21
+
+- Benchmark plan v3 before any confirmatory trial: the harder `fixtures/expense-portal` (three screens, a four-step wizard, deliberate UX weaknesses; oracle observed by replay) replaces `multi-step-journey` in the confirmatory set. `benchmark/BENCHMARK_RUN_PLAN_2026-11-21-v3.md`, `benchmark/expectations/2026-11-21-v3.json`. Measures and thresholds unchanged from v2.
+
 ## Documentation 1.5.1 — 2026-11-21
 
 - Benchmark plan v2 before any confirmatory trial: the first plan's rubric saturated in the exploratory run (`benchmark/exploratory/2026-11-21-dense-form.md`). Adds D6 interaction cost, D7 main action in the first view and D8 error next to its field (`benchmark/BENCHMARK_RUN_PLAN_2026-11-21-v2.md`, `benchmark/expectations/2026-11-21-v2.json` with reference journeys and the originals' action counts). Thresholds unchanged.

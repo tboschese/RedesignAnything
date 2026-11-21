@@ -1,0 +1,167 @@
+{
+  "fixture_id": "expense-portal",
+  "oracle_author": "Coding agent (Claude Code), by replay in Craft Anything's browser",
+  "captured_at": "2026-11-21T19:00:00Z",
+  "oracle_type": "observed_verified",
+  "environment_fingerprint": "static HTML/CSS/JS served by python3 -m http.server on 127.0.0.1:8768; no backend",
+  "coverage_scope": "The seven rules in MANIFEST.md, one replay each, desktop width; roles employee and viewer",
+  "unknowns": [
+    "What happens after a claim is submitted (approval workflow)",
+    "Persistence: claims live in the page only"
+  ],
+  "scenarios": [
+    {
+      "id": "scenario_portal_details_required",
+      "capability_id": "cap_portal_details_validation",
+      "profile": "employee",
+      "fixture_id": "expense-portal",
+      "given": [
+        "On New claim, step 1, fields empty"
+      ],
+      "when": [
+        "Click Next"
+      ],
+      "then": [
+        "Error 'What was it for is required.'",
+        "Error 'Amount must be greater than 0.'",
+        "The errors are announced"
+      ],
+      "assertion_source": "observed",
+      "evidence_ids": [
+        "ev_scenario_portal_details_required_replay"
+      ],
+      "safe_execution_target": "generated_mock",
+      "executable": true
+    },
+    {
+      "id": "scenario_portal_approver_required",
+      "capability_id": "cap_portal_approval_limit",
+      "profile": "employee",
+      "fixture_id": "expense-portal",
+      "given": [
+        "What 'Client dinner', amount 420, category Meals, a date"
+      ],
+      "when": [
+        "Reach Approval, click Next with no approver code"
+      ],
+      "then": [
+        "Error 'Claims over 300 EUR need an approver code.'",
+        "The error is announced"
+      ],
+      "assertion_source": "observed",
+      "evidence_ids": [
+        "ev_scenario_portal_approver_required_replay"
+      ],
+      "safe_execution_target": "generated_mock",
+      "executable": true
+    },
+    {
+      "id": "scenario_portal_submit_success",
+      "capability_id": "cap_portal_submit",
+      "profile": "employee",
+      "fixture_id": "expense-portal",
+      "given": [
+        "What 'Taxi', amount 40, category Travel, a date"
+      ],
+      "when": [
+        "Go through every step and submit"
+      ],
+      "then": [
+        "'No approver needed for claims up to 300 EUR.' shows",
+        "'Claim submitted for approval.' shows"
+      ],
+      "assertion_source": "observed",
+      "evidence_ids": [
+        "ev_scenario_portal_submit_success_replay"
+      ],
+      "safe_execution_target": "generated_mock",
+      "executable": true
+    },
+    {
+      "id": "scenario_portal_back_keeps_entries",
+      "capability_id": "cap_portal_back_preserve",
+      "profile": "employee",
+      "fixture_id": "expense-portal",
+      "given": [
+        "What 'Taxi', amount 40 on step 1"
+      ],
+      "when": [
+        "Next, then Back"
+      ],
+      "then": [
+        "What was it for still holds 'Taxi'",
+        "Amount (EUR) still holds '40'"
+      ],
+      "assertion_source": "observed",
+      "evidence_ids": [
+        "ev_scenario_portal_back_keeps_entries_replay"
+      ],
+      "safe_execution_target": "generated_mock",
+      "executable": true
+    },
+    {
+      "id": "scenario_portal_withdraw_pending",
+      "capability_id": "cap_portal_withdraw",
+      "profile": "employee",
+      "fixture_id": "expense-portal",
+      "given": [
+        "My claims lists C-1042, pending"
+      ],
+      "when": [
+        "Open C-1042, withdraw it"
+      ],
+      "then": [
+        "'Claim C-1042 withdrawn.' shows"
+      ],
+      "assertion_source": "observed",
+      "evidence_ids": [
+        "ev_scenario_portal_withdraw_pending_replay"
+      ],
+      "safe_execution_target": "generated_mock",
+      "executable": true
+    },
+    {
+      "id": "scenario_portal_withdraw_only_pending",
+      "capability_id": "cap_portal_withdraw",
+      "profile": "employee",
+      "fixture_id": "expense-portal",
+      "given": [
+        "My claims lists C-1041, approved"
+      ],
+      "when": [
+        "Open C-1041, try to withdraw it"
+      ],
+      "then": [
+        "'Only pending claims can be withdrawn.' shows"
+      ],
+      "assertion_source": "observed",
+      "evidence_ids": [
+        "ev_scenario_portal_withdraw_only_pending_replay"
+      ],
+      "safe_execution_target": "generated_mock",
+      "executable": true
+    },
+    {
+      "id": "scenario_portal_viewer_cannot_submit",
+      "capability_id": "cap_portal_permission",
+      "profile": "viewer",
+      "fixture_id": "expense-portal",
+      "given": [
+        "Open /?role=viewer",
+        "What 'Taxi', amount 40, category Travel, a date"
+      ],
+      "when": [
+        "Go through every step and submit"
+      ],
+      "then": [
+        "'Viewers cannot submit claims.' shows"
+      ],
+      "assertion_source": "observed",
+      "evidence_ids": [
+        "ev_scenario_portal_viewer_cannot_submit_replay"
+      ],
+      "safe_execution_target": "generated_mock",
+      "executable": true
+    }
+  ]
+}
