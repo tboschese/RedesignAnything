@@ -2926,6 +2926,87 @@ fn a_saved_asset_key_gets_an_api_builders_tool_past_the_key_check() {
 }
 
 /// A worker over a test session and the workspace's feed, for check tests.
+/// In the builder's own check round, the redesign kind runs the kept journeys in the built site and
+/// tells the builder which step failed and which scenario has no journey; the Ready check then
+/// judges the scenarios by what ran. Live (`--ignored`): needs a browser.
+#[test]
+#[ignore]
+fn the_builders_check_round_runs_the_journeys_and_says_what_to_fix() {
+    use crate::rebuild::kinds::redesign::JourneysCheck;
+    let d = tempfile::tempdir().unwrap();
+    let mut ws = Workspace::create(d.path(), "Catalogue", "kind=redesign", TargetRef::None).unwrap();
+    ws.manifest.kind = Some("redesign".into());
+    ws.save().unwrap();
+    let dist = ws.app_dir().join("dist");
+    std::fs::create_dir_all(&dist).unwrap();
+    std::fs::write(
+        dist.join("index.html"),
+        "<!doctype html><html lang=en><body><form id=f><label for=q>Search the catalogue</label> <input id=q> <button>Search</button></form><p id=out></p>\
+         <script>document.getElementById('f').onsubmit = ev => { ev.preventDefault(); document.getElementById('out').textContent = 'Results for ' + document.getElementById('q').value; };</script></body></html>",
+    )
+    .unwrap();
+    let redesign = ws.root.join("redesign");
+    std::fs::create_dir_all(redesign.join("oracle")).unwrap();
+    let scenarios = json!({"scenarios": [
+        {"id": "search", "capability_id": "c1", "executable": true, "then": ["Search returns results"]},
+        {"id": "donate", "capability_id": "c2", "executable": true, "then": ["Donate opens the donation form"]},
+        {"id": "languages", "capability_id": "c3", "executable": true, "then": ["Other languages can be chosen"]},
+    ]});
+    std::fs::write(redesign.join("oracle/scenarios.json"), scenarios.to_string()).unwrap();
+    let journeys = json!({"journeys": [
+        {"scenario_id": "search", "steps": [{"type": "maps", "into": "Search the catalogue"}, {"press": "Enter"}, {"expect": "Results for maps"}]},
+        {"scenario_id": "donate", "steps": [{"click": "Donate"}, {"expect": "Donation form"}]},
+    ]});
+    std::fs::create_dir_all(redesign.join("quality")).unwrap();
+    std::fs::write(redesign.join("quality/journeys.json"), journeys.to_string()).unwrap();
+
+    let worker = Worker { engine: Arc::new(Engine::new(craft_anything_engine::testing::live_session())), ..check_worker(&ws, false) };
+    let checks = worker.run_checks(&ws, &RedesignKind, 1).unwrap();
+    let ran = checks.iter().find(|c| c.check == JourneysCheck::ID).expect("the journeys check ran");
+    assert!(!ran.passed, "{ran:?}");
+    assert!(ran.note.contains("donate") && ran.note.contains("no control named \"Donate\""), "the failed step is named: {}", ran.note);
+    assert!(ran.note.contains("languages") && ran.note.contains("journeys.json"), "the scenario with no journey, and how to write one: {}", ran.note);
+    let passed: Vec<(&str, bool)> = ran.claims.iter().map(|c| (c.title.as_str(), c.passed)).collect();
+    assert_eq!(passed, [("the journey for search passes", true), ("the journey for donate passes", false), ("the journey for languages passes", false)]);
+    assert!(RedesignKind.checks(&ws).iter().find(|c| c.id() == JourneysCheck::ID).unwrap().can_refine(ran), "the builder can fix it");
+
+    // The Ready check, later in the same round, judged the scenarios by what ran.
+    let (results, _) = crate::rebuild::redesign_journeys::fresh_results(&ws);
+    assert_eq!(results.get("search").map(|r| r.passed), Some(true));
+    assert_eq!(results.get("donate").map(|r| r.passed), Some(false));
+}
+
+/// The builder's brief lists the scenarios that owe a journey, with what each must show, and how
+/// to write one; a retired scenario or a project without scenarios adds nothing.
+#[test]
+fn a_redesign_brief_asks_for_one_journey_per_scenario() {
+    let d = tempfile::tempdir().unwrap();
+    let mut ws = Workspace::create(d.path(), "R", "kind=redesign", TargetRef::None).unwrap();
+    ws.manifest.kind = Some("redesign".into());
+    ws.save().unwrap();
+    assert!(!brief(&ws, "redesign", false, false, None, false, None).contains("journeys.json"), "no scenario, no journey asked for");
+    let oracle = ws.root.join("redesign/oracle");
+    std::fs::create_dir_all(&oracle).unwrap();
+    let scenarios = json!({"scenarios": [{"id": "search", "capability_id": "c1", "then": ["Search returns results"]}]});
+    std::fs::write(oracle.join("scenarios.json"), scenarios.to_string()).unwrap();
+    let b = brief(&ws, "redesign", false, false, None, false, None);
+    assert!(b.contains("redesign/quality/journeys.json") && b.contains("- search: Search returns results"), "{b}");
+}
+
+/// Without a scenario that owes a journey, the journeys check does not run at all.
+#[test]
+fn a_redesign_without_scenarios_runs_no_journeys_check() {
+    use crate::rebuild::kinds::redesign::JourneysCheck;
+    let d = tempfile::tempdir().unwrap();
+    let mut ws = Workspace::create(d.path(), "R", "kind=redesign", TargetRef::None).unwrap();
+    ws.manifest.kind = Some("redesign".into());
+    ws.save().unwrap();
+    std::fs::create_dir_all(ws.app_dir().join("dist")).unwrap();
+    std::fs::write(ws.app_dir().join("dist/index.html"), "<p>hi</p>").unwrap();
+    let checks = check_worker(&ws, false).run_checks(&ws, &RedesignKind, 1).unwrap();
+    assert!(checks.iter().all(|c| c.check != JourneysCheck::ID), "{checks:?}");
+}
+
 pub(crate) fn check_worker(ws: &Workspace, deep: bool) -> Worker {
     let mut s = craft_anything_engine::testing::session();
     s.settings.deep_mode = deep;

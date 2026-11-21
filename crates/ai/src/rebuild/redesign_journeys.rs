@@ -87,6 +87,24 @@ fn scenario_ids(ws: &Workspace) -> Vec<String> {
     oracle["scenarios"].as_array().into_iter().flatten().filter_map(|s| s["id"].as_str().map(str::to_string)).collect()
 }
 
+/// The scenarios that owe a journey, with what each must show: every executable scenario of the
+/// oracle that is not retired by an approved decision (`redesign_scenario_retire`).
+pub fn owed(ws: &Workspace) -> Vec<(String, String)> {
+    let oracle: Value = fs::read(file(ws, "oracle/scenarios.json")).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default();
+    let (retired, _) = super::redesign_retired::in_force(ws);
+    oracle["scenarios"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|s| s["executable"].as_bool().unwrap_or(true))
+        .filter_map(|s| {
+            let id = s["id"].as_str()?.to_string();
+            let then: Vec<&str> = s["then"].as_array().into_iter().flatten().filter_map(Value::as_str).collect();
+            (!retired.contains_key(&id)).then(|| (id, then.join("; ")))
+        })
+        .collect()
+}
+
 /// Refuse journeys that name no scenario of the oracle, repeat one, or check nothing at the end.
 pub fn check(ws: &Workspace, journeys: &[Journey]) -> Result<(), ToolError> {
     let known = scenario_ids(ws);
