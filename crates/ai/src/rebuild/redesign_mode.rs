@@ -1,8 +1,8 @@
 //! How far a redesign may go. The plan's `mode` is one of three scopes:
 //! `refresh` organises each screen (hierarchy, grouping, spacing, legibility) with the same blocks
 //! in the same places, the same journeys and the same look; `redesign` may reorganise journeys
-//! with traceability; `reimagine` may propose new flows and pages and must flag what would need
-//! backend work. `mode_scope` compares the plan with its mode. It is advisory: it reports `warn`,
+//! with traceability; `reimagine` may propose new flows, pages and a new visual design, keeping or
+//! evolving every intentional identity trait, and must flag what would need backend work. `mode_scope` compares the plan with its mode. It is advisory: it reports `warn`,
 //! never `fail`, because a failed row would fail the kind's Ready check.
 //!
 //! How alike each page is to the original (`redesign_likeness`) is reported here as numbers and
@@ -35,7 +35,8 @@ pub enum RedesignMode {
     /// Reorganise journeys and navigation, each change traced to evidence; style evolves.
     #[default]
     Redesign,
-    /// Rethink flows and pages from the capabilities up; backend needs are flagged, never invented.
+    /// New flows, pages and visual design from the capabilities up; the intentional identity traits
+    /// stay, kept or evolved; backend needs are flagged, never invented.
     Reimagine,
 }
 
@@ -79,9 +80,10 @@ impl RedesignMode {
                  The look follows redesign/identity.json: kept traits evolve within their style."
             }
             Self::Reimagine => {
-                "Build new flows and pages from the capabilities up: new routes, merged or split screens, new \
-                 navigation. It changes structure, not character: the look still follows redesign/identity.json. \
-                 Anything that would need backend work is flagged as backend_change_required, never invented."
+                "Build new flows and pages from the capabilities up, with a new visual design: routes, navigation, \
+                 layout, composition, density and components may all change. The target's essence stays: every \
+                 intentional trait in redesign/identity.json is kept or evolved, never dropped. Anything that would \
+                 need backend work is flagged as backend_change_required, never invented."
             }
         }
     }
@@ -95,10 +97,17 @@ impl RedesignMode {
                  each screen easier to read and use (hierarchy, grouping, spacing, legibility, hit areas, focus), and \
                  never let the page scroll sideways on a phone."
             }
-            Self::Redesign | Self::Reimagine => {
+            Self::Redesign => {
                 "The capture is evidence of what the original does and how it looks, not a layout to copy: do not clone \
                  its pages. Take the look (colours, fonts, shapes) from redesign/identity.json, with exact values from \
                  capture.json for the traits that are kept, and never let the page scroll sideways on a phone."
+            }
+            Self::Reimagine => {
+                "The capture is evidence, not a layout or a look to copy: propose a new visual design as well as new \
+                 flows (layout, composition, density, components). What makes the original itself must stay \
+                 recognisable: keep or evolve every intentional trait in redesign/identity.json, with exact values \
+                 from capture.json for the ones that are kept, and say in each evolved trait how far it goes. Never \
+                 let the page scroll sideways on a phone."
             }
         }
     }

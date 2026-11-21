@@ -248,7 +248,7 @@ pub fn specs() -> Vec<ToolSpec> {
         ToolSpec {
             id: "redesign_modes_list",
             title: "List redesign modes",
-            summary: "List the three redesign scopes a plan can use: refresh (organise each screen; same blocks in the same places, same routes, journeys, navigation and look), redesign (reorganise journeys with traceability; the default) and reimagine (new flows and pages; backend needs flagged, never invented). mode_scope in redesign_checks_run compares the plan with its mode and warns when the plan goes out of scope.",
+            summary: "List the three redesign scopes a plan can use: refresh (organise each screen; same blocks in the same places, same routes, journeys, navigation and look), redesign (reorganise journeys with traceability; the default) and reimagine (new flows, pages and visual design, with every intentional identity trait kept or evolved; backend needs flagged, never invented). mode_scope in redesign_checks_run compares the plan with its mode and warns when the plan goes out of scope.",
             beginner: "Shows how far a redesign can go, from organising the screens to new flows.",
             toolset: Toolset::Projects,
             effects: Effects::READ_ONLY,

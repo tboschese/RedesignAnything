@@ -8,7 +8,7 @@
   - `refresh` warns when a capability moves to a route it did not have, a mapping needs backend changes, or an identity trait is replaced.
   - `redesign` reports route moves and divergent decisions.
   - `reimagine` warns when the plan proposes nothing new.
-- The builder brief: a redesign project no longer gets the website kind's "Match it exactly" paragraph. `TargetKind::capture_guidance` lets a kind say what to do with the capture; the redesign kind answers by mode (`refresh`: keep the layout; the others: the capture is evidence, not a layout to copy).
+- The builder brief: a redesign project no longer gets the website kind's "Match it exactly" paragraph. `TargetKind::capture_guidance` lets a kind say what to do with the capture; the redesign kind answers by mode (`refresh`: keep the layout; `redesign`: the capture is evidence, not a layout to copy; `reimagine`: propose a new visual design too, keeping or evolving every intentional identity trait).
 - `redesign/scaffold_refs.json` records the plan's `mode` and the scaffold's `router`.
 
 ## Guarantees tested
