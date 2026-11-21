@@ -48,7 +48,7 @@ confirmation: the product must run it and settle it. The rubric is therefore com
 mechanical measures in the product's browser (fixed oracle checks reached by journeys, captures,
 design-system check), and no LLM judges any result; an agent may only drive a build to the fixed
 checks. Arms A and B run in plain Craft as the person's own project, so no instruction to match
-the original biases them. Pre-registration: [`benchmark/BENCHMARK_RUN_PLAN_2026-11-21-v2.md`](benchmark/BENCHMARK_RUN_PLAN_2026-11-21-v2.md) (finer measures; it superseded the first 2026-11-21 plan after an exploratory run showed its rubric saturates).
+the original biases them. Pre-registration: [`benchmark/BENCHMARK_RUN_PLAN_2026-11-21-v3.md`](benchmark/BENCHMARK_RUN_PLAN_2026-11-21-v3.md) (finer measures and a harder fixture; it superseded the earlier 2026-11-21 plans after an exploratory run showed their rubric saturates).
 Where this addendum conflicts with "blind rubric" or "human evaluation" above, it takes precedence.
 
 ## First public release launch gate

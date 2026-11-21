@@ -1,0 +1,20 @@
+/* Deliberately weak in places (see MANIFEST.md, "Known UX problems"). */
+body { margin: 0; font-family: Arial, sans-serif; color: #333; background: #fafafa; }
+.top { display: flex; gap: 24px; align-items: center; padding: 10px 16px; background: #fff; border-bottom: 1px solid #ddd; }
+.brand { font-weight: bold; }
+.who { color: #aaa; font-size: 12px; margin-left: auto; }
+nav a { color: #6f8fbf; margin-right: 12px; }
+main { padding: 16px; }
+a, button, input, select { outline: none; }
+table.claims { width: 900px; border-collapse: collapse; background: #fff; }
+table.claims th, table.claims td { border: 1px solid #e3e3e3; padding: 8px; text-align: left; }
+.status { color: #b9b9b9; font-size: 11px; }
+.intro { color: #888; line-height: 1.6; max-width: 640px; }
+.errors { background: #fff3f3; color: #c66; padding: 8px 12px; border: 1px solid #f0caca; }
+label { display: block; margin: 12px 0 4px; }
+input, select { padding: 6px; border: 1px solid #ccc; width: 260px; }
+button { margin-top: 16px; padding: 8px 14px; background: #e9e9e9; border: 1px solid #ccc; color: #555; }
+.more { position: relative; display: inline-block; }
+.menu { position: absolute; background: #fff; border: 1px solid #ccc; padding: 4px; }
+.menu button { display: block; margin: 2px 0; }
+.done { color: #2b6; font-weight: bold; }

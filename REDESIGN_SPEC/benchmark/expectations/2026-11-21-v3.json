@@ -1,0 +1,884 @@
+{
+  "frozen_at": "2026-11-21 (v3, before any confirmatory trial)",
+  "note": "Fixed checks per critical scenario. Texts in `shows` are the oracle's and never change. Controls and fields are named by their role; the evaluating agent writes the journey that reaches each check and names the control or field as it is labelled in the build under test, and the report lists those names for audit. v2 adds announced-error checks to the field-error scenarios, each fixture's primary action, and the reference journeys run on the unchanged originals with their action counts. v3 adds the harder expense-portal fixture.",
+  "check_kinds": {
+    "shows": "this text shows on the page (case and spacing ignored)",
+    "alert": "an error is announced: an element with role alert or aria-live shows text",
+    "present": "a control or field with this role shows",
+    "absent": "no control with this role shows",
+    "enabled": "the control with this role can be used",
+    "disabled": "the control with this role shows but cannot be used",
+    "disabled_or_absent": "the control with this role cannot be used or does not show",
+    "value": "the field with this role holds `equals`"
+  },
+  "fixtures": {
+    "dense-form": {
+      "scenario_dense_amount_bounds": [
+        {
+          "disabled": "submit claim",
+          "after": "amount 0, other required fields valid"
+        },
+        {
+          "disabled": "submit claim",
+          "after": "amount 10000.01"
+        },
+        {
+          "enabled": "submit claim",
+          "after": "amount 42"
+        }
+      ],
+      "scenario_dense_submit_gate": [
+        {
+          "disabled": "submit claim",
+          "after": "fresh load"
+        },
+        {
+          "enabled": "submit claim",
+          "after": "amount, category and date valid"
+        }
+      ],
+      "scenario_dense_approver_button": [
+        {
+          "open": "/?role=approver"
+        },
+        {
+          "present": "approve claim"
+        },
+        {
+          "shows": "Approver"
+        }
+      ],
+      "scenario_dense_employee_no_approve": [
+        {
+          "open": "/"
+        },
+        {
+          "absent": "approve claim"
+        }
+      ],
+      "scenario_dense_attachments_empty": [
+        {
+          "shows": "No attachments yet."
+        }
+      ]
+    },
+    "multi-step-journey": {
+      "scenario_journey_profile_gate": [
+        {
+          "alert": true,
+          "after": "continue with empty profile"
+        },
+        {
+          "present": "full name field"
+        }
+      ],
+      "scenario_journey_permission_denied": [
+        {
+          "open": "/?denied=1"
+        },
+        {
+          "shows": "You do not have permission to create a workspace.",
+          "after": "valid profile, then continue with valid workspace fields"
+        },
+        {
+          "present": "workspace name field"
+        }
+      ],
+      "scenario_journey_back_preserves_profile": [
+        {
+          "value": "full name field",
+          "equals": "Ada Lovelace",
+          "after": "profile entered, continue, back"
+        },
+        {
+          "value": "work email field",
+          "equals": "ada@example.test"
+        }
+      ],
+      "scenario_journey_confirm_success": [
+        {
+          "shows": "Workspace ready.",
+          "after": "valid profile and workspace, confirm on review"
+        }
+      ]
+    },
+    "ds-claims-journey": {
+      "scenario_claims_details_gate": [
+        {
+          "shows": "Enter a description.",
+          "after": "continue with empty details"
+        },
+        {
+          "alert": true
+        },
+        {
+          "shows": "Enter an amount greater than 0."
+        }
+      ],
+      "scenario_claims_approver_required": [
+        {
+          "shows": "Claims over 500 need an approver code.",
+          "after": "description, amount 620, continue, continue with no approver code"
+        },
+        {
+          "alert": true
+        }
+      ],
+      "scenario_claims_no_approver_under_limit": [
+        {
+          "shows": "Claims up to 500 EUR need no approver.",
+          "after": "description, amount 40, continue"
+        },
+        {
+          "present": "submit claim",
+          "after": "continue"
+        }
+      ],
+      "scenario_claims_back_preserves": [
+        {
+          "value": "description field",
+          "equals": "Taxi",
+          "after": "description Taxi, amount 40, continue, back"
+        },
+        {
+          "value": "amount field",
+          "equals": "40"
+        }
+      ],
+      "scenario_claims_submit_success": [
+        {
+          "shows": "MGR-7",
+          "after": "amount 620, approver code MGR-7, continue to review"
+        },
+        {
+          "shows": "Claim submitted.",
+          "after": "submit"
+        }
+      ],
+      "scenario_claims_viewer_cannot_submit": [
+        {
+          "open": "/?role=viewer"
+        },
+        {
+          "shows": "Viewers cannot submit claims.",
+          "after": "description, amount 40, continue to review"
+        },
+        {
+          "disabled_or_absent": "submit claim"
+        }
+      ]
+    },
+    "expense-portal": {
+      "scenario_portal_details_required": [
+        {
+          "shows": "What was it for is required.",
+          "after": "start a new claim, Next with step 1 empty"
+        },
+        {
+          "alert": true
+        },
+        {
+          "shows": "Amount must be greater than 0."
+        }
+      ],
+      "scenario_portal_approver_required": [
+        {
+          "shows": "Claims over 300 EUR need an approver code.",
+          "after": "amount 420, category and date, reach approval, go on with no approver code"
+        },
+        {
+          "alert": true
+        }
+      ],
+      "scenario_portal_submit_success": [
+        {
+          "shows": "No approver needed for claims up to 300 EUR.",
+          "after": "amount 40, category and date"
+        },
+        {
+          "shows": "Claim submitted for approval.",
+          "after": "submit"
+        }
+      ],
+      "scenario_portal_back_keeps_entries": [
+        {
+          "value": "what was it for field",
+          "equals": "Taxi",
+          "after": "what Taxi, amount 40, next, back"
+        },
+        {
+          "value": "amount field",
+          "equals": "40"
+        }
+      ],
+      "scenario_portal_withdraw_pending": [
+        {
+          "shows": "Claim C-1042 withdrawn.",
+          "after": "open C-1042 from my claims, withdraw it"
+        }
+      ],
+      "scenario_portal_withdraw_only_pending": [
+        {
+          "shows": "Only pending claims can be withdrawn.",
+          "after": "open C-1041 from my claims, try to withdraw it"
+        }
+      ],
+      "scenario_portal_viewer_cannot_submit": [
+        {
+          "open": "/?role=viewer"
+        },
+        {
+          "shows": "Viewers cannot submit claims.",
+          "after": "a complete claim, submit"
+        }
+      ]
+    }
+  },
+  "error_scenarios": [
+    "scenario_dense_amount_bounds",
+    "scenario_dense_submit_gate",
+    "scenario_journey_profile_gate",
+    "scenario_journey_permission_denied",
+    "scenario_claims_details_gate",
+    "scenario_claims_approver_required",
+    "scenario_claims_viewer_cannot_submit",
+    "scenario_portal_details_required",
+    "scenario_portal_approver_required",
+    "scenario_portal_withdraw_only_pending",
+    "scenario_portal_viewer_cannot_submit"
+  ],
+  "supersedes": "2026-11-21-v2.json",
+  "field_error_scenarios": [
+    "scenario_journey_profile_gate",
+    "scenario_claims_details_gate",
+    "scenario_claims_approver_required",
+    "scenario_portal_details_required",
+    "scenario_portal_approver_required"
+  ],
+  "primary_action": {
+    "dense-form": "Submit claim",
+    "multi-step-journey": "Continue",
+    "ds-claims-journey": "Continue",
+    "expense-portal": "Next"
+  },
+  "reference_journeys": {
+    "multi-step-journey": [
+      {
+        "scenario_id": "scenario_journey_profile_gate",
+        "steps": [
+          {
+            "click": "Continue"
+          },
+          {
+            "alert": ""
+          },
+          {
+            "check": "Full name",
+            "is": "present"
+          }
+        ]
+      },
+      {
+        "scenario_id": "scenario_journey_permission_denied",
+        "steps": [
+          {
+            "open": "/?denied=1"
+          },
+          {
+            "type": "Ada Lovelace",
+            "into": "Full name"
+          },
+          {
+            "type": "ada@example.test",
+            "into": "Work email"
+          },
+          {
+            "click": "Continue"
+          },
+          {
+            "type": "Research",
+            "into": "Workspace name"
+          },
+          {
+            "type": "Team",
+            "into": "Plan"
+          },
+          {
+            "click": "Continue"
+          },
+          {
+            "expect": "You do not have permission to create a workspace."
+          },
+          {
+            "check": "Workspace name",
+            "is": "present"
+          }
+        ]
+      },
+      {
+        "scenario_id": "scenario_journey_back_preserves_profile",
+        "steps": [
+          {
+            "type": "Ada Lovelace",
+            "into": "Full name"
+          },
+          {
+            "type": "ada@example.test",
+            "into": "Work email"
+          },
+          {
+            "click": "Continue"
+          },
+          {
+            "click": "Back"
+          },
+          {
+            "value_of": "Full name",
+            "equals": "Ada Lovelace"
+          },
+          {
+            "value_of": "Work email",
+            "equals": "ada@example.test"
+          }
+        ]
+      },
+      {
+        "scenario_id": "scenario_journey_confirm_success",
+        "steps": [
+          {
+            "type": "Ada Lovelace",
+            "into": "Full name"
+          },
+          {
+            "type": "ada@example.test",
+            "into": "Work email"
+          },
+          {
+            "click": "Continue"
+          },
+          {
+            "type": "Research",
+            "into": "Workspace name"
+          },
+          {
+            "type": "Team",
+            "into": "Plan"
+          },
+          {
+            "click": "Continue"
+          },
+          {
+            "click": "Confirm"
+          },
+          {
+            "expect": "Workspace ready."
+          }
+        ]
+      }
+    ],
+    "dense-form": [
+      {
+        "scenario_id": "scenario_dense_amount_bounds",
+        "steps": [
+          {
+            "type": "Travel",
+            "into": "Category"
+          },
+          {
+            "type": "2026-11-20",
+            "into": "Date"
+          },
+          {
+            "type": "0",
+            "into": "Amount (USD)"
+          },
+          {
+            "check": "Submit claim",
+            "is": "disabled"
+          },
+          {
+            "type": "10000.01",
+            "into": "Amount (USD)"
+          },
+          {
+            "check": "Submit claim",
+            "is": "disabled"
+          },
+          {
+            "type": "42",
+            "into": "Amount (USD)"
+          },
+          {
+            "check": "Submit claim",
+            "is": "enabled"
+          }
+        ]
+      },
+      {
+        "scenario_id": "scenario_dense_submit_gate",
+        "steps": [
+          {
+            "check": "Submit claim",
+            "is": "disabled"
+          },
+          {
+            "type": "42",
+            "into": "Amount (USD)"
+          },
+          {
+            "type": "Travel",
+            "into": "Category"
+          },
+          {
+            "type": "2026-11-20",
+            "into": "Date"
+          },
+          {
+            "check": "Submit claim",
+            "is": "enabled"
+          }
+        ]
+      },
+      {
+        "scenario_id": "scenario_dense_approver_button",
+        "steps": [
+          {
+            "open": "/?role=approver"
+          },
+          {
+            "check": "Approve",
+            "is": "present"
+          },
+          {
+            "expect": "Approver"
+          }
+        ]
+      },
+      {
+        "scenario_id": "scenario_dense_employee_no_approve",
+        "steps": [
+          {
+            "open": "/"
+          },
+          {
+            "check": "Approve",
+            "is": "absent"
+          }
+        ]
+      },
+      {
+        "scenario_id": "scenario_dense_attachments_empty",
+        "steps": [
+          {
+            "expect": "No attachments yet."
+          }
+        ]
+      }
+    ],
+    "ds-claims-journey": [
+      {
+        "scenario_id": "scenario_claims_details_gate",
+        "steps": [
+          {
+            "click": "Continue"
+          },
+          {
+            "expect": "Enter a description."
+          },
+          {
+            "alert": ""
+          },
+          {
+            "expect": "Enter an amount greater than 0."
+          }
+        ]
+      },
+      {
+        "scenario_id": "scenario_claims_approver_required",
+        "steps": [
+          {
+            "type": "Team dinner",
+            "into": "Description"
+          },
+          {
+            "type": "620",
+            "into": "Amount (EUR)"
+          },
+          {
+            "click": "Continue"
+          },
+          {
+            "click": "Continue"
+          },
+          {
+            "expect": "Claims over 500 need an approver code."
+          },
+          {
+            "alert": ""
+          }
+        ]
+      },
+      {
+        "scenario_id": "scenario_claims_no_approver_under_limit",
+        "steps": [
+          {
+            "type": "Taxi",
+            "into": "Description"
+          },
+          {
+            "type": "40",
+            "into": "Amount (EUR)"
+          },
+          {
+            "click": "Continue"
+          },
+          {
+            "expect": "Claims up to 500 EUR need no approver."
+          },
+          {
+            "click": "Continue"
+          },
+          {
+            "check": "Submit claim",
+            "is": "present"
+          }
+        ]
+      },
+      {
+        "scenario_id": "scenario_claims_back_preserves",
+        "steps": [
+          {
+            "type": "Taxi",
+            "into": "Description"
+          },
+          {
+            "type": "40",
+            "into": "Amount (EUR)"
+          },
+          {
+            "click": "Continue"
+          },
+          {
+            "click": "Back"
+          },
+          {
+            "value_of": "Description",
+            "equals": "Taxi"
+          },
+          {
+            "value_of": "Amount (EUR)",
+            "equals": "40"
+          }
+        ]
+      },
+      {
+        "scenario_id": "scenario_claims_submit_success",
+        "steps": [
+          {
+            "type": "Team dinner",
+            "into": "Description"
+          },
+          {
+            "type": "620",
+            "into": "Amount (EUR)"
+          },
+          {
+            "click": "Continue"
+          },
+          {
+            "type": "MGR-7",
+            "into": "Approver code"
+          },
+          {
+            "click": "Continue"
+          },
+          {
+            "expect": "MGR-7"
+          },
+          {
+            "click": "Submit claim"
+          },
+          {
+            "expect": "Claim submitted."
+          }
+        ]
+      },
+      {
+        "scenario_id": "scenario_claims_viewer_cannot_submit",
+        "steps": [
+          {
+            "open": "/?role=viewer"
+          },
+          {
+            "type": "Taxi",
+            "into": "Description"
+          },
+          {
+            "type": "40",
+            "into": "Amount (EUR)"
+          },
+          {
+            "click": "Continue"
+          },
+          {
+            "click": "Continue"
+          },
+          {
+            "expect": "Viewers cannot submit claims."
+          },
+          {
+            "check": "Submit claim",
+            "is": "disabled"
+          }
+        ]
+      }
+    ],
+    "expense-portal": [
+      {
+        "scenario_id": "scenario_portal_details_required",
+        "steps": [
+          {
+            "click": "New claim"
+          },
+          {
+            "click": "Next"
+          },
+          {
+            "expect": "What was it for is required."
+          },
+          {
+            "alert": ""
+          },
+          {
+            "expect": "Amount must be greater than 0."
+          }
+        ]
+      },
+      {
+        "scenario_id": "scenario_portal_approver_required",
+        "steps": [
+          {
+            "click": "New claim"
+          },
+          {
+            "type": "Client dinner",
+            "into": "What was it for"
+          },
+          {
+            "type": "420",
+            "into": "Amount (EUR)"
+          },
+          {
+            "click": "Next"
+          },
+          {
+            "type": "Meals",
+            "into": "Category"
+          },
+          {
+            "type": "2026-11-18",
+            "into": "Date of expense"
+          },
+          {
+            "click": "Next"
+          },
+          {
+            "click": "Next"
+          },
+          {
+            "expect": "Claims over 300 EUR need an approver code."
+          },
+          {
+            "alert": ""
+          }
+        ]
+      },
+      {
+        "scenario_id": "scenario_portal_submit_success",
+        "steps": [
+          {
+            "click": "New claim"
+          },
+          {
+            "type": "Taxi",
+            "into": "What was it for"
+          },
+          {
+            "type": "40",
+            "into": "Amount (EUR)"
+          },
+          {
+            "click": "Next"
+          },
+          {
+            "type": "Travel",
+            "into": "Category"
+          },
+          {
+            "type": "2026-11-18",
+            "into": "Date of expense"
+          },
+          {
+            "click": "Next"
+          },
+          {
+            "expect": "No approver needed for claims up to 300 EUR."
+          },
+          {
+            "click": "Next"
+          },
+          {
+            "click": "Yes, submit claim"
+          },
+          {
+            "expect": "Claim submitted for approval."
+          }
+        ]
+      },
+      {
+        "scenario_id": "scenario_portal_back_keeps_entries",
+        "steps": [
+          {
+            "click": "New claim"
+          },
+          {
+            "type": "Taxi",
+            "into": "What was it for"
+          },
+          {
+            "type": "40",
+            "into": "Amount (EUR)"
+          },
+          {
+            "click": "Next"
+          },
+          {
+            "click": "Back"
+          },
+          {
+            "value_of": "What was it for",
+            "equals": "Taxi"
+          },
+          {
+            "value_of": "Amount (EUR)",
+            "equals": "40"
+          }
+        ]
+      },
+      {
+        "scenario_id": "scenario_portal_withdraw_pending",
+        "steps": [
+          {
+            "click": "My claims"
+          },
+          {
+            "click": "Open C-1042"
+          },
+          {
+            "click": "More"
+          },
+          {
+            "click": "Withdraw claim"
+          },
+          {
+            "expect": "Claim C-1042 withdrawn."
+          }
+        ]
+      },
+      {
+        "scenario_id": "scenario_portal_withdraw_only_pending",
+        "steps": [
+          {
+            "click": "My claims"
+          },
+          {
+            "click": "Open C-1041"
+          },
+          {
+            "click": "More"
+          },
+          {
+            "click": "Withdraw claim"
+          },
+          {
+            "expect": "Only pending claims can be withdrawn."
+          }
+        ]
+      },
+      {
+        "scenario_id": "scenario_portal_viewer_cannot_submit",
+        "steps": [
+          {
+            "open": "/?role=viewer"
+          },
+          {
+            "click": "New claim"
+          },
+          {
+            "type": "Taxi",
+            "into": "What was it for"
+          },
+          {
+            "type": "40",
+            "into": "Amount (EUR)"
+          },
+          {
+            "click": "Next"
+          },
+          {
+            "type": "Travel",
+            "into": "Category"
+          },
+          {
+            "type": "2026-11-18",
+            "into": "Date of expense"
+          },
+          {
+            "click": "Next"
+          },
+          {
+            "click": "Next"
+          },
+          {
+            "click": "Yes, submit claim"
+          },
+          {
+            "expect": "Viewers cannot submit claims."
+          }
+        ]
+      }
+    ]
+  },
+  "original_actions": {
+    "multi-step-journey": {
+      "scenario_journey_profile_gate": 1,
+      "scenario_journey_permission_denied": 6,
+      "scenario_journey_back_preserves_profile": 4,
+      "scenario_journey_confirm_success": 7
+    },
+    "dense-form": {
+      "scenario_dense_amount_bounds": 5,
+      "scenario_dense_submit_gate": 3,
+      "scenario_dense_approver_button": 0,
+      "scenario_dense_employee_no_approve": 0,
+      "scenario_dense_attachments_empty": 0
+    },
+    "ds-claims-journey": {
+      "scenario_claims_details_gate": 1,
+      "scenario_claims_approver_required": 4,
+      "scenario_claims_no_approver_under_limit": 4,
+      "scenario_claims_back_preserves": 4,
+      "scenario_claims_submit_success": 6,
+      "scenario_claims_viewer_cannot_submit": 4
+    },
+    "expense-portal": {
+      "scenario_portal_details_required": 2,
+      "scenario_portal_approver_required": 8,
+      "scenario_portal_submit_success": 9,
+      "scenario_portal_back_keeps_entries": 5,
+      "scenario_portal_withdraw_pending": 4,
+      "scenario_portal_withdraw_only_pending": 4,
+      "scenario_portal_viewer_cannot_submit": 9
+    }
+  }
+}

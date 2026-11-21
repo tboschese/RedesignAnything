@@ -1,6 +1,6 @@
 # BENCHMARK_RUN_PLAN — 2026-11-21 v2 (judged by the tool, finer measures)
 
-**Status:** registered, **not executed** (confirmatory). Supersedes the first 2026-11-21 plan before any confirmatory trial of it.
+**Status:** registered, **not executed**; superseded before any confirmatory trial by [`BENCHMARK_RUN_PLAN_2026-11-21-v3.md`](BENCHMARK_RUN_PLAN_2026-11-21-v3.md) (a harder fixture).
 **Registered at (UTC):** 2026-11-21, before any run of this plan.
 **Registered by:** the coding agent (Claude Code) under Thiago Boschese's decision of 2026-11-21:
 "não tem que ter humano, a ferramenta tem que conseguir resolver" (no human raters; the tool must

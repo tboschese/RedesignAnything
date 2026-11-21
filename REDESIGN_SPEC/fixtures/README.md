@@ -8,6 +8,7 @@ Oracles are authored independently of any generated redesign (`ORACLE_POLICY.md`
 | `dense-form` | Dense enterprise-style form (many fields, validation, permission states) | [`dense-form/`](dense-form/) |
 | `multi-step-journey` | 3-step onboarding journey with error and permission branches | [`multi-step-journey/`](multi-step-journey/) |
 | `ds-claims-journey` | 3-step expense claim built with the fixture design system (`design-system/`); approval limit and viewer role | [`ds-claims-journey/`](ds-claims-journey/) |
+| `expense-portal` | Three screens and a four-step wizard with deliberate UX weaknesses (the harder benchmark fixture) | [`expense-portal/`](expense-portal/) |
 
 Each fixture includes:
 

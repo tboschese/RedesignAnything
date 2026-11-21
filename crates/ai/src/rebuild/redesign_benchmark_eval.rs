@@ -12,9 +12,9 @@ use serde::Serialize;
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 
-/// The registered expectations, frozen with the run plan (v2: finer measures, before any
-/// confirmatory trial).
-pub const EXPECTATIONS: &str = "REDESIGN_SPEC/benchmark/expectations/2026-11-21-v2.json";
+/// The registered expectations, frozen with the run plan (v3: finer measures and the harder
+/// expense-portal fixture, before any confirmatory trial).
+pub const EXPECTATIONS: &str = "REDESIGN_SPEC/benchmark/expectations/2026-11-21-v3.json";
 
 /// An announced error at most this far from its field counts as shown next to it.
 pub const NEAR_PX: u64 = 120;
@@ -415,7 +415,7 @@ mod tests {
     #[test]
     fn the_reference_journeys_reach_the_fixed_checks_and_give_the_baseline() {
         let e: Value = serde_json::from_slice(&std::fs::read(expectations_path()).unwrap()).unwrap();
-        for f in ["dense-form", "multi-step-journey", "ds-claims-journey"] {
+        for f in ["dense-form", "multi-step-journey", "ds-claims-journey", "expense-portal"] {
             let (checks, _) = fixture_checks(&e, f).unwrap();
             let reference = e["reference_journeys"][f].as_array().unwrap();
             for (id, fixed) in &checks {
@@ -432,7 +432,7 @@ mod tests {
     fn the_expectations_cover_every_critical_scenario_of_the_fixtures() {
         let e: Value = serde_json::from_slice(&std::fs::read(expectations_path()).unwrap()).unwrap();
         let fixtures = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../REDESIGN_SPEC/fixtures");
-        for f in ["dense-form", "multi-step-journey", "ds-claims-journey"] {
+        for f in ["dense-form", "multi-step-journey", "ds-claims-journey", "expense-portal"] {
             let (checks, _) = fixture_checks(&e, f).unwrap();
             let oracle: Value = serde_json::from_slice(&std::fs::read(fixtures.join(f).join("oracle/scenarios.json")).unwrap()).unwrap();
             for s in oracle["scenarios"].as_array().unwrap() {
