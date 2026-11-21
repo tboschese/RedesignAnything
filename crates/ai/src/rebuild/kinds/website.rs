@@ -56,7 +56,8 @@ pub fn pictured_states(ws: &Workspace) -> Vec<String> {
         out.extend(v.get("states").and_then(Value::as_array).into_iter().flatten().filter_map(|s| {
             let file = s.get("file").and_then(Value::as_str)?;
             let label = s.get("label").and_then(Value::as_str).filter(|l| !l.is_empty()).unwrap_or("a control");
-            Some(format!("{dir}/{file} ({label}, {}{width})", s.get("kind").and_then(Value::as_str).unwrap_or("menu")))
+            let typed = s.get("typed").and_then(Value::as_str).map(|t| format!(", {t:?} typed")).unwrap_or_default();
+            Some(format!("{dir}/{file} ({label}, {}{typed}{width})", s.get("kind").and_then(Value::as_str).unwrap_or("menu")))
         }));
     }
     out
@@ -205,7 +206,7 @@ impl TargetKind for WebsiteKind {
         let states = pictured_states(cx.ws);
         if !states.is_empty() {
             out.push(format!(
-                "Its menus, pop-ups and tabs were opened one at a time and photographed in capture/ (on a computer, and on a phone where its controls differ, such as a menu button): {}. Make them open and look the same way at each width.",
+                "Its menus, pop-ups and tabs were opened one at a time and photographed in capture/ (on a computer, and on a phone where its controls differ, such as a menu button): {}. Make them open and look the same way at each width. A search state pictures what showed as the word named was typed into the search field, never submitted.",
                 states.join(", ")
             ));
         }
@@ -735,7 +736,12 @@ fn states_note(cx: &CheckCx, base: &str, out: &Path, dir: &str, unknowns: &mut V
     cx.call("web_site_open", json!({"url": base, "settle_ms": 1200, "signed_in": false}))?;
     // More than the study opened, so the same controls are found even when the build orders them differently.
     let width = original.get("width").and_then(Value::as_u64).unwrap_or(1440);
-    if let Err(e) = cx.call("web_page_states_capture", json!({"output_directory": ours.display().to_string(), "max_states": 8, "width": width})) {
+    let mut params = json!({"output_directory": ours.display().to_string(), "max_states": 8, "width": width});
+    // The build's search is typed into with the word the study typed, so the pictures compare.
+    if let Some(typed) = original["states"].as_array().into_iter().flatten().find(|s| s["kind"] == "search").and_then(|s| s["typed"].as_str()) {
+        params["search_text"] = json!(typed);
+    }
+    if let Err(e) = cx.call("web_page_states_capture", params) {
         unknowns.push(format!("menus and pop-ups at {width} px couldn't be opened"));
         return Ok(Some(format!("menus and pop-ups couldn't be opened: {}", e.message)));
     }

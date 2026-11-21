@@ -95,7 +95,7 @@ impl TargetKind for RedesignKind {
         let states = website::pictured_states(cx.ws);
         if !states.is_empty() {
             out.push(format!(
-                "Observed UI states (menus, dialogs, tabs): {}. Preserve those behaviours when redesigning; do not invent states that were not observed.",
+                "Observed UI states (menus, dialogs, tabs; a search state pictures what showed as the word named was typed, never submitted): {}. Preserve those behaviours when redesigning; do not invent states that were not observed.",
                 states.join(", ")
             ));
         }
