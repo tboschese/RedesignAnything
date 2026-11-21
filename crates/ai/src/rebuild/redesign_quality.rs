@@ -320,10 +320,28 @@ pub fn playwright_check(ws: &Workspace) -> QualityCheck {
             details: json!({"path": err_path.display().to_string()}),
         };
     }
+    // The scenarios' journeys are browser tests the product ran itself, in this build: with no
+    // external report, they stand for one instead of leaving the row unverified.
+    let (ran, _) = super::redesign_journeys::fresh_results(ws);
+    if !ran.is_empty() {
+        let failed: Vec<&str> = ran.values().filter(|j| !j.passed).map(|j| j.scenario_id.as_str()).collect();
+        return QualityCheck {
+            id: "playwright".into(),
+            status: if failed.is_empty() { "pass" } else { "fail" }.into(),
+            summary: format!(
+                "no external report; {} journey(s) ran in the product's own browser on this build, {} failed{}",
+                ran.len(),
+                failed.len(),
+                if failed.is_empty() { String::new() } else { format!(": {}", failed.join(", ")) }
+            ),
+            details: json!({"source": "redesign_journeys", "journeys": ran.len(), "failed": failed}),
+        };
+    }
     QualityCheck {
         id: "playwright".into(),
         status: "not_evaluated".into(),
-        summary: "no redesign/quality/playwright-report.json; drop a report after an external run".into(),
+        summary: "no redesign/quality/playwright-report.json and no journeys run on this build (redesign_journeys_run); drop a report after an external run"
+            .into(),
         details: json!({
             "hint": "write {\"status\":\"pass\",\"failed\":0,\"passed\":N} or use playwright-error.json on failure",
             "npx_on_path": tool_available("npx"),
@@ -616,6 +634,35 @@ mod tests {
         assert_eq!(playwright_check(&ws).status, "pass");
         fs::write(dir.join("playwright-report.json"), r#"{"status":"timeout","failed":1}"#).unwrap();
         assert_eq!(playwright_check(&ws).status, "fail");
+    }
+
+    /// The product's own journeys on this build stand for a browser test run when nobody dropped an
+    /// external report; an external report still decides, and an older build's journeys don't count.
+    #[test]
+    fn journeys_run_on_this_build_stand_for_the_browser_test_report() {
+        use crate::rebuild::redesign_journeys as journeys;
+        let d = tempfile::tempdir().unwrap();
+        let ws = Workspace::create(d.path(), "Q", "q", TargetRef::None).unwrap();
+        assert_eq!(playwright_check(&ws).status, "not_evaluated");
+        fs::create_dir_all(ws.app_dir().join("dist")).unwrap();
+        fs::write(ws.app_dir().join("dist/index.html"), "<p>x</p>").unwrap();
+        let ran = |id: &str, passed: bool| journeys::result_of(id, Ok(json!({"passed": passed, "steps": []})));
+        let write = |results: Vec<journeys::JourneyResult>| {
+            journeys::write_report(&ws, &journeys::Report { built: journeys::built_fingerprint(&ws).unwrap(), width: 1440, journeys: results }).unwrap()
+        };
+        write(vec![ran("search", true), ran("donate", true)]);
+        let q = playwright_check(&ws);
+        assert_eq!(q.status, "pass", "{q:?}");
+        assert!(q.summary.contains("2 journey(s) ran"), "{}", q.summary);
+        write(vec![ran("search", true), ran("donate", false)]);
+        let q = playwright_check(&ws);
+        assert!(q.status == "fail" && q.summary.contains("donate"), "{q:?}");
+        let dir = ensure_quality_dir(&ws).unwrap();
+        fs::write(dir.join("playwright-report.json"), r#"{"status":"pass","failed":0,"passed":3}"#).unwrap();
+        assert_eq!(playwright_check(&ws).status, "pass", "an external report decides");
+        fs::remove_file(dir.join("playwright-report.json")).unwrap();
+        fs::write(ws.app_dir().join("dist/index.html"), "<p>built again</p>").unwrap();
+        assert_eq!(playwright_check(&ws).status, "not_evaluated", "another build's journeys say nothing");
     }
 
     #[test]
