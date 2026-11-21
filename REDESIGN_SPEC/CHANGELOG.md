@@ -1,5 +1,9 @@
 # Changelog — Redesign Anything specification
 
+## Documentation 1.4.11 — 2026-11-21
+
+- `prototype_basics` (advisory) also names text too faint against its background, measured by `web_site_capture` (`a11y.low_contrast`). See `docs/PR16_LIKENESS.md`. No contract or schema change; nothing claims WCAG conformance.
+
 ## Documentation 1.4.10 — 2026-11-21
 
 - `CONTRACTS.md` §7: a scenario that an approved decision replaces can be retired in a project with the operator's approval (`redesign_scenario_retire`). It is listed as retired and is not in `critical_scenarios_total`; a project with no scenario left is still not Prototype Ready.
