@@ -200,7 +200,13 @@ pub fn list_decisions(ws: &Workspace) -> Result<Vec<DesignDecision>, ToolError> 
 }
 
 /// Choosing anything other than keep_as_is (or changing a prior approved choice) requires approval.
+/// `change` says, in a sentence, what the choice changes in the prototype; it becomes the start of
+/// the rationale, which the builder's brief quotes, since an option's own text is generic advice.
 pub fn choose_option(ws: &Workspace, decision_id: &str, option_id: &str) -> Result<DesignDecision, ToolError> {
+    choose_option_saying(ws, decision_id, option_id, None)
+}
+
+pub fn choose_option_saying(ws: &Workspace, decision_id: &str, option_id: &str, change: Option<&str>) -> Result<DesignDecision, ToolError> {
     let mut dec = load_decision(ws, decision_id)?;
     if !dec.options.iter().any(|o| o.id == option_id) {
         return Err(ToolError::invalid(format!("option {option_id} not in decision")));
@@ -214,6 +220,9 @@ pub fn choose_option(ws: &Workspace, decision_id: &str, option_id: &str) -> Resu
     } else {
         dec.status = "proposed".into();
         dec.rationale = "keep_as_is selected; still recorded as proposed until acknowledged.".into();
+    }
+    if let Some(change) = change.map(str::trim).filter(|c| !c.is_empty()) {
+        dec.rationale = format!("{change} ({})", dec.rationale.trim_end_matches('.'));
     }
     save_decision(ws, &dec)?;
     Ok(dec)
