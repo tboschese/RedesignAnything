@@ -922,6 +922,25 @@ pub fn pixel_diff(a: &Image, b: &Image, tolerance: u8) -> Value {
 }
 
 /// The top-left `w`×`h` part of an image (clamped to its size).
+/// The share of a picture's height made of bands (`band_px` tall) with one flat colour. A page that
+/// draws only what is in view comes out like that when it is photographed beyond the window.
+pub fn flat_band_share(img: &Image, band_px: u32) -> f64 {
+    let (w, h, band) = (img.width as usize, img.height as usize, band_px.max(1) as usize);
+    if w == 0 || h == 0 {
+        return 1.0;
+    }
+    let (mut bands, mut flat) = (0usize, 0usize);
+    for top in (0..h).step_by(band) {
+        let rows = &img.rgba[top * w * 4..(top + band).min(h) * w * 4];
+        let first = &rows[..4];
+        // Every 8th pixel is enough to tell a drawn band from a flat one.
+        let same = rows.as_chunks::<4>().0.iter().step_by(8).all(|px| px.iter().zip(first).all(|(a, b)| a.abs_diff(*b) <= 3));
+        bands += 1;
+        flat += usize::from(same);
+    }
+    flat as f64 / bands as f64
+}
+
 pub fn crop(img: &Image, w: u32, h: u32) -> Image {
     let (w, h) = (w.min(img.width), h.min(img.height));
     let mut rgba = Vec::with_capacity((w as usize).saturating_mul(h as usize).saturating_mul(4));
@@ -1528,6 +1547,24 @@ mod tests {
             assert!(left[0] > 150 && left[2] < 90, "{name}: the left half stays red ({left:?})");
         }
         assert!(decode_picture(b"not a picture").is_err_and(|e| e.code == ErrorCode::GarbledOutput));
+    }
+
+    #[test]
+    fn a_picture_left_blank_below_the_window_has_more_flat_bands_than_one_drawn_to_the_end() {
+        use super::{Image, flat_band_share};
+        // Vertical stripes down to `drawn` rows, white below.
+        let page = |drawn: u32| {
+            let (w, h) = (128u32, 640u32);
+            let mut rgba = vec![255u8; (w * h * 4) as usize];
+            for y in 0..drawn {
+                for x in (0..w).filter(|x| (x / 8) % 2 == 0) {
+                    let at = ((y * w + x) * 4) as usize;
+                    rgba[at..at + 3].copy_from_slice(&[0, 0, 0]);
+                }
+            }
+            Image { width: w, height: h, rgba }
+        };
+        assert!(flat_band_share(&page(128), 64) > flat_band_share(&page(640), 64));
     }
 
     #[test]

@@ -1370,3 +1370,17 @@ identity traits (`redesign_identity_record`): kept traits constrain style and mu
 that look; `identity_evolution` warns when nothing evolves. Neither changes Ready. A single
 max-radius check cannot tell a pill search field from a square card, so don't encode a radius
 cap the original itself breaks.
+
+**One tall screenshot of a page that draws only what is in view is empty below the window.**
+archive.org's home lists its collections in a virtualised scroller: `captureBeyondViewport` with a
+full-height clip showed the first window and left 65% of the picture's height flat. `web_site_capture`
+now takes that picture again one window at a time while scrolling, waits for the pictures in each
+window (in shadow roots too), and stitches the bands; what doesn't scroll with the page is shown
+once. It does so only when the tall picture has large flat bands, so other pages are photographed as
+before.
+
+**Crop a picture with a tool whose origin you know before you describe what is at its top.**
+While chasing the bug above, `sips -c` was used to cut "the top" of tall screenshots for viewing. It
+crops around the centre, so a correct picture looked shifted by hundreds of pixels and "blank at the
+top", and that wrong reading went into an issue and two descriptions before a second method showed it.
+Check a reading of a picture another way (a pixel at a known place, a second tool) before writing it down.
