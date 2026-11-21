@@ -569,7 +569,7 @@ impl AgentAdapter for ClaudeCode {
                     p.failure = Some(failure);
                     let why = v.pointer("/message/content").map(content_text).unwrap_or_else(|| code.to_string());
                     let (message, hint) = claude_code_failure_in(&why, self.folder.as_deref());
-                    let hint = plan_limit.map(|(kind, at)| plan_limit_fix(&kind, at, unix_now())).or(hint);
+                    let hint = plan_limit.map(|(kind, at)| plan_limit_fix(&kind, at, unix_now(), &why)).or(hint);
                     let remediation = hint.or_else(|| match failure.kind {
                         FailureKind::Authentication => self.sign_in_fix(),
                         FailureKind::Billing => Some("Check the account's credits, plan and spending limit before trying again.".into()),
@@ -635,7 +635,7 @@ impl AgentAdapter for ClaudeCode {
                     let (message, remediation) = claude_code_failure_in(&why, self.folder.as_deref());
                     // The run keeps the turn's last error: a used-up plan limit keeps saying when it resets.
                     let plan_limit = p.failure.filter(|f| f.kind == FailureKind::UsageLimit).and(p.plan_limit.clone());
-                    let remediation = plan_limit.map(|(kind, at)| plan_limit_fix(&kind, at, unix_now())).or(remediation);
+                    let remediation = plan_limit.map(|(kind, at)| plan_limit_fix(&kind, at, unix_now(), &why)).or(remediation);
                     out.push(AgentEvent::Error { message, remediation, log: None });
                 }
             }
