@@ -207,7 +207,8 @@ fn summary(ws: &Workspace) -> Value {
 
 /// Whether the variants are as alike to the original as their modes say: on a page, a variant that
 /// changes less must not score lower than one that changes more. `(mode, page → overall)` in, the
-/// pairs out of order out. Needs no limit of our own: the variants share one original.
+/// pairs out of order out. Needs no limit of our own: the variants share one original. Scores are
+/// reported in whole points, so two that round to the same point are a tie, not an order.
 pub fn out_of_order(scores: &[(RedesignMode, Vec<(String, f64)>)]) -> Vec<String> {
     let rank = |m: RedesignMode| RedesignMode::ALL.iter().position(|x| *x == m);
     let mut out = Vec::new();
@@ -217,9 +218,9 @@ pub fn out_of_order(scores: &[(RedesignMode, Vec<(String, f64)>)]) -> Vec<String
                 if rank(*less) <= rank(*more) { (less, less_pages, more, more_pages) } else { (more, more_pages, less, less_pages) };
             for (page, a) in less_pages {
                 if let Some((_, b)) = more_pages.iter().find(|(p, _)| p == page)
-                    && a < b
+                    && a.round() < b.round()
                 {
-                    out.push(format!("{page}: `{}` is less like the original ({a:.0}) than `{}` ({b:.0})", less.as_str(), more.as_str()));
+                    out.push(format!("{page}: `{}` is less like the original ({a:.1}) than `{}` ({b:.1})", less.as_str(), more.as_str()));
                 }
             }
         }
@@ -394,6 +395,11 @@ mod tests {
         // Pages only one of them measured say nothing.
         let apart = [(RedesignMode::Refresh, page(10.0)), (RedesignMode::Reimagine, vec![("details".to_string(), 90.0)])];
         assert!(out_of_order(&apart).is_empty());
+        // Scores are told in whole points: two that round to the same point are a tie.
+        let tied = [(RedesignMode::Refresh, page(36.0)), (RedesignMode::Redesign, page(36.4))];
+        assert!(out_of_order(&tied).is_empty(), "{:?}", out_of_order(&tied));
+        let a_point_apart = [(RedesignMode::Refresh, page(36.0)), (RedesignMode::Redesign, page(37.2))];
+        assert_eq!(out_of_order(&a_point_apart).len(), 1);
     }
 
     #[cfg(unix)]
