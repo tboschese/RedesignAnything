@@ -2265,7 +2265,7 @@ body{margin:0} .d{display:none} @media (min-width:800px){.d{display:block} .p{di
 <script>
 const n = document.getElementById('n'), s = document.getElementById('s');
 n.oninput = () => { s.disabled = !n.value.trim(); };
-document.getElementById('v').onclick = () => { document.getElementById('e').textContent = n.value.trim() ? '' : 'Enter your name.'; };
+document.getElementById('v').onclick = () => { document.getElementById('e').textContent = n.value.trim() ? '' : 'Enter your name.'; n.setAttribute('aria-invalid', String(!n.value.trim())); };
 </script></body></html>"#,
         );
         let cli = || crate::CallOptions::new(crate::Caller::Cli).with_consent(crate::Consent::Granted);
@@ -2277,6 +2277,10 @@ document.getElementById('v').onclick = () => { document.getElementById('e').text
             {"type": "Ada", "into": "Name"}, {"check": "Submit claim", "is": "enabled"}, {"value_of": "Name", "equals": "ada"}
         ]));
         assert_eq!(good["passed"], true, "{good}");
+        // The announced error shows close to the field marked invalid: its gap is small, and reported.
+        let near = run(json!([{"click": "Validate"}, {"alert": "Enter your name."}]));
+        let gap = near["steps"][1]["alert_gap_px"].as_u64();
+        assert!(gap.is_some_and(|g| g < 120), "{near}");
         for (steps, why) in [
             (json!([{"check": "Submit claim", "is": "enabled"}]), "disabled until the name is typed"),
             (json!([{"check": "Approve", "is": "present"}]), "there is no Approve"),

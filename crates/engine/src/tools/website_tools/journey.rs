@@ -101,7 +101,7 @@ pub(super) fn tool() -> ToolSpec {
     spec(
         "web_site_journey_run",
         "Run a visitor's journey",
-        "On the open website, do a visitor's steps in order and say which one failed: {\"click\": name} clicks the control with that visible or accessible name, {\"type\": text, \"into\": field} types into the field with that label, placeholder or name (or chooses that option of a drop-down, or sets a date, time, colour or range field to it, a date written 2026-11-20), {\"press\": key} presses Enter, Escape, Tab, Space or an arrow key, {\"open\": path} loads that address on the same site from scratch, and {\"expect\": text} waits up to wait_ms for that text to show, {\"check\": name, \"is\": state} for that control or field to be enabled, disabled, present, absent or unusable, {\"value_of\": field, \"equals\": text} for that field to hold the text (compared in the page; its content is never read back), and {\"alert\": text} for an alert or live region to announce it (empty: anything). Controls inside open shadow roots are found; ones in frames are not. A click is a real pointer click at the control's centre, so a covered control fails the step. The page is loaded again first unless restart is false. With output_directory, a picture of the page at the end is saved as end.png. Clicking and typing run the site's own code, so it needs your approval.",
+        "On the open website, do a visitor's steps in order and say which one failed: {\"click\": name} clicks the control with that visible or accessible name, {\"type\": text, \"into\": field} types into the field with that label, placeholder or name (or chooses that option of a drop-down, or sets a date, time, colour or range field to it, a date written 2026-11-20), {\"press\": key} presses Enter, Escape, Tab, Space or an arrow key, {\"open\": path} loads that address on the same site from scratch, and {\"expect\": text} waits up to wait_ms for that text to show, {\"check\": name, \"is\": state} for that control or field to be enabled, disabled, present, absent or unusable, {\"value_of\": field, \"equals\": text} for that field to hold the text (compared in the page; its content is never read back), and {\"alert\": text} for an alert or live region to announce it (empty: anything); a passed alert step also says how many pixels it shows from the field marked invalid, or else the focused field (`alert_gap_px`). Controls inside open shadow roots are found; ones in frames are not. A click is a real pointer click at the control's centre, so a covered control fails the step. The page is loaded again first unless restart is false. With output_directory, a picture of the page at the end is saved as end.png. Clicking and typing run the site's own code, so it needs your approval.",
         "Click and type through the site the way a visitor would, and check what shows.",
         Toolset::Browser,
         Effects::EVIDENCE.union(Effects::WRITES_FILESYSTEM).union(Effects::EXECUTES_FOREIGN_CODE).union(Effects::ACCESSES_NETWORK),
@@ -212,6 +212,25 @@ const ALERT_JS: &str = r#"(() => {
   const want = norm(__TEXT__);
   return all(document, []).some(el => el.matches('[role="alert"], [role="alertdialog"], [role="status"], [aria-live="assertive"], [aria-live="polite"], output')
     && shown(el) && norm(el.innerText) !== '' && norm(el.innerText).includes(want));
+})()"#;
+
+/// Where the alert announcing `__TEXT__` is against the field it is about: the field marked
+/// `aria-invalid="true"` (the nearest one when several are) or else the focused field. The gap is
+/// in CSS pixels between the two boxes, 0 when they touch. `{field: false}` when there is none.
+const ALERT_NEAR_JS: &str = r#"(() => {
+  __DEEP__
+  const want = norm(__TEXT__);
+  const els = all(document, []);
+  const alert = els.find(el => el.matches('[role="alert"], [role="alertdialog"], [role="status"], [aria-live="assertive"], [aria-live="polite"], output')
+    && shown(el) && norm(el.innerText) !== '' && norm(el.innerText).includes(want));
+  if (!alert) return {field: false};
+  const a = alert.getBoundingClientRect();
+  const gap = r => Math.round(Math.hypot(Math.max(0, r.left - a.right, a.left - r.right), Math.max(0, r.top - a.bottom, a.top - r.bottom)));
+  let fields = els.filter(el => el.getAttribute('aria-invalid') === 'true' && shown(el));
+  if (!fields.length) { let f = document.activeElement; while (f && f.shadowRoot && f.shadowRoot.activeElement) f = f.shadowRoot.activeElement;
+    if (f && f.matches && f.matches('input, select, textarea')) fields = [f]; }
+  if (!fields.length) return {field: false};
+  return {field: true, gap: Math.min(...fields.map(f => gap(f.getBoundingClientRect())))};
 })()"#;
 
 /// Whether `__TEXT__` shows on the page, open shadow roots included.
@@ -483,7 +502,15 @@ fn web_site_journey_run(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, 
             }
             ctx.report(Some(n as f32 / p.steps.len() as f32), format!("Step {} of {}…", n + 1, p.steps.len()));
             let done = run_step(&mut client, step, &start, &p, &dl)?;
-            rows.push(json!({"step": step, "ok": done.is_ok(), "note": match &done { Ok(note) | Err(note) => note }}));
+            let mut row = json!({"step": step, "ok": done.is_ok(), "note": match &done { Ok(note) | Err(note) => note }});
+            // An announced error: how far it shows from the field it is about.
+            if let (Step::Alert { alert }, Ok(_)) = (step, &done)
+                && let Ok(near) = eval(&mut client, &script(ALERT_NEAR_JS, "", alert), &dl)
+                && near["field"] == true
+            {
+                row["alert_gap_px"] = near["gap"].clone();
+            }
+            rows.push(row);
             if done.is_err() {
                 failed_at = Some(n);
                 break;
