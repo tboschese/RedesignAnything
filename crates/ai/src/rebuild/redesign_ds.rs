@@ -480,6 +480,20 @@ mod tests {
         assert_eq!(loaded.source_digest, reg.source_digest);
     }
 
+    /// The benchmark's design-system fixture app is built only from the package: its sources pass
+    /// the strict check, so an arm's conformance is measured against a conformant original.
+    #[test]
+    fn the_design_system_fixture_app_conforms_to_the_package() {
+        let d = tempfile::tempdir().unwrap();
+        let ws = Workspace::create(d.path(), "DsDemo", "ds", TargetRef::None).unwrap();
+        let reg = ingest_package(&ws, &fixture_ds(), "strict", false).unwrap();
+        let app = fixture_ds().join("../ds-claims-journey/app/src");
+        let sources: Vec<(String, String)> =
+            ["App.tsx", "main.tsx"].iter().map(|f| (format!("app/src/{f}"), fs::read_to_string(app.join(f)).expect("fixture app source"))).collect();
+        let report = check_sources(&reg, &sources, Some("1.2.0"));
+        assert_eq!(report.status, "pass", "{report:?}");
+    }
+
     #[test]
     fn real_import_passes_fake_fails() {
         let d = tempfile::tempdir().unwrap();

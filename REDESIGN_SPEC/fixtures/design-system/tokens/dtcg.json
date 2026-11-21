@@ -5,12 +5,42 @@
       "primary": {
         "$type": "color",
         "$value": "#0B5FFF"
+      },
+      "on": {
+        "$type": "color",
+        "$value": "#FFFFFF"
       }
     },
     "neutral": {
       "900": {
         "$type": "color",
         "$value": "#111827"
+      },
+      "600": {
+        "$type": "color",
+        "$value": "#4B5563"
+      },
+      "400": {
+        "$type": "color",
+        "$value": "#9CA3AF"
+      },
+      "100": {
+        "$type": "color",
+        "$value": "#F3F4F6"
+      }
+    },
+    "surface": {
+      "$type": "color",
+      "$value": "#FFFFFF"
+    },
+    "feedback": {
+      "danger": {
+        "$type": "color",
+        "$value": "#B42318"
+      },
+      "success": {
+        "$type": "color",
+        "$value": "#067647"
       }
     }
   },
@@ -22,6 +52,14 @@
     "md": {
       "$type": "dimension",
       "$value": "16px"
+    },
+    "xs": {
+      "$type": "dimension",
+      "$value": "4px"
+    },
+    "lg": {
+      "$type": "dimension",
+      "$value": "24px"
     }
   }
 }

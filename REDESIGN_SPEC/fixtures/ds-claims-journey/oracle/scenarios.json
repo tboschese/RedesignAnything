@@ -1,0 +1,156 @@
+{
+  "fixture_id": "ds-claims-journey",
+  "oracle_author": "Coding agent (Claude Code), by replay in Craft Anything's browser; human confirmation by Thiago Boschese pending",
+  "captured_at": "2026-11-21T15:00:00Z",
+  "oracle_type": "observed_verified",
+  "human_confirmed": false,
+  "environment_fingerprint": "React 18.3.1 + Vite 5.4.11 build of app/, @fixture/acme-ds 1.2.0 linked from ../design-system; served by vite preview on 127.0.0.1:8767; no backend",
+  "coverage_scope": "The six rules in MANIFEST.md, one replay each, desktop width; roles employee and viewer",
+  "unknowns": [
+    "What happens to a claim after Submit (approval workflow, email)",
+    "Currency other than EUR",
+    "Validation of the approver code itself"
+  ],
+  "scenarios": [
+    {
+      "id": "scenario_claims_details_gate",
+      "capability_id": "cap_claims_details_validation",
+      "profile": "employee",
+      "fixture_id": "ds-claims-journey",
+      "given": [
+        "On Claim details with empty fields"
+      ],
+      "when": [
+        "Click Continue"
+      ],
+      "then": [
+        "Error 'Enter a description.'",
+        "Error 'Enter an amount greater than 0.'",
+        "Remain on Claim details"
+      ],
+      "assertion_source": "observed",
+      "evidence_ids": [
+        "ev_scenario_claims_details_gate_replay"
+      ],
+      "safe_execution_target": "generated_mock",
+      "executable": true
+    },
+    {
+      "id": "scenario_claims_approver_required",
+      "capability_id": "cap_claims_approval_limit",
+      "profile": "employee",
+      "fixture_id": "ds-claims-journey",
+      "given": [
+        "Description 'Team dinner', amount 620",
+        "On Approval"
+      ],
+      "when": [
+        "Click Continue with no approver code"
+      ],
+      "then": [
+        "Error 'Claims over 500 need an approver code.'",
+        "Remain on Approval"
+      ],
+      "assertion_source": "observed",
+      "evidence_ids": [
+        "ev_scenario_claims_approver_required_replay"
+      ],
+      "safe_execution_target": "generated_mock",
+      "executable": true
+    },
+    {
+      "id": "scenario_claims_no_approver_under_limit",
+      "capability_id": "cap_claims_approval_limit",
+      "profile": "employee",
+      "fixture_id": "ds-claims-journey",
+      "given": [
+        "Description 'Taxi', amount 40"
+      ],
+      "when": [
+        "Continue to Approval",
+        "Click Continue"
+      ],
+      "then": [
+        "'Claims up to 500 EUR need no approver.' shows",
+        "Review shows"
+      ],
+      "assertion_source": "observed",
+      "evidence_ids": [
+        "ev_scenario_claims_no_approver_under_limit_replay"
+      ],
+      "safe_execution_target": "generated_mock",
+      "executable": true
+    },
+    {
+      "id": "scenario_claims_back_preserves",
+      "capability_id": "cap_claims_back_preserve",
+      "profile": "employee",
+      "fixture_id": "ds-claims-journey",
+      "given": [
+        "Description 'Taxi', amount 40",
+        "On Approval"
+      ],
+      "when": [
+        "Click Back",
+        "Click Continue"
+      ],
+      "then": [
+        "Claim details shows",
+        "Continuing again shows 'Amount: 40.00 EUR' without re-entering anything"
+      ],
+      "assertion_source": "observed",
+      "evidence_ids": [
+        "ev_scenario_claims_back_preserves_replay"
+      ],
+      "safe_execution_target": "generated_mock",
+      "executable": true
+    },
+    {
+      "id": "scenario_claims_submit_success",
+      "capability_id": "cap_claims_submit",
+      "profile": "employee",
+      "fixture_id": "ds-claims-journey",
+      "given": [
+        "Description 'Team dinner', amount 620, approver code 'MGR-7'",
+        "On Review"
+      ],
+      "when": [
+        "Click Submit claim"
+      ],
+      "then": [
+        "Review lists 'MGR-7' before submitting",
+        "'Claim submitted.' shows"
+      ],
+      "assertion_source": "observed",
+      "evidence_ids": [
+        "ev_scenario_claims_submit_success_replay"
+      ],
+      "safe_execution_target": "generated_mock",
+      "executable": true
+    },
+    {
+      "id": "scenario_claims_viewer_cannot_submit",
+      "capability_id": "cap_claims_permission",
+      "profile": "viewer",
+      "fixture_id": "ds-claims-journey",
+      "given": [
+        "Open /?role=viewer",
+        "Description 'Taxi', amount 40",
+        "On Review"
+      ],
+      "when": [
+        "Try Submit claim"
+      ],
+      "then": [
+        "'Viewers cannot submit claims.' shows",
+        "Submit claim is disabled"
+      ],
+      "assertion_source": "observed",
+      "evidence_ids": [
+        "ev_scenario_claims_viewer_cannot_submit_replay"
+      ],
+      "safe_execution_target": "generated_mock",
+      "executable": true
+    }
+  ]
+}
