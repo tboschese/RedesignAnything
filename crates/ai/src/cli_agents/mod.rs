@@ -1656,6 +1656,23 @@ mod tests {
         assert_eq!(p.failure, Some(TurnFailure::new(FailureKind::ToolsUnavailable)));
     }
 
+    /// A used-up Codex plan was retried as an ordinary exit, failing again; it stops at once and
+    /// says when Codex can be used again.
+    #[test]
+    fn a_used_up_codex_usage_limit_is_not_retried_and_says_when_it_returns() {
+        let mut p = StreamParser::new(adapter_for("codex"));
+        let failed = json!({"type":"turn.failed","error":{"message":"You’ve hit your usage limit. Upgrade to Pro, visit the settings to purchase more credits or try again at 9:00 AM."}});
+        let events = p.line(&failed.to_string());
+        assert_eq!(p.failure, Some(TurnFailure::new(FailureKind::UsageLimit)));
+        assert!(!p.failure.unwrap().retryable());
+        let [AgentEvent::Error { remediation: Some(fix), .. }] = events.as_slice() else { panic!("{events:?}") };
+        assert!(fix.contains("usage limit is used up") && fix.contains("again at 9:00 AM"), "{fix}");
+
+        let mut p = StreamParser::new(adapter_for("codex"));
+        p.line(&json!({"type":"turn.failed","error":{"message":"stream disconnected before completion"}}).to_string());
+        assert!(p.failure.is_none(), "another failure is left to the process exit, as before");
+    }
+
     /// #1919: a used-up weekly limit was retried as a per-minute rate limit, failing each time.
     #[test]
     fn a_used_up_claude_plan_limit_is_not_retried_and_says_when_it_resets() {

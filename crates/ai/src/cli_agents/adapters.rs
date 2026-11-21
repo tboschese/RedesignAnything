@@ -1061,12 +1061,38 @@ impl AgentAdapter for Codex {
                 ]
                 .iter()
                 .any(|phrase| lower.contains(phrase));
-                out.push(AgentEvent::Error { message: format!("Codex: {m}"), remediation: if auth { self.sign_in_fix() } else { None }, log: None });
+                // A used-up plan comes back in hours: trying again before then only fails again.
+                let used_up = lower.contains("usage limit");
+                if used_up {
+                    p.failure = Some(TurnFailure::new(FailureKind::UsageLimit));
+                }
+                let remediation = if auth {
+                    self.sign_in_fix()
+                } else if used_up {
+                    Some(codex_usage_limit_fix(m))
+                } else {
+                    None
+                };
+                out.push(AgentEvent::Error { message: format!("Codex: {m}"), remediation, log: None });
             }
             _ => {}
         }
         out
     }
+}
+
+/// What to do about Codex's used-up usage limit, with the time Codex gave when it gave one.
+fn codex_usage_limit_fix(message: &str) -> String {
+    let lower = message.to_ascii_lowercase();
+    let when = lower
+        .find("try again at ")
+        .map(|i| &message[i + "try again at ".len()..])
+        .map(|rest| rest.split(['.', '\n']).next().unwrap_or(rest).trim())
+        .filter(|at| !at.is_empty() && at.len() <= 40)
+        .map_or(String::new(), |at| format!(" Codex says it can be used again at {at}."));
+    format!(
+        "Codex's usage limit is used up, so the build stopped instead of trying again.{when} Press Try again then, or choose another AI to build in Settings → AI."
+    )
 }
 
 /// The models `codex debug models` lists for people to pick (`visibility: "list"`), in its own
