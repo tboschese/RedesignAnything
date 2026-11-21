@@ -15,4 +15,6 @@ The stored ids `refresh`, `redesign` and `reimagine` come from `REDESIGN_SPEC/CO
 | Redesign journeys | `redesign` | Used | A plain description. A web search found it only as a service description. |
 | New flows | `reimagine` | Used | A plain description. A web search found it only as generic wording. |
 
+**Confirmed by the operator:** on 2026-11-20 the operator confirmed the three labels in use (Organize screens, Redesign journeys, New flows). That is a choice of wording, not trademark clearance.
+
 **How it was checked:** general web searches on 2026-11-20. The USPTO, EUIPO or TMview, and WIPO Global Brand Database were **not** searched directly; whoever ships these labels in a UI runs those searches and updates this table.
