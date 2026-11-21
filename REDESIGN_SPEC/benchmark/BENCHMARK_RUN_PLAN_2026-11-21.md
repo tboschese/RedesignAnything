@@ -1,6 +1,6 @@
 # BENCHMARK_RUN_PLAN — 2026-11-21 (judged by the tool)
 
-**Status:** registered, **not executed**.
+**Status:** registered, **not executed**; superseded before any confirmatory trial by [`BENCHMARK_RUN_PLAN_2026-11-21-v2.md`](BENCHMARK_RUN_PLAN_2026-11-21-v2.md) (its rubric saturated in the exploratory run).
 **Registered at (UTC):** 2026-11-21, before any run of this plan.
 **Registered by:** the coding agent (Claude Code) under Thiago Boschese's decision of 2026-11-21:
 "não tem que ter humano, a ferramenta tem que conseguir resolver" (no human raters; the tool must
