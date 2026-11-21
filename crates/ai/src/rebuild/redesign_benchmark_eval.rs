@@ -12,8 +12,12 @@ use serde::Serialize;
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 
-/// The registered expectations, frozen with the run plan.
-pub const EXPECTATIONS: &str = "REDESIGN_SPEC/benchmark/expectations/2026-11-21.json";
+/// The registered expectations, frozen with the run plan (v2: finer measures, before any
+/// confirmatory trial).
+pub const EXPECTATIONS: &str = "REDESIGN_SPEC/benchmark/expectations/2026-11-21-v2.json";
+
+/// An announced error at most this far from its field counts as shown next to it.
+pub const NEAR_PX: u64 = 120;
 
 /// The expectations file in this checkout.
 pub fn expectations_path() -> PathBuf {
@@ -130,7 +134,8 @@ pub fn page_measures(capture: &Value) -> PageMeasures {
     PageMeasures { fits_phone, unnamed_controls: n("/a11y/unnamed_controls").unwrap_or(0), keyboard_reach, focus_visible, faint }
 }
 
-/// The plan's rubric for one trial, each dimension 1–5.
+/// The plan's rubric for one trial, each dimension 1–5. D6–D8 are left out when the fixture gives
+/// nothing to measure them on, and the mean is over the dimensions measured.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Rubric {
     pub d1_task_success: f64,
@@ -138,7 +143,67 @@ pub struct Rubric {
     pub d3_fits_the_screen: f64,
     pub d4_consistency: f64,
     pub d5_keyboard_and_contrast: f64,
+    pub d6_interaction_cost: Option<f64>,
+    pub d7_main_action_in_first_view: Option<f64>,
+    pub d8_error_next_to_its_field: Option<f64>,
     pub mean: f64,
+}
+
+/// The finer measures of v2, each 1–5 or None when not measurable on this fixture.
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+pub struct Finer {
+    pub d6: Option<f64>,
+    pub d7: Option<f64>,
+    pub d8: Option<f64>,
+}
+
+/// The user actions of a journey: clicks, typing and key presses.
+pub fn actions(steps: &[Value]) -> usize {
+    steps.iter().filter(|s| ["click", "type", "press"].iter().any(|k| s.get(*k).is_some())).count()
+}
+
+/// D6 for one scenario: 3 when it takes the original's number of actions, 5 at half or fewer, 1 at
+/// twice or more, on a log scale.
+pub fn cost_score(original: usize, arm: usize) -> f64 {
+    if arm == 0 {
+        return 5.0;
+    }
+    (3.0 + 2.0 * (original as f64 / arm as f64).log2()).clamp(1.0, 5.0)
+}
+
+/// D6: the mean cost score over the scenarios that need actions on the original; a scenario that
+/// failed scores 1.
+pub fn interaction_cost(passed: &[(String, bool)], journeys: &[(String, Vec<Value>)], original: &serde_json::Map<String, Value>) -> Option<f64> {
+    mean(passed.iter().filter_map(|(id, ok)| {
+        let base = original.get(id)?.as_u64().filter(|n| *n > 0)? as usize;
+        let steps = journeys.iter().find(|(j, _)| j == id).map(|(_, s)| s);
+        Some(match (ok, steps) {
+            (true, Some(steps)) => cost_score(base, actions(steps)),
+            _ => 1.0,
+        })
+    }))
+}
+
+/// D7: 1 + 4 · the share of captured pages × widths (390 and 1440) whose first window shows the
+/// main action.
+pub fn main_action_in_first_view(captures: &[Value], name: &str) -> Option<f64> {
+    let want = norm(name);
+    let seen: Vec<bool> = captures
+        .iter()
+        .flat_map(|c| c["layouts"].as_array().cloned().unwrap_or_default())
+        .filter(|l| matches!(l["width"].as_u64(), Some(390 | 1440)))
+        .filter_map(|l| l["first_view_controls"].as_array().map(|names| names.iter().filter_map(Value::as_str).any(|n| norm(n) == want)))
+        .collect();
+    (!seen.is_empty()).then(|| 1.0 + 4.0 * seen.iter().filter(|s| **s).count() as f64 / seen.len() as f64)
+}
+
+/// D8: 1 + 4 · the share of announced errors in the field-error scenarios shown within
+/// [`NEAR_PX`] of their field. `rows` are the journey result rows of those scenarios; an alert with
+/// no field to measure against is not next to one.
+pub fn error_next_to_field(rows: &[Value]) -> Option<f64> {
+    let near: Vec<bool> =
+        rows.iter().filter(|r| r["ok"] == true && r["step"].get("alert").is_some()).map(|r| r["alert_gap_px"].as_u64().is_some_and(|g| g <= NEAR_PX)).collect();
+    (!near.is_empty()).then(|| 1.0 + 4.0 * near.iter().filter(|n| **n).count() as f64 / near.len() as f64)
 }
 
 fn mean(xs: impl Iterator<Item = f64>) -> Option<f64> {
@@ -150,7 +215,7 @@ fn mean(xs: impl Iterator<Item = f64>) -> Option<f64> {
 /// scenario and whether it passed; `ds_status` is the design-system check's status for the DS
 /// fixture, None for the others. A measure no page recorded counts as its best value, and the
 /// report says which ones were missing.
-pub fn rubric(passed: &[(String, bool)], error_scenarios: &[String], pages: &[PageMeasures], ds_status: Option<&str>) -> Rubric {
+pub fn rubric(passed: &[(String, bool)], error_scenarios: &[String], pages: &[PageMeasures], ds_status: Option<&str>, finer: &Finer) -> Rubric {
     let rate = |items: Vec<bool>| if items.is_empty() { 1.0 } else { items.iter().filter(|p| **p).count() as f64 / items.len() as f64 };
     let d1 = 1.0 + 4.0 * rate(passed.iter().map(|(_, p)| *p).collect());
     let d2 = 1.0 + 4.0 * rate(passed.iter().filter(|(id, _)| error_scenarios.contains(id)).map(|(_, p)| *p).collect());
@@ -167,13 +232,18 @@ pub fn rubric(passed: &[(String, bool)], error_scenarios: &[String], pages: &[Pa
     let f = mean(pages.iter().filter_map(|p| p.faint)).unwrap_or(0.0);
     let d5 = 1.0 + 4.0 * r * v * (1.0 - f);
     let round = |x: f64| (x * 100.0).round() / 100.0;
-    let mean = round((d1 + d2 + d3 + d4 + d5) / 5.0);
+    let all = [Some(d1), Some(d2), Some(d3), Some(d4), Some(d5), finer.d6, finer.d7, finer.d8];
+    let measured: Vec<f64> = all.iter().flatten().copied().collect();
+    let mean = round(measured.iter().sum::<f64>() / measured.len() as f64);
     Rubric {
         d1_task_success: round(d1),
         d2_error_prevention: round(d2),
         d3_fits_the_screen: round(d3),
         d4_consistency: round(d4),
         d5_keyboard_and_contrast: round(d5),
+        d6_interaction_cost: finer.d6.map(round),
+        d7_main_action_in_first_view: finer.d7.map(round),
+        d8_error_next_to_its_field: finer.d8.map(round),
         mean,
     }
 }
@@ -279,17 +349,56 @@ mod tests {
             faint: Some(faint),
         };
         let passed = vec![("a".to_string(), true), ("b".to_string(), false), ("c".to_string(), true), ("d".to_string(), true)];
-        let perfect = rubric(&passed, &["b".into()], &[page(true, 1.0, 1.0, 0.0)], Some("pass"));
+        let perfect = rubric(&passed, &["b".into()], &[page(true, 1.0, 1.0, 0.0)], Some("pass"), &Finer::default());
         assert_eq!(
             (perfect.d1_task_success, perfect.d2_error_prevention, perfect.d3_fits_the_screen, perfect.d4_consistency, perfect.d5_keyboard_and_contrast),
             (4.0, 1.0, 5.0, 5.0, 5.0)
         );
-        let worse = rubric(&passed, &["b".into()], &[page(true, 1.0, 1.0, 0.0), page(false, 0.5, 0.5, 0.5)], Some("fail"));
+        let worse = rubric(&passed, &["b".into()], &[page(true, 1.0, 1.0, 0.0), page(false, 0.5, 0.5, 0.5)], Some("fail"), &Finer::default());
         assert!(worse.d3_fits_the_screen < 5.0 && worse.d4_consistency == 1.0 && worse.d5_keyboard_and_contrast < perfect.d5_keyboard_and_contrast);
         assert!(worse.mean < perfect.mean);
         let unnamed = PageMeasures { unnamed_controls: 7, ..Default::default() };
-        assert_eq!(rubric(&passed, &[], std::slice::from_ref(&unnamed), None).d4_consistency, 1.0, "without a design system, names count, capped");
+        assert_eq!(
+            rubric(&passed, &[], std::slice::from_ref(&unnamed), None, &Finer::default()).d4_consistency,
+            1.0,
+            "without a design system, names count, capped"
+        );
         assert_eq!(missing_measures(&[unnamed]), ["page width at 390 px", "keyboard walk", "text contrast"]);
+    }
+
+    /// The finer measures: fewer actions than the original score above 3, more below; the main
+    /// action counts where the first window shows it; an error counts next to its field within
+    /// the limit. They join the mean only when measured.
+    #[test]
+    fn the_finer_measures_reward_fewer_actions_a_visible_main_action_and_errors_by_their_field() {
+        assert_eq!(cost_score(4, 4), 3.0);
+        assert!(cost_score(4, 2) > cost_score(4, 3) && cost_score(4, 3) > 3.0 && cost_score(4, 8) < 3.0);
+        assert_eq!((cost_score(4, 1), cost_score(4, 40)), (5.0, 1.0), "capped both ways");
+        let original = json!({"a": 4, "b": 4, "z": 0});
+        let journeys =
+            vec![("a".to_string(), vec![json!({"click": "Go"}), json!({"type": "x", "into": "y"})]), ("b".to_string(), vec![json!({"click": "Go"})])];
+        let d6 = interaction_cost(&[("a".into(), true), ("b".into(), false), ("z".into(), true)], &journeys, original.as_object().unwrap()).unwrap();
+        assert_eq!(d6, (5.0 + 1.0) / 2.0, "a failed scenario scores 1; one with no actions on the original is left out");
+
+        let layout = |w: u64, names: &[&str]| json!({"width": w, "first_view_controls": names});
+        let captures = [json!({"layouts": [layout(1440, &["Submit claim"]), layout(390, &["Menu"]), layout(768, &["Submit claim"])]})];
+        assert_eq!(main_action_in_first_view(&captures, "submit  CLAIM"), Some(3.0), "seen at 1440, not at 390; 768 doesn't count");
+        assert_eq!(main_action_in_first_view(&[json!({"layouts": [{"width": 390}]})], "Go"), None);
+
+        let row = |gap: Option<u64>| {
+            let mut r = json!({"ok": true, "step": {"alert": ""}});
+            if let Some(g) = gap {
+                r["alert_gap_px"] = json!(g);
+            }
+            r
+        };
+        assert_eq!(error_next_to_field(&[row(Some(8)), row(Some(500)), row(None), json!({"ok": true, "step": {"click": "Go"}})]), Some(1.0 + 4.0 / 3.0));
+        assert_eq!(error_next_to_field(&[]), None);
+
+        let passed = [("a".to_string(), true)];
+        let base = rubric(&passed, &[], &[], None, &Finer::default());
+        let finer = rubric(&passed, &[], &[], None, &Finer { d6: Some(1.0), d7: None, d8: None });
+        assert!(finer.mean < base.mean && finer.d7_main_action_in_first_view.is_none(), "a measured dimension joins the mean, an unmeasured one doesn't");
     }
 
     #[test]
@@ -299,6 +408,23 @@ mod tests {
         let m = page_measures(&c);
         assert_eq!((m.fits_phone, m.unnamed_controls, m.keyboard_reach, m.focus_visible), (Some(false), 2, Some(0.8), Some(0.75)));
         assert!((m.faint.unwrap() - 0.1).abs() < 1e-9);
+    }
+
+    /// The reference journeys run on the unchanged originals reach every fixed check, and their
+    /// action counts are the registered baseline.
+    #[test]
+    fn the_reference_journeys_reach_the_fixed_checks_and_give_the_baseline() {
+        let e: Value = serde_json::from_slice(&std::fs::read(expectations_path()).unwrap()).unwrap();
+        for f in ["dense-form", "multi-step-journey", "ds-claims-journey"] {
+            let (checks, _) = fixture_checks(&e, f).unwrap();
+            let reference = e["reference_journeys"][f].as_array().unwrap();
+            for (id, fixed) in &checks {
+                let j = reference.iter().find(|j| j["scenario_id"] == id.as_str()).unwrap_or_else(|| panic!("{f}: no reference journey for {id}"));
+                let steps = j["steps"].as_array().unwrap();
+                assert!(reaches(fixed, steps).is_ok(), "{f}: {id}: {:?}", reaches(fixed, steps));
+                assert_eq!(e["original_actions"][f][id].as_u64(), Some(actions(steps) as u64), "{f}: {id}");
+            }
+        }
     }
 
     /// The registered expectations hold every critical scenario of the three fixtures' oracles.

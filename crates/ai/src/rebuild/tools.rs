@@ -720,6 +720,10 @@ struct BenchmarkEvaluateParams {
     /// Absolute path of a folder that does not exist yet: the evaluation, the journeys' pictures
     /// and the captures are written there.
     pub output_directory: PathBuf,
+    /// The fixture's main action as this build names it (default: the original's name, from the
+    /// expectations). Reported for audit.
+    #[serde(default)]
+    pub primary_action: Option<String>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -1720,6 +1724,9 @@ fn redesign_benchmark_evaluate(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolO
 
     let mut scenarios = Vec::new();
     let mut passed = Vec::new();
+    let field_errors: Vec<String> =
+        expectations["field_error_scenarios"].as_array().into_iter().flatten().filter_map(Value::as_str).map(str::to_string).collect();
+    let mut error_rows: Vec<Value> = Vec::new();
     let _ = step(ctx, "web_site_close", json!({}));
     let opened = step(ctx, "web_site_open", json!({"url": format!("{base}/")}));
     for (i, (id, fixed)) in checks.iter().enumerate() {
@@ -1733,7 +1740,13 @@ fn redesign_benchmark_evaluate(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolO
                 Ok(names) => {
                     let ran =
                         step(ctx, "web_site_journey_run", json!({"steps": j.steps, "output_directory": out.join("journeys").join(id).display().to_string()}));
-                    match ran.map(|o| o.to_json()["result"].clone()) {
+                    let ran = ran.map(|o| o.to_json()["result"].clone());
+                    if let Ok(r) = &ran
+                        && field_errors.contains(id)
+                    {
+                        error_rows.extend(r["steps"].as_array().cloned().unwrap_or_default());
+                    }
+                    match ran {
                         Ok(r) if r["passed"] == true => (true, "every fixed check passed".to_string(), names),
                         Ok(r) => {
                             let at = r["failed_at"].as_u64().unwrap_or(0);
@@ -1766,6 +1779,7 @@ fn redesign_benchmark_evaluate(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolO
         }
     }
     let mut pages = Vec::new();
+    let mut captures = Vec::new();
     let mut not_captured = Vec::new();
     for (n, address) in addresses.iter().enumerate() {
         let dir = out.join("captures").join(format!("page-{}", n + 1));
@@ -1774,7 +1788,11 @@ fn redesign_benchmark_evaluate(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolO
             .and_then(|_| step(ctx, "web_site_capture", json!({"output_directory": dir.display().to_string(), "widths": [1440, 390], "include_html": false})));
         let _ = step(ctx, "web_site_close", json!({}));
         match done.and_then(|_| std::fs::read(dir.join("capture.json")).map_err(|e| ToolError::io(dir.display(), e))) {
-            Ok(bytes) => pages.push(eval::page_measures(&serde_json::from_slice(&bytes).unwrap_or(Value::Null))),
+            Ok(bytes) => {
+                let capture: Value = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
+                pages.push(eval::page_measures(&capture));
+                captures.push(capture);
+            }
             Err(e) => not_captured.push(json!({"address": address, "why": e.message})),
         }
     }
@@ -1792,11 +1810,22 @@ fn redesign_benchmark_evaluate(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolO
     } else {
         None
     };
-    let rubric = eval::rubric(&passed, &error_scenarios, &pages, ds.as_ref().and_then(|d| d["status"].as_str()));
+    let journeys: Vec<(String, Vec<Value>)> = p.journeys.iter().map(|j| (j.scenario_id.clone(), j.steps.clone())).collect();
+    let empty = serde_json::Map::new();
+    let original_actions = expectations.pointer(&format!("/original_actions/{}", p.fixture_id)).and_then(Value::as_object).unwrap_or(&empty);
+    let primary =
+        p.primary_action.clone().or_else(|| expectations.pointer(&format!("/primary_action/{}", p.fixture_id)).and_then(Value::as_str).map(str::to_string));
+    let finer = eval::Finer {
+        d6: eval::interaction_cost(&passed, &journeys, original_actions),
+        d7: primary.as_deref().and_then(|name| eval::main_action_in_first_view(&captures, name)),
+        d8: eval::error_next_to_field(&error_rows),
+    };
+    let rubric = eval::rubric(&passed, &error_scenarios, &pages, ds.as_ref().and_then(|d| d["status"].as_str()), &finer);
     let missing = eval::missing_measures(&pages);
     let mut record = eval::record(&p.fixture_id, &p.arm, p.trial, scenarios, &rubric, &missing, ds.as_ref());
     record["pages"] = json!(pages);
     record["not_captured"] = json!(not_captured);
+    record["primary_action"] = json!(primary);
     record["project"] = json!(ws.root);
     let bytes = serde_json::to_vec_pretty(&record).map_err(|e| ToolError::internal(e.to_string()))?;
     craft_anything_engine::project::write_atomic(&out.join("evaluation.json"), &bytes)?;

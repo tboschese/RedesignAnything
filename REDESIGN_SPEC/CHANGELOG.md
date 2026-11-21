@@ -1,5 +1,9 @@
 # Changelog — Redesign Anything specification
 
+## Documentation 1.5.1 — 2026-11-21
+
+- Benchmark plan v2 before any confirmatory trial: the first plan's rubric saturated in the exploratory run (`benchmark/exploratory/2026-11-21-dense-form.md`). Adds D6 interaction cost, D7 main action in the first view and D8 error next to its field (`benchmark/BENCHMARK_RUN_PLAN_2026-11-21-v2.md`, `benchmark/expectations/2026-11-21-v2.json` with reference journeys and the originals' action counts). Thresholds unchanged.
+
 ## Documentation 1.5.0 — 2026-11-21
 
 - Benchmark judged by the tool (Thiago Boschese's decision): no human raters and no human oracle confirmation; the rubric is computed from mechanical measures and no LLM judges results. Arms A and B run in plain Craft as the person's own project. `BENCHMARK_PROTOCOL.md` addendum, `V1_FIRST_RELEASE.md` impact criterion note, pre-registration `benchmark/BENCHMARK_RUN_PLAN_2026-11-21.md` with fixed checks in `benchmark/expectations/2026-11-21.json`.
