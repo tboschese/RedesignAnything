@@ -392,6 +392,24 @@ pub(super) fn recording_params(url: &str) -> serde_json::Value {
 /// visitor sees.
 const PAGE_HTML: &str = "page.html";
 
+/// Keep a study another tool made (a redesign's, see `TargetKind::keeps_its_study`) instead of
+/// studying again. A Clean room run still removes what only Deep mode may keep, from the start page
+/// and from every captured page, and then records the capture as Clean room's.
+pub(super) fn keep_kinds_study(ws: &mut Workspace, deep: bool) -> Result<(), ToolError> {
+    if deep {
+        return Ok(());
+    }
+    let capture = ws.capture_dir();
+    remove_deep_only(&capture)?;
+    if let Ok(pages) = std::fs::read_dir(capture.join("routes")) {
+        for page in pages.flatten() {
+            remove_deep_only(&page.path())?;
+        }
+    }
+    ws.manifest.capture_deep = Some(false);
+    ws.save()
+}
+
 /// Remove what only a Deep study writes before a Clean room study replaces the capture: its
 /// builder must not find what only Deep mode may see. A missing file is fine; any other failure
 /// stops the study rather than leave it behind.
@@ -421,5 +439,32 @@ pub(super) fn describe(out: &ToolOutput) -> String {
             format!("{}\n\nEvidence {}.\n\n```json\n{}\n```\n", e.summary, e.id, body.chars().take(20_000).collect::<String>())
         }
         ToolOutput::Value(v) => format!("```json\n{}\n```\n", serde_json::to_string_pretty(v).unwrap_or_default().chars().take(20_000).collect::<String>()),
+    }
+}
+
+#[cfg(test)]
+mod keep_tests {
+    use super::*;
+    use craft_anything_engine::workspace::TargetRef;
+
+    /// A Clean room run keeps the study but not what only Deep mode may keep, on any page; a Deep
+    /// run keeps it all.
+    #[test]
+    fn a_kept_study_loses_what_only_deep_mode_may_keep_in_a_clean_room_run() {
+        let d = tempfile::tempdir().unwrap();
+        let mut ws = Workspace::create(d.path(), "S", "kind=redesign", TargetRef::None).unwrap();
+        let capture = ws.capture_dir();
+        std::fs::create_dir_all(capture.join("routes/details")).unwrap();
+        for f in
+            [capture.join("capture.json"), capture.join(PAGE_HTML), capture.join("routes/details/capture.json"), capture.join("routes/details").join(PAGE_HTML)]
+        {
+            std::fs::write(f, "x").unwrap();
+        }
+        keep_kinds_study(&mut ws, true).unwrap();
+        assert!(capture.join(PAGE_HTML).is_file() && ws.manifest.capture_deep.is_none(), "a Deep run changes nothing");
+        keep_kinds_study(&mut ws, false).unwrap();
+        assert!(!capture.join(PAGE_HTML).exists() && !capture.join("routes/details").join(PAGE_HTML).exists());
+        assert!(capture.join("capture.json").is_file() && capture.join("routes/details/capture.json").is_file(), "the study itself stays");
+        assert_eq!(ws.manifest.capture_deep, Some(false));
     }
 }

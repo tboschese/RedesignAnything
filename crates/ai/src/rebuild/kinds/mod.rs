@@ -113,6 +113,11 @@ pub trait TargetKind: Send + Sync {
     fn studies_folder(&self) -> bool {
         false
     }
+    /// Whether the project's study was made by other tools and the builder must build from it
+    /// instead of studying the target again (a redesign's study is its plan's ground).
+    fn keeps_its_study(&self, _ws: &Workspace) -> bool {
+        false
+    }
     /// "What to build" in the brief.
     fn goal(&self) -> &'static str;
     /// What the builder does with a website capture, in place of matching it exactly. `None`: match it.
