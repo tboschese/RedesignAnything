@@ -8,7 +8,7 @@
 ## Gates
 
 - **concept_ready** — security ok + preview + build not failed/errored + `identity_essence` not failed (PR-14)
-- **prototype_ready** — concept + build pass + design system pass (an advisory warning does not block; a strict one fails) + ≥1 critical oracle passed + button works + no unmapped critical + no critical a11y fail + `identity_drift` not failed (PR-14)
+- **prototype_ready** — concept + build pass (`build_scaffold`: a built site in `app/dist`, `build` or `out` that is as new as the sources; the check runs no build, and a scaffold never built or edited since is `not_evaluated`) + design system pass (an advisory warning does not block; a strict one fails) + ≥1 critical oracle passed + button works + no unmapped critical + no critical a11y fail + `identity_drift` not failed (PR-14)
 - **engineering_ready** — prototype + approved backend deps + no secrets
 
 ## Guarantees tested
