@@ -104,7 +104,9 @@ pub fn prototype_ready(inp: &CheckInputs, unmapped_critical_unapproved: u32) -> 
     }
     concept_ready(inp)
         && inp.build_status.is_pass()
-        && (inp.ds_status.is_pass() || inp.ds_status == CheckExec::NotEvaluated)
+        // A warning only exists under the advisory policy (strict turns it into a failure), and advice
+        // doesn't block: CONTRACTS.md §7 asks for a pass only when the design system is strict.
+        && matches!(inp.ds_status, CheckExec::Pass | CheckExec::NotEvaluated | CheckExec::Warn)
         && inp.functional.critical_scenarios_total > 0
         && inp.functional.critical_scenarios_passed == inp.functional.critical_scenarios_total
         && inp.functional.button_works
@@ -161,7 +163,11 @@ pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
             checks.push(CheckResult {
                 id: "design_system".into(),
                 status: st.as_status().into(),
-                summary: format!("DS policy={} status={}", reg.policy, report.status),
+                summary: if st == CheckExec::Warn && reg.policy != "strict" {
+                    format!("DS policy={} status={} (advice: does not block Prototype Ready)", reg.policy, report.status)
+                } else {
+                    format!("DS policy={} status={}", reg.policy, report.status)
+                },
                 details: serde_json::to_value(&report).unwrap_or(json!({})),
             });
             if reg.policy == "strict" && st != CheckExec::Pass { CheckExec::Fail } else { st }
@@ -506,6 +512,23 @@ mod tests {
         assert!(primary_action_present("<div role=\"button\">Go</div>"));
         assert!(!primary_action_present("export function App(){return null}"));
         assert!(!primary_action_present("<button>TODO_BROKEN_BUTTON</button>"));
+    }
+
+    #[test]
+    fn an_advisory_design_system_warning_does_not_block_a_prototype_and_a_strict_failure_does() {
+        let ready = |ds_status| {
+            let inp = CheckInputs {
+                preview_available: true,
+                security_ok: true,
+                build_status: CheckExec::Pass,
+                ds_status,
+                functional: FunctionalSummary { critical_scenarios_total: 1, critical_scenarios_passed: 1, button_works: true },
+                ..Default::default()
+            };
+            prototype_ready(&inp, 0)
+        };
+        assert!(ready(CheckExec::Warn), "advice is not a blocker");
+        assert!(!ready(CheckExec::Fail), "a strict design system that doesn't pass still is");
     }
 
     #[test]
