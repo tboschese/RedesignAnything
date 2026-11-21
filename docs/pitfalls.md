@@ -593,6 +593,13 @@ through pipes, as Windows does.
 
 ## Design
 
+**A study's other pages were all one kind of page.** The study took the first same-site links of
+the start page, and a site's first links are often a row of alike pages: archive.org's were four
+collection pages, pt.wikipedia's four portal and project pages and no article. A redesign of those
+had no article or help page to stand for. Group the links by kind of page (a top-level page is its
+own kind; deeper pages share their first folder, told apart by a `Prefix:` after it) and take one
+of each kind first, the kinds the page links to most first (`pick_routes`).
+
 **A source inventory limit came after expansion.** Taking five thousand names after collecting
 every source path copied a large `sourceRoot` into every entry first. Count retained entries and
 expanded UTF-8 bytes before allocating each path, share the budget across indexed sections and

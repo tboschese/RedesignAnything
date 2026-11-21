@@ -72,7 +72,36 @@ pub struct Route {
 
 /// Up to `max` other pages of the same site, from the links a capture found (`capture.json`'s
 /// `links`): same scheme and host, a page rather than a file, each path once, not the start page.
+/// One page of each kind comes first ([`page_kind`]), the kinds the page links to most first, so
+/// a site's article, listing and help pages are studied before a fourth page like the first.
 pub fn pick_routes(capture: &Value, start: &str, max: usize) -> Vec<Route> {
+    choose_routes(links_to_pages(capture, start), &[], max)
+}
+
+/// The next level: up to `max` pages linked from already captured ones (`captures`, their
+/// `capture.json`s) that aren't in `have` yet, same rules as [`pick_routes`]; kinds `have`
+/// already shows come after the others.
+pub fn pick_deeper_routes(captures: &[Value], start: &str, have: &[Route], max: usize) -> Vec<Route> {
+    choose_routes(captures.iter().flat_map(|c| links_to_pages(c, start)).collect(), have, max)
+}
+
+/// What kind of page a path is, to study pages of different kinds: a page at the top (`/about`)
+/// is a kind of its own; deeper pages share their first folder's (`/details/movies` and
+/// `/details/texts`), told apart by a `Prefix:` on the part after the folder, which some sites
+/// put on the kinds of page under one folder (`/wiki/Help:Start` and `/wiki/Help:Editing/First`
+/// are help pages, not articles).
+fn page_kind(path: &str) -> String {
+    let parts: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+    match parts.as_slice() {
+        [] => String::new(),
+        [one] => format!("={one}"),
+        [first, second, ..] => format!("{first}/{}", second.split_once(':').map_or("", |(prefix, _)| prefix)),
+    }
+}
+
+/// Every link of `capture` to another page of the start page's site, in page order, repeats
+/// included (they say how much the page links to that kind).
+fn links_to_pages(capture: &Value, start: &str) -> Vec<Route> {
     let origin_and_path = |u: &str| -> Option<(String, String)> {
         let (scheme, rest) = u.split_once("://")?;
         if scheme != "http" && scheme != "https" {
@@ -84,41 +113,60 @@ pub fn pick_routes(capture: &Value, start: &str, max: usize) -> Vec<Route> {
     };
     let Some((origin, start_path)) = origin_and_path(start) else { return Vec::new() };
     let norm = |p: &str| p.trim_end_matches('/').to_string();
-    let mut out: Vec<Route> = Vec::new();
+    let mut out = Vec::new();
     for link in capture.get("links").and_then(Value::as_array).into_iter().flatten() {
-        if out.len() >= max {
-            break;
-        }
         let Some((o, path)) = link.get("href").and_then(Value::as_str).and_then(origin_and_path) else { continue };
         let last = path.rsplit('/').next().unwrap_or_default();
         let file = last.contains('.') && !last.ends_with(".html") && !last.ends_with(".htm");
-        if o != origin || file || norm(&path) == norm(&start_path) || out.iter().any(|r| norm(&r.path) == norm(&path)) {
+        if o != origin || file || norm(&path) == norm(&start_path) {
             continue;
         }
         let slug: String = path.trim_matches('/').chars().map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '-' }).collect();
         let slug = slug.split('-').filter(|s| !s.is_empty()).collect::<Vec<_>>().join("-");
-        if slug.is_empty() || out.iter().any(|r| r.slug == slug) {
-            continue;
+        if !slug.is_empty() {
+            out.push(Route { url: format!("{origin}{path}"), path, slug });
         }
-        out.push(Route { url: format!("{origin}{path}"), path, slug });
     }
     out
 }
 
-/// The next level: up to `max` pages linked from already captured ones (`captures`, their
-/// `capture.json`s) that aren't in `have` yet, same rules as [`pick_routes`].
-pub fn pick_deeper_routes(captures: &[Value], start: &str, have: &[Route], max: usize) -> Vec<Route> {
+/// Up to `max` of `links` not in `have`, each path and folder name once: first one page of each
+/// kind `have` lacks, the kinds linked most first (then in page order), then the rest in page order.
+fn choose_routes(links: Vec<Route>, have: &[Route], max: usize) -> Vec<Route> {
     let norm = |p: &str| p.trim_end_matches('/').to_string();
+    let mut kinds: Vec<(String, usize)> = Vec::new();
+    for r in &links {
+        let kind = page_kind(&r.path);
+        match kinds.iter_mut().find(|(k, _)| *k == kind) {
+            Some((_, n)) => *n += 1,
+            None => kinds.push((kind, 1)),
+        }
+    }
+    // Stable: equal counts keep the order the page first links to them in.
+    kinds.sort_by_key(|(_, n)| std::cmp::Reverse(*n));
+    let mut pages: Vec<Route> = Vec::new();
+    for r in links {
+        let taken = |x: &Route| norm(&x.path) == norm(&r.path) || x.slug == r.slug;
+        if !have.iter().any(taken) && !pages.iter().any(taken) {
+            pages.push(r);
+        }
+    }
+    let shown: Vec<String> = have.iter().map(|r| page_kind(&r.path)).collect();
     let mut out: Vec<Route> = Vec::new();
-    for c in captures {
-        for r in pick_routes(c, start, MAX_ROUTES) {
-            if out.len() >= max {
-                return out;
-            }
-            let taken = |x: &Route| norm(&x.path) == norm(&r.path) || x.slug == r.slug;
-            if !have.iter().any(taken) && !out.iter().any(taken) {
-                out.push(r);
-            }
+    for (kind, _) in kinds.iter().filter(|(k, _)| !shown.contains(k)) {
+        if out.len() >= max {
+            return out;
+        }
+        if let Some(r) = pages.iter().find(|r| page_kind(&r.path) == *kind) {
+            out.push(r.clone());
+        }
+    }
+    for r in pages {
+        if out.len() >= max {
+            break;
+        }
+        if !out.contains(&r) {
+            out.push(r);
         }
     }
     out
