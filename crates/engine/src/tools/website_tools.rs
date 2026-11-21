@@ -45,7 +45,7 @@ pub fn specs() -> Vec<ToolSpec> {
         spec(
             "web_site_capture",
             "Capture a website for rebuilding",
-            "Record the open website into a new folder: full-page PNG screenshots at each requested width, the rendered HTML, design tokens (fonts, sizes, weights, text and background colours as hex, radii, shadows, spacing, content widths, CSS custom properties), the widths its CSS switches layout at, the layout at each width (page width, heading and text sizes, each section's padding, gap, content column and items per row), a layout outline of visible landmarks, headings, controls and images with positions, asset lists (images, stylesheets, scripts, font files, the requests it made), links and form outlines (never values). Then presses Tab through the page from its top (up to 80 times) and records how many visible controls the focus reached and which showed no focus. Writes capture.json and a README.md summary.",
+            "Record the open website into a new folder: full-page PNG screenshots at each requested width, the rendered HTML, design tokens (fonts, sizes, weights, text and background colours as hex, radii, shadows, spacing, content widths, CSS custom properties), the widths its CSS switches layout at, the layout at each width (page width, heading and text sizes, each section's padding, gap, content column and items per row, and the controls seen before scrolling), a layout outline of visible landmarks, headings, controls and images with positions, asset lists (images, stylesheets, scripts, font files, the requests it made), links and form outlines (never values). Then presses Tab through the page from its top (up to 80 times) and records how many visible controls the focus reached and which showed no focus. Writes capture.json and a README.md summary.",
             "Save pictures and a blueprint of a web page so it can be rebuilt.",
             Toolset::Browser,
             Effects::EVIDENCE.union(Effects::WRITES_FILESYSTEM).union(Effects::ACCESSES_NETWORK),
@@ -1129,8 +1129,19 @@ const LAYOUT_JS: &str = r#"(() => {
     }
     blocks.push(b);
   }
+  // The controls a visitor sees before scrolling, by name, at the top of the page.
+  if (scrollY !== 0) scrollTo(0, 0);
+  const firstView = [];
+  for (const el of document.querySelectorAll('a[href], button, input[type="submit"], input[type="button"], [role="button"], [role="link"], summary')) {
+    if (firstView.length >= 40) break;
+    if (!shown(el)) continue;
+    const r = el.getBoundingClientRect();
+    if (r.top >= innerHeight || r.bottom <= 0 || r.left >= innerWidth || r.right <= 0) continue;
+    const name = cap(el.innerText || el.getAttribute('aria-label') || el.value || el.getAttribute('title'), 60);
+    if (name && !firstView.includes(name)) firstView.push(name);
+  }
   return {page_w: document.documentElement.scrollWidth, page_h: document.documentElement.scrollHeight,
-    type: {h1: size('h1'), h2: size('h2'), h3: size('h3'), body: size('p')}, blocks};
+    type: {h1: size('h1'), h2: size('h2'), h3: size('h3'), body: size('p')}, blocks, first_view_controls: firstView};
 })()"#;
 
 fn web_site_capture(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
@@ -2399,6 +2410,34 @@ for (const t of tabs) t.onclick = () => tabs.forEach(o => o.setAttribute('aria-s
         let out = dir.path().join("capture");
         e.call("web_site_capture", json!({"output_directory": out.display().to_string(), "widths": [1440]}), cli()).unwrap();
         serde_json::from_str(&std::fs::read_to_string(out.join("capture.json")).unwrap()).unwrap()
+    }
+
+    /// Each width lists the controls seen before scrolling: one far down the page is not, a pinned
+    /// one is, and one shown only on a wide screen is listed only there. Live (`--ignored`).
+    #[test]
+    #[ignore]
+    fn each_width_lists_the_controls_seen_before_scrolling() {
+        let e = serve_and_open(
+            r#"<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width"><style>
+body{margin:0} .wide{display:none} @media (min-width:800px){.wide{display:inline-block}}
+.pin{position:fixed;bottom:0;left:0}
+</style></head><body><button>Top action</button><button class="wide">Wide only</button>
+<div style="height:2000px"></div><button>Later action</button><button class="pin">Pinned</button></body></html>"#,
+        );
+        let cli = || crate::CallOptions::new(crate::Caller::Cli).with_consent(crate::Consent::Granted);
+        let dir = tempfile::tempdir().unwrap();
+        let out = dir.path().join("capture");
+        e.call("web_site_capture", json!({"output_directory": out.display().to_string(), "widths": [1440, 390]}), cli()).unwrap();
+        let c: Value = serde_json::from_str(&std::fs::read_to_string(out.join("capture.json")).unwrap()).unwrap();
+        let seen = |w: u64| -> Vec<String> {
+            let l = c["layouts"].as_array().unwrap().iter().find(|l| l["width"] == w).unwrap();
+            l["first_view_controls"].as_array().unwrap().iter().map(|v| v.as_str().unwrap().to_string()).collect()
+        };
+        let (wide, phone) = (seen(1440), seen(390));
+        assert!(wide.contains(&"Top action".to_string()) && wide.contains(&"Pinned".to_string()) && wide.contains(&"Wide only".to_string()), "{wide:?}");
+        assert!(phone.contains(&"Top action".to_string()) && phone.contains(&"Pinned".to_string()) && !phone.contains(&"Wide only".to_string()), "{phone:?}");
+        assert!(!wide.contains(&"Later action".to_string()) && !phone.contains(&"Later action".to_string()), "below the first window");
+        let _ = e.call("web_site_close", json!({}), cli());
     }
 
     /// The Tab walk reaches each visible control once, in open shadow roots too, skips what is
