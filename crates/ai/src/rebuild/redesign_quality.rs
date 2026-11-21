@@ -27,6 +27,10 @@ pub struct ScenarioEval {
     pub capability_id: String,
     pub status: String,
     pub notes: Vec<String>,
+    /// How it was judged: `journey_run` (its journey ran in the built prototype), `word_hint`
+    /// (a word of its "then" was found in the app sources) or empty when it was not judged.
+    #[serde(default)]
+    pub method: String,
 }
 
 /// Probe whether an external program looks available on PATH (no install).
@@ -96,6 +100,9 @@ pub fn evaluate_oracle(ws: &Workspace, oracle: &Value) -> Result<(QualityCheck, 
         ));
     }
 
+    // A journey run in the built prototype says more than a word in the sources, either way.
+    let (ran, journeys_note) = super::redesign_journeys::fresh_results(ws);
+    let (mut by_journey, mut by_hint) = (0u32, 0u32);
     let mut passed = 0u32;
     let mut failed = 0u32;
     for sc in &scenarios {
@@ -111,9 +118,23 @@ pub fn evaluate_oracle(ws: &Workspace, oracle: &Value) -> Result<(QualityCheck, 
                 capability_id: cap,
                 status: "not_evaluated".into(),
                 notes: vec!["scenario marked not executable".into()],
+                method: String::new(),
             });
             continue;
         }
+
+        if let Some(journey) = ran.get(&id) {
+            by_journey += 1;
+            if journey.passed {
+                passed += 1;
+            } else {
+                failed += 1;
+            }
+            let status = if journey.passed { "pass" } else { "fail" };
+            evals.push(ScenarioEval { scenario_id: id, capability_id: cap, status: status.into(), notes: vec![journey.note()], method: "journey_run".into() });
+            continue;
+        }
+        by_hint += 1;
 
         let mut notes = Vec::new();
         let mut ok = true;
@@ -133,11 +154,11 @@ pub fn evaluate_oracle(ws: &Workspace, oracle: &Value) -> Result<(QualityCheck, 
         }
         if ok {
             passed += 1;
-            evals.push(ScenarioEval { scenario_id: id, capability_id: cap, status: "pass".into(), notes });
         } else {
             failed += 1;
-            evals.push(ScenarioEval { scenario_id: id, capability_id: cap, status: "fail".into(), notes });
         }
+        let status = if ok { "pass" } else { "fail" };
+        evals.push(ScenarioEval { scenario_id: id, capability_id: cap, status: status.into(), notes, method: "word_hint".into() });
     }
 
     let status = if failed > 0 {
@@ -147,15 +168,35 @@ pub fn evaluate_oracle(ws: &Workspace, oracle: &Value) -> Result<(QualityCheck, 
     } else {
         "pass"
     };
+    let how = if by_journey == 0 {
+        "a word hint found in the app sources, mock data included; no journey was run".to_string()
+    } else {
+        format!(
+            "{by_journey} judged by a journey run in the built prototype, {by_hint} by a word hint found in the app sources (mock data included; no journey run)"
+        )
+    };
+    let method = match (by_journey, by_hint) {
+        (0, _) => "word_hint_in_sources",
+        (_, 0) => "journey_run",
+        _ => "mixed",
+    };
+    let mut summary = format!("scenarios pass={passed} fail={failed} total={} ({how})", evals.len());
+    if let Some(note) = &journeys_note {
+        summary.push_str(&format!("; {note}"));
+    }
     Ok((
         QualityCheck {
             id: "functional_scenarios".into(),
             status: status.into(),
-            summary: format!(
-                "scenarios pass={passed} fail={failed} total={} (a word hint found in the app sources, mock data included; no journey was run)",
-                evals.len()
-            ),
-            details: json!({ "evals": evals, "method": "word_hint_in_sources", "ran_journeys": false }),
+            summary,
+            details: json!({
+                "evals": evals,
+                "method": method,
+                "ran_journeys": by_journey > 0,
+                "journeys_run": by_journey,
+                "word_hints": by_hint,
+                "journeys_note": journeys_note,
+            }),
         },
         evals.clone(),
     ))
@@ -391,6 +432,51 @@ mod tests {
         });
         let (qc, _) = evaluate_oracle(&ws, &oracle).unwrap();
         assert_eq!(qc.status, "pass", "{qc:?}");
+    }
+
+    /// A word in the sources can agree with a scenario that doesn't work and miss one that does;
+    /// a journey run in the built prototype decides both ways, for the build it ran in.
+    #[test]
+    fn a_scenario_whose_journey_ran_is_judged_by_it_and_not_by_a_word_in_the_sources() {
+        use crate::rebuild::redesign_journeys as journeys;
+        let d = tempfile::tempdir().unwrap();
+        let ws = Workspace::create(d.path(), "Q", "q", TargetRef::None).unwrap();
+        std::fs::create_dir_all(ws.app_dir().join("src")).unwrap();
+        std::fs::write(ws.app_dir().join("src/App.tsx"), "export function App(){ return <p>Donate</p> }\n").unwrap();
+        std::fs::create_dir_all(ws.app_dir().join("dist")).unwrap();
+        std::fs::write(ws.app_dir().join("dist/index.html"), "<p>Donate</p>").unwrap();
+        let oracle = json!({"scenarios": [
+            {"id": "donate", "capability_id": "c1", "executable": true, "then": ["Donate control remains available"]},
+            {"id": "calendar", "capability_id": "c2", "executable": true, "then": ["Calendar day selection is available"]},
+            {"id": "search", "capability_id": "c3", "executable": true, "then": ["Search returns results"]},
+        ]});
+        let statuses = |ws: &Workspace| {
+            let (qc, evals) = evaluate_oracle(ws, &oracle).unwrap();
+            (qc, evals.into_iter().map(|e| (e.scenario_id, e.status, e.method)).collect::<Vec<_>>())
+        };
+        let s = |a: &str, b: &str, c: &str| (a.to_string(), b.to_string(), c.to_string());
+        let (hints, by_hint) = statuses(&ws);
+        assert_eq!(by_hint, [s("donate", "pass", "word_hint"), s("calendar", "fail", "word_hint"), s("search", "fail", "word_hint")]);
+        assert_eq!(hints.details["ran_journeys"], false);
+
+        let ran = |id: &str, passed: bool| {
+            journeys::result_of(
+                id,
+                Ok(json!({"passed": passed, "failed_at": if passed { None } else { Some(1) }, "steps": [{"ok": passed, "note": "what happened"}]})),
+            )
+        };
+        let report =
+            journeys::Report { built: journeys::built_fingerprint(&ws).unwrap(), width: 1440, journeys: vec![ran("donate", false), ran("calendar", true)] };
+        journeys::write_report(&ws, &report).unwrap();
+        let (mixed, by_journey) = statuses(&ws);
+        assert_eq!(by_journey, [s("donate", "fail", "journey_run"), s("calendar", "pass", "journey_run"), s("search", "fail", "word_hint")]);
+        assert_eq!((&mixed.details["journeys_run"], &mixed.details["word_hints"]), (&json!(2), &json!(1)), "the summary counts each way: {}", mixed.summary);
+
+        // Built again: the journeys said nothing about this build, and the check says so.
+        std::fs::write(ws.app_dir().join("dist/index.html"), "<p>Donate now</p>").unwrap();
+        let (stale, after_rebuild) = statuses(&ws);
+        assert_eq!(after_rebuild, by_hint);
+        assert!(stale.summary.contains("redesign_journeys_run"), "{}", stale.summary);
     }
 
     #[test]

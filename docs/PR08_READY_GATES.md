@@ -18,3 +18,7 @@
 - Broken button ⇒ not prototype_ready
 - Critic alone never promotes Ready
 - No WCAG certification claim from native gate
+
+## Scenarios (PR-17)
+
+`functional_scenarios` judges a scenario by its journey run in the built prototype when there is one for the build on disk (`redesign_journeys_run`), and by a word hint in the sources otherwise. It says which for each scenario. See `docs/PR17_JOURNEYS.md`.

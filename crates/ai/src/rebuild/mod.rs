@@ -55,6 +55,7 @@ pub mod redesign_build;
 pub mod redesign_checks;
 pub mod redesign_ds;
 pub mod redesign_identity;
+pub mod redesign_journeys;
 pub mod redesign_knowledge;
 pub mod redesign_likeness;
 pub mod redesign_mcp_trust;

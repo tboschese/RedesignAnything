@@ -23,6 +23,8 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
+mod journey;
+
 pub fn specs() -> Vec<ToolSpec> {
     vec![
         spec(
@@ -62,6 +64,7 @@ pub fn specs() -> Vec<ToolSpec> {
             schema_of::<StatesParams>,
             web_page_states_capture,
         ),
+        journey::tool(),
         spec(
             "web_site_close",
             "Close the website",
@@ -1901,6 +1904,72 @@ body{margin:0} .d{display:none} @media (min-width:800px){.d{display:block} .p{di
             e.call("web_page_states_capture", json!({"output_directory": out.display().to_string(), "width": width, "max_states": 1}), cli()).unwrap();
             assert_eq!(top_colour(&out), (label.to_string(), colour.to_vec()), "at {width} px");
         }
+        let _ = e.call("web_site_close", json!({}), cli());
+    }
+
+    /// A journey is done the way a visitor would do it: fields are found by their label, controls
+    /// by their name (inside an open shadow root too), Enter submits, and each run starts from a
+    /// page loaded again. A covered control, or a text that never shows, fails its own step. Live
+    /// (`--ignored`).
+    #[test]
+    #[ignore]
+    fn a_journey_types_clicks_and_checks_what_shows_and_names_the_step_that_failed() {
+        let e = serve_and_open(
+            r#"<!doctype html><html><body>
+<form id="f"><label for="q">Search the library</label> <input id="q"> <button>Search</button></form>
+<label>Kind <select id="k"><option>All</option><option>Texts</option></select></label>
+<p id="out"></p>
+<x-panel></x-panel>
+<div style="position:relative;width:200px;height:40px"><button id="c">Covered action</button>
+<div style="position:absolute;inset:0;background:#fff"></div></div>
+<script>
+const out = document.getElementById('out');
+document.getElementById('f').onsubmit = ev => { ev.preventDefault(); out.textContent = 'Results for ' + document.getElementById('q').value; };
+document.getElementById('k').onchange = ev => { out.textContent = 'Kind chosen: ' + ev.target.value; };
+document.getElementById('c').onclick = () => { out.textContent = 'Covered action ran'; };
+customElements.define('x-panel', class extends HTMLElement { connectedCallback() {
+  const root = this.attachShadow({mode: 'open'});
+  root.innerHTML = '<button>Open panel</button><p></p>';
+  root.querySelector('button').onclick = () => { root.querySelector('p').textContent = 'Panel is open'; };
+} });
+if (location.hash === '#/library') out.textContent = 'Library page';
+</script></body></html>"#,
+        );
+        let cli = || crate::CallOptions::new(crate::Caller::Cli).with_consent(crate::Consent::Granted);
+        let run = |args: Value| e.call("web_site_journey_run", args, cli()).unwrap().to_json()["result"].clone();
+
+        let typed = run(json!({"steps": [{"type": "cats", "into": "Search the library"}, {"press": "Enter"}, {"expect": "results for cats"}]}));
+        assert_eq!(typed["passed"], true, "{typed}");
+        let clicked = run(json!({"steps": [{"type": "maps", "into": "search the library"}, {"click": "Search"}, {"expect": "Results for maps"}]}));
+        assert_eq!(clicked["passed"], true, "{clicked}");
+
+        let fresh = run(json!({"steps": [{"expect": "Results for maps"}], "wait_ms": 300}));
+        assert_eq!((&fresh["passed"], &fresh["failed_at"]), (&json!(false), &json!(1)), "the page is loaded again before a journey: {fresh}");
+        let kept = run(json!({"steps": [{"click": "Search"}, {"expect": "Results for"}], "restart": true}));
+        assert_eq!(kept["passed"], true, "{kept}");
+        let carried_on = run(json!({"steps": [{"expect": "Results for"}], "restart": false}));
+        assert_eq!(carried_on["passed"], true, "without a restart the page is as the last journey left it: {carried_on}");
+
+        let in_shadow = run(json!({"steps": [{"click": "Open panel"}, {"expect": "Panel is open"}]}));
+        assert_eq!(in_shadow["passed"], true, "{in_shadow}");
+        let chosen = run(json!({"steps": [{"type": "Texts", "into": "Kind"}, {"expect": "Kind chosen: Texts"}]}));
+        assert_eq!(chosen["passed"], true, "{chosen}");
+        let opened = run(json!({"steps": [{"open": "/#/library"}, {"expect": "Library page"}]}));
+        assert_eq!(opened["passed"], true, "{opened}");
+
+        let covered = run(json!({"steps": [{"click": "Covered action"}, {"expect": "Covered action ran"}]}));
+        assert_eq!((&covered["passed"], &covered["failed_at"]), (&json!(false), &json!(1)), "{covered}");
+        assert!(covered["steps"][0]["note"].as_str().unwrap().contains("covered"), "{covered}");
+        assert_eq!(covered["steps"].as_array().unwrap().len(), 1, "the steps after a failed one are not run");
+        let missing = run(json!({"steps": [{"click": "Search"}, {"expect": "A text that never shows"}, {"click": "Search"}], "wait_ms": 300}));
+        assert_eq!((&missing["passed"], &missing["failed_at"], &missing["steps"][0]["ok"]), (&json!(false), &json!(2), &json!(true)), "{missing}");
+        let no_such = run(json!({"steps": [{"click": "A control that is not there"}]}));
+        assert_eq!(no_such["passed"], false, "{no_such}");
+
+        let dir = tempfile::tempdir().unwrap();
+        let out = dir.path().join("journey");
+        let pictured = run(json!({"steps": [{"click": "Open panel"}, {"expect": "Panel is open"}], "output_directory": out.display().to_string()}));
+        assert!(out.join("end.png").is_file() && pictured["picture"].is_string(), "{pictured}");
         let _ = e.call("web_site_close", json!({}), cli());
     }
 

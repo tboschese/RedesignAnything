@@ -170,7 +170,7 @@ pub fn create(ws: &Workspace, modes: &[RedesignMode]) -> Result<Value, ToolError
         })).collect::<Vec<_>>(),
         "carried": ["capture/", "reference/", "redesign/evidence/", "redesign/capabilities/", "redesign/oracle/", "redesign/identity.json", "redesign/design_system.json", "redesign/decisions/ (as proposals)"],
         "not_carried": NOT_CARRIED,
-        "next": "In each variant: choose its decisions, redesign_plan_build (the variant's mode is used), redesign_scaffold_app, build the UI, redesign_checks_run. Then redesign_variants_show on any of them to compare.",
+        "next": "In each variant: choose its decisions, redesign_plan_build (the variant's mode is used), redesign_scaffold_app, build the UI, redesign_journeys_run (one journey per oracle scenario), redesign_checks_run. Then redesign_variants_show on any of them to compare.",
     }))
 }
 

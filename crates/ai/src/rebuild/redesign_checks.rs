@@ -394,7 +394,7 @@ fn modified(path: &Path) -> Option<std::time::SystemTime> {
 }
 
 /// Every file under `dir`, to a depth no source tree needs more than.
-fn files_under(dir: &Path, depth: u32, out: &mut Vec<PathBuf>) {
+pub(super) fn files_under(dir: &Path, depth: u32, out: &mut Vec<PathBuf>) {
     let Ok(entries) = fs::read_dir(dir) else { return };
     for entry in entries.flatten() {
         let path = entry.path();
