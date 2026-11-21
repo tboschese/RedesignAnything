@@ -13,7 +13,7 @@ An **agent-first, local-first capability release** of Redesign Anything on `main
 - Not a claim of **measured UX gain vs Craft + UX prompts (arm B)**. Human blind evaluation remains **unavailable** — see `REDESIGN_SPEC/benchmark/published/`.
 - Not a claim of production parity, complete hidden-rule extraction, or WCAG certification.
 - Not a full binary rebrand: machine names remain `craft-anything*`; window title and docs say **Redesign Anything**.
-- Not signed cross-platform installers (packaging scripts exist; signing keys are operator-owned).
+- Not installers: the first release is source code only, built on your machine (decision 2026-11-21). Packaging scripts stay in the repository for later.
 
 ## How to use (agent)
 

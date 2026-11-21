@@ -16,12 +16,12 @@ Release notes: [`FIRST_PUBLIC_RELEASE_NOTES.md`](FIRST_PUBLIC_RELEASE_NOTES.md).
 | Quality Engine | Ready + quality runners + **HTML/MD report**; advisory rows for likeness and its order across variants, page fits its window, basics (names, alt text, text contrast, language, landmarks) and sentences copied from the original | Manual a11y sample log template; keyboard and focus measured by the product |
 | Agent-first / DX | README + CLI/MCP + EN docs; the builder ran real redesigns end to end with Codex and with Claude Code (2026-11-21) | Executed Cursor/Claude/Codex matrix log |
 | Experience | Offline fixture → `redesign/report/report.html` + Vite preview hint; `redesign_report_write` for any project, saying first what waits for the person | Optional redesign desktop panels |
-| OSS / distribution | SBOM + notices + packaging README | **Signed** installers; binary rename; clean-OS upgrade test |
+| OSS / distribution | SBOM + notices + packaging README; V1 ships as source code only (decision 2026-11-21) | Build from source tested on macOS, Linux and Windows with one documented command; binary rename |
 | Impact (benchmark) | Published record with **impact_verdict=unevaluated**; pre-registered run plan for two fixtures | Third fixture with a real design system; blind human A/B/C before claiming gain vs B |
 
 ## Explicitly out of claims
 
 - Inventing benchmark KPIs or “gain vs B”
 - WCAG certification from `not_evaluated` a11y, or from the advisory basics and contrast rows
-- Declaring signed installers without operator keys
+- Declaring signed or prebuilt installers: V1 is source code only (decision 2026-11-21)
 - Treating likeness to the original as a quality score: it only informs
