@@ -139,10 +139,50 @@ pub fn list() -> Value {
 
 fn same_route(a: &str, b: &str) -> bool {
     let norm = |s: &str| {
-        let t = s.trim().trim_end_matches('/');
-        if t.is_empty() { "/".to_string() } else { t.to_ascii_lowercase() }
+        let decoded = percent_decoded(s.trim());
+        let t = decoded.trim_end_matches('/');
+        if t.is_empty() { "/".to_string() } else { t.to_lowercase() }
     };
     norm(a) == norm(b)
+}
+
+/// `%C3%A9` and `é` are the same letter of a route, whichever way it was written down.
+fn percent_decoded(s: &str) -> String {
+    let bytes = s.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        let hex = (bytes[i] == b'%').then(|| s.get(i + 1..i + 3)).flatten().and_then(|h| u8::from_str_radix(h, 16).ok());
+        match hex {
+            Some(byte) => {
+                out.push(byte);
+                i += 3;
+            }
+            None => {
+                out.push(bytes[i]);
+                i += 1;
+            }
+        }
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+/// The path of a web address, without what follows `?` or `#`.
+fn path_of(url: &str) -> Option<&str> {
+    let after_scheme = &url[url.find("://")? + 3..];
+    let path = after_scheme.find('/').map_or("/", |i| &after_scheme[i..]);
+    Some(path.split(['?', '#']).next().unwrap_or(path))
+}
+
+/// The page the study started at is the prototype's `/`, whatever its address was in the
+/// original: a capability that stays on the start page has not moved.
+fn on_the_start_page(caps: &mut [Capability], target_url: &str) {
+    let Some(start) = path_of(target_url) else { return };
+    for route in caps.iter_mut().flat_map(|c| c.original_routes.iter_mut()) {
+        if same_route(route, start) {
+            *route = "/".into();
+        }
+    }
 }
 
 /// A mapping that sends a capability to a route it didn't have in the original.
@@ -246,10 +286,13 @@ pub fn scope_check(ws: &Workspace) -> CheckResult {
         summary: format!("{what} could not be read: {}", e.message),
         details: json!({"advisory": true, "note": ADVISORY_NOTE}),
     };
-    let caps = match super::redesign_store::list_capabilities(ws) {
+    let mut caps = match super::redesign_store::list_capabilities(ws) {
         Ok(c) => c,
         Err(e) => return not_evaluated("capabilities", e),
     };
+    if let craft_anything_engine::workspace::TargetRef::Website { url } = &ws.manifest.target {
+        on_the_start_page(&mut caps, url);
+    }
     let decisions = match super::redesign_plan::list_decisions(ws) {
         Ok(d) => d,
         Err(e) => return not_evaluated("decisions", e),
@@ -330,6 +373,22 @@ mod tests {
             }],
             ..Default::default()
         }
+    }
+
+    /// A site whose start page has an address of its own: what stays on that page has not moved,
+    /// and what comes to it from another page has.
+    #[test]
+    fn a_capability_that_stays_on_the_start_page_has_not_moved_whatever_that_pages_address_was() {
+        let mut caps = vec![cap("cap_search", "/wiki/Página_principal"), cap("cap_read", "/wiki/Artigo")];
+        let to_start = |capability: &str| {
+            let mut p = plan("refresh", "/", "ui_only");
+            p.mappings[0].capability_id = capability.into();
+            p
+        };
+        assert_eq!(moved_routes(&caps, &to_start("cap_search")).len(), 1, "compared as text, the start page looks moved");
+        on_the_start_page(&mut caps, "https://example.org/wiki/P%C3%A1gina_principal?uselang=pt#top");
+        assert!(moved_routes(&caps, &to_start("cap_search")).is_empty());
+        assert_eq!(moved_routes(&caps, &to_start("cap_read")).len(), 1, "another page's capability brought to the start page did move");
     }
 
     #[test]
