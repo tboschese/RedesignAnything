@@ -1,5 +1,9 @@
 # Changelog — Redesign Anything specification
 
+## Documentation 1.6.0 — 2026-11-21
+
+- Distribution decision (Thiago Boschese): the first public release is **source code only**, built on the user's machine; no prebuilt or signed installers in V1 (`V1_FIRST_RELEASE.md`, `docs/V1_GAP.md`, `docs/PR12_RELEASE_CHECKLIST.md`).
+
 ## Documentation 1.5.1 — 2026-11-21
 
 - Benchmark plan v2 before any confirmatory trial: the first plan's rubric saturated in the exploratory run (`benchmark/exploratory/2026-11-21-dense-form.md`). Adds D6 interaction cost, D7 main action in the first view and D8 error next to its field (`benchmark/BENCHMARK_RUN_PLAN_2026-11-21-v2.md`, `benchmark/expectations/2026-11-21-v2.json` with reference journeys and the originals' action counts). Thresholds unchanged.

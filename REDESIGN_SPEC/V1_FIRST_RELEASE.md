@@ -21,7 +21,7 @@ Redesign existing web applications with significant structure and experience cha
 | Quality Engine | Build, functional checks, automatic a11y + manual sample, visual evaluation, regression, security, report | Honest report when checks cannot run; critical gates do not pass |
 | Agent-first / DX | README, AGENTS, CLI/MCP, doctor, assisted setup, no duplicate agent, real tests for announced agents | Do not announce untested compatibility |
 | Experience | One entry instruction; progressive configuration; preview, before/after comparison, decisions, limitations, exportable artifacts | Headless CLI/report is enough; desktop not required |
-| OSS / distribution | Verified licence/attribution, SBOM, pinned dependencies, CI, docs and reproducible fixtures | No private corporate assets distributed |
+| OSS / distribution | Verified licence/attribution, SBOM, pinned dependencies, CI, docs and reproducible fixtures; distributed as source code, built on the user's machine (decision 2026-11-21) | No private corporate assets distributed; no prebuilt or signed installers |
 
 ## Impact criterion (not completeness alone)
 
@@ -30,6 +30,14 @@ Redesign existing web applications with significant structure and experience cha
 - *Decision 2026-11-21 (Thiago Boschese): no human evaluation; the product computes the rubric from mechanical measures and no LLM judges results. See `BENCHMARK_PROTOCOL.md`, addendum 2026-11-21.*
 - V1 must show **relevant gain against B**, without critical function or security regression. If there is no gain, fix before public release; do not rebrand a demo as V1.
 - Primary demo: authorized corporate web app with a full journey, corporate DS, executable before/after, decision evidence, and check report. A second demo without DS proves generality.
+
+## Distribution decision (2026-11-21)
+
+Thiago Boschese decided (chat, 2026-11-21): **the first public release is distributed as source
+code only.** People (or their agents) clone the repository and build it on their own machine
+(`cargo build` / `cargo install`), which needs no code-signing certificate: an operating system only
+warns about programs downloaded already built. No prebuilt or signed installer is part of V1;
+signed installers are out of its scope and its gate, and any later one is a separate decision.
 
 ## Architecture policy
 

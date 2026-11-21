@@ -142,7 +142,7 @@ In development; nothing is published yet. The redesign flow (Study → Critic �
 | Application MCP trust gateway | Ready (catalogue/gate + fixture smoke) |
 | REA Deep | Contracts + fallback + **fixture live** (`redesign_rea_run`); override with `REDESIGN_REA_ADAPTER` |
 | A/B/C/D benchmark | Honest dry-run; **no invented KPIs / no published results** |
-| Installers / full rebrand | Open — [`docs/PR12_RELEASE_CHECKLIST.md`](docs/PR12_RELEASE_CHECKLIST.md) |
+| Distribution | Source code only (built on your machine); full rebrand open — [`docs/PR12_RELEASE_CHECKLIST.md`](docs/PR12_RELEASE_CHECKLIST.md) |
 | SBOM inventory | `cargo xtask sbom` → [`docs/sbom/`](docs/sbom/), [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) |
 
 Per-PR docs: `docs/PR01_*.md` … `docs/PR12_*.md`.
@@ -210,4 +210,4 @@ Code under **MIT OR Apache-2.0**, same as Craft Anything. Preserve notices in `N
 
 Capability release notes: [`docs/FIRST_PUBLIC_RELEASE_NOTES.md`](docs/FIRST_PUBLIC_RELEASE_NOTES.md).
 
-Still open after the capability ship: **signed** installers, full `cargo about` HTML texts, blind human impact eval (gain vs arm B), binary rename. See [`docs/V1_GAP.md`](docs/V1_GAP.md) and [`REDESIGN_SPEC/V1_FIRST_RELEASE.md`](REDESIGN_SPEC/V1_FIRST_RELEASE.md). Do not invent KPIs.
+Still open after the capability ship: full `cargo about` HTML texts, the tool-judged impact benchmark (gain vs arm B), binary rename. The first release is **source code only**, built on your machine; there are no prebuilt or signed installers. See [`docs/V1_GAP.md`](docs/V1_GAP.md) and [`REDESIGN_SPEC/V1_FIRST_RELEASE.md`](REDESIGN_SPEC/V1_FIRST_RELEASE.md). Do not invent KPIs.

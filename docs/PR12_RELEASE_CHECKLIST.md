@@ -12,8 +12,8 @@ Notes: [`FIRST_PUBLIC_RELEASE_NOTES.md`](FIRST_PUBLIC_RELEASE_NOTES.md). Gaps: [
 - [x] Branding pass (display name **Redesign Anything**; Craft credits preserved; machine names still `craft-anything*`)
 - [x] Published benchmark record with environment + **unavailable** human scores (`REDESIGN_SPEC/benchmark/published/`)
 - [x] Packaging guide for this fork (`packaging/redesign/README.md`)
-- [ ] Cross-platform **signed** installers (scripts exist; need operator certs)
-- [ ] Upgrade/rollback on clean OS images (needs signed artefacts)
+- [x] ~~Cross-platform signed installers~~ — out of V1 scope: V1 ships as source code only (decision 2026-11-21, `REDESIGN_SPEC/V1_FIRST_RELEASE.md`)
+- [ ] Build from source on clean macOS, Linux and Windows with the documented command (replaces the installer upgrade/rollback test)
 
 ## Impact gate (separate from capability ship)
 
