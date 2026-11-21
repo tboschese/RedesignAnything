@@ -467,6 +467,9 @@ fn basics_of(original: &Value, prototype: &Value) -> Vec<String> {
             out.push(format!("{now} {what}{shown} (the original has {before})"));
         }
     }
+    if let Some(note) = contrast_note(original, prototype) {
+        out.push(note);
+    }
     let lang = |v: &Value| v.pointer("/a11y/lang").and_then(Value::as_str).unwrap_or_default().trim().to_string();
     if lang(prototype).is_empty() && lang(original).is_empty() {
         out.push("the page language isn't set (nor is the original's)".into());
@@ -481,8 +484,32 @@ fn basics_of(original: &Value, prototype: &Value) -> Vec<String> {
     out
 }
 
+/// The prototype page's text that is too faint against what is behind it, with its worst examples,
+/// and how the original measured. `None` when none is, or when the capture didn't measure it.
+fn contrast_note(original: &Value, prototype: &Value) -> Option<String> {
+    let low = prototype.pointer("/a11y/low_contrast").and_then(Value::as_u64).filter(|n| *n > 0)?;
+    let examples: Vec<String> = prototype
+        .pointer("/a11y/low_contrast_examples")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .take(3)
+        .map(|e| {
+            let text = |k: &str| e[k].as_str().unwrap_or("?").to_string();
+            let times = e["count"].as_u64().filter(|n| *n > 1).map(|n| format!(", {n} texts")).unwrap_or_default();
+            format!("{} {}:1 ({} on {}, needs {}{times})", text("element"), e["ratio"], text("color"), text("background"), e["needs"])
+        })
+        .collect();
+    let before = match original.pointer("/a11y/low_contrast").and_then(Value::as_u64) {
+        Some(n) => format!("the original has {n}"),
+        None => "the original's capture didn't measure it".to_string(),
+    };
+    Some(format!("{low} text(s) with too little contrast: {} ({before})", examples.join(", ")))
+}
+
 /// Advisory: the basics each captured prototype page gets wrong (controls without a name, pictures
-/// without alt text, no page language, a landmark of the original it lacks, and errors or failed
+/// without alt text, text too faint against its background, no page language, a landmark of the
+/// original it lacks, and errors or failed
 /// requests when the captures recorded them). As old as the prototype captures; no certification.
 pub fn basics_check(ws: &Workspace) -> CheckResult {
     let (mut captured, mut found) = (0u32, Vec::new());
@@ -498,7 +525,7 @@ pub fn basics_check(ws: &Workspace) -> CheckResult {
         (
             "pass",
             format!(
-                "{captured} captured page(s): every control has a name, every picture has alt text, the language is set and the original's landmarks are there"
+                "{captured} captured page(s): every control has a name, every picture has alt text, the text measured has enough contrast, the language is set and the original's landmarks are there"
             ),
         )
     } else {
@@ -635,6 +662,42 @@ mod tests {
         fs::write(ws.capture_dir().join("capture.json"), layouts(390)).unwrap();
         fs::write(prototype.join("capture.json"), layouts(640)).unwrap();
         assert!(fits_window_check(&ws).summary.contains("the original's page fits"), "a prototype that made it worse is told so");
+    }
+
+    /// Faint text is told with its worst examples and how the original measured, and only when the
+    /// prototype's capture measured some.
+    #[test]
+    fn a_prototype_is_told_about_text_too_faint_against_its_background() {
+        let d = tempfile::tempdir().unwrap();
+        let ws = Workspace::create(d.path(), "L", "kind=redesign", craft_anything_engine::workspace::TargetRef::None).unwrap();
+        let measured = |low: u64| {
+            let examples: Vec<Value> = (0..low.min(1))
+                .map(|_| json!({"element": "span", "ratio": 2.32, "needs": 4.5, "color": "#aaaaaa", "background": "#ffffff", "count": low}))
+                .collect();
+            json!({"a11y": {"lang": "pt", "text_checked": 40, "low_contrast": low, "low_contrast_examples": examples}}).to_string()
+        };
+        fs::create_dir_all(ws.capture_dir()).unwrap();
+        fs::write(ws.capture_dir().join("capture.json"), json!({"a11y": {"lang": "pt"}}).to_string()).unwrap();
+        let prototype = prototype_dir(&ws).join(START_PAGE);
+        fs::create_dir_all(&prototype).unwrap();
+
+        fs::write(prototype.join("capture.json"), measured(0)).unwrap();
+        assert_eq!(basics_check(&ws).status, "pass");
+        fs::write(prototype.join("capture.json"), json!({"a11y": {"lang": "pt"}}).to_string()).unwrap();
+        assert_eq!(basics_check(&ws).status, "pass", "a capture that didn't measure contrast isn't held against the prototype");
+
+        fs::write(prototype.join("capture.json"), measured(2)).unwrap();
+        let faint = basics_check(&ws);
+        assert_eq!(faint.status, "warn", "{faint:?}");
+        assert!(
+            faint.summary.contains("2 text(s) with too little contrast") && faint.summary.contains("#aaaaaa on #ffffff, needs 4.5, 2 texts"),
+            "{}",
+            faint.summary
+        );
+        assert!(faint.summary.contains("didn't measure"), "an older original capture is said to be unmeasured: {}", faint.summary);
+
+        fs::write(ws.capture_dir().join("capture.json"), measured(5)).unwrap();
+        assert!(basics_check(&ws).summary.contains("the original has 5"), "fewer than the original is still told");
     }
 
     /// A prototype is told what it still gets wrong, whether or not the original got it wrong too,

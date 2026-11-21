@@ -813,9 +813,46 @@ const BLUEPRINT_JS: &str = r#"(() => {
     const role = el.getAttribute('role') || {header: 'banner', nav: 'navigation', main: 'main', footer: 'contentinfo', aside: 'complementary', form: 'form'}[el.tagName.toLowerCase()];
     tally(landmarks, role);
   }
+  // Text contrast (the WCAG ratio) against the colour behind the text: the element's own background
+  // and its ancestors', blended down to the first opaque one over a white canvas. Text over a
+  // picture or a gradient, or in a colour this can't read as rgb, is counted apart, not judged.
+  const rgba = c => { const m = /^rgba?\((\d+), (\d+), (\d+)(?:, ([\d.]+))?\)$/.exec(c || ''); return m ? [+m[1], +m[2], +m[3], m[4] === undefined ? 1 : +m[4]] : null; };
+  const over = (t, u) => [0, 1, 2].map(i => t[i] * t[3] + u[i] * (1 - t[3])).concat(1);
+  const lum = c => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); };
+  const rgbHex = c => '#' + c.slice(0, 3).map(v => Math.round(v).toString(16).padStart(2, '0')).join('');
+  const seenBehind = new Map();
+  const behind = el => {
+    if (!el) return [255, 255, 255, 1];
+    if (seenBehind.has(el)) return seenBehind.get(el);
+    const s = getComputedStyle(el), b = rgba(s.backgroundColor);
+    let c;
+    if ((s.backgroundImage && s.backgroundImage !== 'none') || (!b && s.backgroundColor && s.backgroundColor !== 'transparent')) c = null;
+    else if (b && b[3] >= 1) c = b;
+    else { const u = behind(up(el)); c = u && b && b[3] > 0 ? over(b, u) : u; }
+    seenBehind.set(el, c); return c;
+  };
+  const ownText = el => { for (const n of el.childNodes) if (n.nodeType === 3 && n.textContent.trim()) return true; return false; };
+  let textChecked = 0, contrastUnknown = 0; const lowContrast = [];
+  for (const el of all) {
+    if (textChecked + contrastUnknown >= 4000) break;
+    if (el.namespaceURI !== 'http://www.w3.org/1999/xhtml' || !ownText(el) || !shown(el) || el.closest('[disabled],[aria-disabled="true"]')) continue;
+    const s = getComputedStyle(el), fg = rgba(s.color), bg = behind(el);
+    if (!fg || !bg) { contrastUnknown++; continue; }
+    if (fg[3] === 0) continue;
+    const text = over(fg, bg), [hi, lo] = [lum(text), lum(bg)].sort((a, b) => b - a), ratio = (hi + 0.05) / (lo + 0.05);
+    const px = parseFloat(s.fontSize), large = px >= 24 || (px >= 18.66 && +s.fontWeight >= 700);
+    textChecked++;
+    if (ratio < (large ? 3 : 4.5)) lowContrast.push({element: el.tagName.toLowerCase() + (typeof el.className === 'string' && el.className.trim() ? '.' + el.className.trim().split(/\s+/)[0] : ''),
+      ratio: Math.round(ratio * 100) / 100, needs: large ? 3 : 4.5, color: rgbHex(text), background: rgbHex(bg)});
+  }
+  // One example per pair of colours, the faintest first, with how many texts share it.
+  const pairs = new Map();
+  for (const l of lowContrast) { const k = l.color + l.background + l.needs; const p = pairs.get(k); if (p) p.count++; else pairs.set(k, Object.assign({count: 1}, l)); }
+  const lowExamples = Array.from(pairs.values()).sort((a, b) => a.ratio - b.ratio);
   const a11y = {lang: document.documentElement.lang || '', landmarks, unnamed_controls: unnamed.length,
     unnamed_examples: unnamed.slice(0, 5).map(el => el.tagName.toLowerCase() + (el.className && typeof el.className === 'string' ? '.' + cap(el.className, 40).split(' ')[0] : '')),
-    images_without_alt: images.filter(i => shown(i) && !i.hasAttribute('alt')).length};
+    images_without_alt: images.filter(i => shown(i) && !i.hasAttribute('alt')).length,
+    text_checked: textChecked, low_contrast: lowContrast.length, low_contrast_examples: lowExamples.slice(0, 5), contrast_unknown: contrastUnknown};
   const fontFaces = []; try { document.fonts.forEach(f => { if (fontFaces.length < 80) fontFaces.push({family: f.family, weight: f.weight, style: f.style, status: f.status}); }); } catch (e) {}
   return {
     url: location.href, title: document.title, lang: document.documentElement.lang || '',
@@ -1294,6 +1331,13 @@ fn visitor_view(blueprint: &mut Value) {
             }
         }
     }
+    if let Some(Value::Array(examples)) = b.get_mut("a11y").and_then(|a| a.get_mut("low_contrast_examples")) {
+        for e in examples.iter_mut().filter_map(|e| e.get_mut("element")) {
+            if let Some(s) = e.as_str() {
+                *e = Value::String(s.split('.').next().unwrap_or_default().to_string());
+            }
+        }
+    }
     if let Some(Value::Object(d)) = b.get_mut("design") {
         d.remove("css_variables");
         d.remove("font_faces");
@@ -1418,6 +1462,14 @@ fn health_section(b: &Value) -> String {
             n("unnamed_controls"),
             n("images_without_alt")
         ));
+        if a.get("text_checked").is_some() {
+            md.push_str(&format!(
+                "Text with too little contrast: {} of {} checked ({} over a picture, a gradient or a colour not read).\n\n",
+                n("low_contrast"),
+                n("text_checked"),
+                n("contrast_unknown")
+            ));
+        }
     }
     md
 }
@@ -1712,7 +1764,7 @@ mod tests {
             "headings": [{"level": 1, "text": "Plans"}], "text": "Plans Pricing", "layouts": [{"width": 1440, "page_w": 1440}],
             "outline": [{"tag": "img", "class": "w-full rounded-xl", "src": "https://cdn.test/hero.webp?dpl=dpl_abc123#x"}, {"tag": "a", "class": "btn", "href": "https://shop.test/plans?ref=sk-test-123"}],
             "links": [{"text": "Plans", "href": "https://shop.test/plans?session=abc"}],
-            "a11y": {"unnamed_examples": ["button.icon-btn", "a"]}
+            "a11y": {"unnamed_examples": ["button.icon-btn", "a"], "low_contrast_examples": [{"element": "span.muted-note", "ratio": 2.1}]}
         });
         visitor_view(&mut b);
         // #156: the page's class names and the query strings on its addresses aren't a visitor's view.
@@ -1721,6 +1773,7 @@ mod tests {
         assert_eq!(b["outline"][1]["href"], "https://shop.test/plans");
         assert_eq!(b["links"][0]["href"], "https://shop.test/plans");
         assert_eq!(b["a11y"]["unnamed_examples"], json!(["button", "a"]));
+        assert_eq!(b["a11y"]["low_contrast_examples"][0]["element"], "span");
         assert!(!b.to_string().contains("dpl_") && !b.to_string().contains("sk-test"));
         for gone in [
             "/meta",
@@ -2006,6 +2059,28 @@ for (const t of tabs) t.onclick = () => tabs.forEach(o => o.setAttribute('aria-s
         let out = dir.path().join("capture");
         e.call("web_site_capture", json!({"output_directory": out.display().to_string(), "widths": [1440]}), cli()).unwrap();
         serde_json::from_str(&std::fs::read_to_string(out.join("capture.json")).unwrap()).unwrap()
+    }
+
+    /// Text is judged against the colour behind it, through its ancestors: pale grey on white is too
+    /// faint, the same grey on a dark band is fine, large text needs less, and text over a gradient
+    /// isn't judged. Live (`--ignored`).
+    #[test]
+    #[ignore]
+    fn text_contrast_is_measured_against_the_colour_behind_it() {
+        const PAGE: &str = r#"<!doctype html><html lang="en"><body style="background:#fff;color:#111"><main>
+<p>Plain dark text</p>
+<p class="faint" style="color:#aaa">Faint grey note</p>
+<div style="background:#202020"><div><p style="color:#aaa">Grey on a dark band</p></div></div>
+<h2 style="color:#888;font-size:28px">Large grey heading</h2>
+<div style="background:linear-gradient(#000,#fff)"><p style="color:#777">Over a gradient</p></div>
+</main></body></html>"#;
+        let a = capture_of(PAGE)["a11y"].clone();
+        assert_eq!(a["low_contrast"], 1, "only the faint note on white: {a}");
+        let worst = &a["low_contrast_examples"][0];
+        assert!(worst["element"].as_str().unwrap().starts_with('p') && worst["ratio"].as_f64().unwrap() < worst["needs"].as_f64().unwrap(), "{a}");
+        assert_eq!(worst["count"], 1, "{a}");
+        assert!(a["text_checked"].as_u64().unwrap() >= 4, "{a}");
+        assert!(a["contrast_unknown"].as_u64().unwrap() >= 1, "the text over the gradient: {a}");
     }
 
     /// What is inside a closed `<details>` keeps a box but isn't seen: it is neither outlined nor

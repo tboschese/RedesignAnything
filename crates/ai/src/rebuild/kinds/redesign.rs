@@ -184,7 +184,7 @@ pub const CAPTURE_BRIEF: &str = concat!(
 /// Photographs the built prototype the way `redesign_prototype_capture` does (the start page and
 /// each original page at its kept address, at the original's widths), measures how alike each page
 /// is, and turns what the captures show into claims the builder can act on: every page fits its
-/// window, and the basics (names, alt text, language, the original's landmarks) are there. Likeness
+/// window, and the basics (names, alt text, text contrast, language, the original's landmarks) are there. Likeness
 /// is reported, never a claim. An original page without an address is an unknown, said in the note.
 pub struct PrototypeCaptureCheck;
 
@@ -239,7 +239,7 @@ impl Check for PrototypeCaptureCheck {
         let basics = likeness::basics_check(ws);
         let mut claims = vec![
             Claim::new("every captured page fits its window", fits.status != "warn", fits.summary.clone()),
-            Claim::new("every captured page has the basics (names, alt text, language, landmarks)", basics.status != "warn", basics.summary.clone()),
+            Claim::new("every captured page has the basics (names, alt text, contrast, language, landmarks)", basics.status != "warn", basics.summary.clone()),
         ];
         claims.extend(not_captured.iter().map(|why| Claim::new(format!("the prototype page {why} could be photographed"), false, why.clone())));
         // A variant is told where it changes too little or too much for its mode next to its siblings.
