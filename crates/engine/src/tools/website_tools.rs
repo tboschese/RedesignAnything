@@ -501,7 +501,7 @@ fn d_state_width() -> u32 {
 const FIND_STATES_JS: &str = r#"(() => {
   for (const old of document.querySelectorAll('[data-craft-state]')) old.removeAttribute('data-craft-state');
   const cap = (s, n) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, n);
-  const shown = el => { const r = el.getBoundingClientRect(); if (r.width < 1 || r.height < 1) return false; const s = getComputedStyle(el); return s.visibility !== 'hidden' && s.display !== 'none'; };
+  const shown = el => { const r = el.getBoundingClientRect(); if (r.width < 1 || r.height < 1) return false; const s = getComputedStyle(el); return s.visibility !== 'hidden' && s.display !== 'none' && (!el.checkVisibility || el.checkVisibility()); };
   const sel = '[aria-expanded="false"], [aria-haspopup]:not([aria-haspopup="false"]), [role="tab"][aria-selected="false"], details:not([open]) > summary';
   const out = [];
   for (const el of document.querySelectorAll(sel)) {
@@ -703,7 +703,7 @@ const MAX_HTML_BYTES: usize = 4 << 20;
 const BLUEPRINT_JS: &str = r#"(() => {
   const cap = (s, n) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, n);
   const box = el => { const r = el.getBoundingClientRect(); return {x: Math.round(r.x + scrollX), y: Math.round(r.y + scrollY), w: Math.round(r.width), h: Math.round(r.height)}; };
-  const shown = el => { const r = el.getBoundingClientRect(); if (r.width < 1 || r.height < 1) return false; const s = getComputedStyle(el); return s.visibility !== 'hidden' && s.display !== 'none' && s.opacity !== '0'; };
+  const shown = el => { const r = el.getBoundingClientRect(); if (r.width < 1 || r.height < 1) return false; const s = getComputedStyle(el); return s.visibility !== 'hidden' && s.display !== 'none' && s.opacity !== '0' && (!el.checkVisibility || el.checkVisibility()); };
   const tally = (m, k) => { if (k) m[k] = (m[k] || 0) + 1; };
   const top = (m, n) => Object.entries(m).sort((a, b) => b[1] - a[1]).slice(0, n).map(([value, count]) => ({value, count}));
   const fonts = {}, sizes = {}, weights = {}, colors = {}, backgrounds = {}, radii = {}, shadows = {}, bgImages = {}, spacing = {}, maxWidths = {};
@@ -912,7 +912,7 @@ const UNPIN_JS: &str = r#"(async () => {
 const LAYOUT_JS: &str = r#"(() => {
   const cap = (s, n) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, n);
   const px = v => Math.round(parseFloat(v) || 0);
-  const shown = el => { const r = el.getBoundingClientRect(); if (r.width < 1 || r.height < 1) return false; const s = getComputedStyle(el); return s.visibility !== 'hidden' && s.display !== 'none' && s.opacity !== '0'; };
+  const shown = el => { const r = el.getBoundingClientRect(); if (r.width < 1 || r.height < 1) return false; const s = getComputedStyle(el); return s.visibility !== 'hidden' && s.display !== 'none' && s.opacity !== '0' && (!el.checkVisibility || el.checkVisibility()); };
   const size = sel => { const el = Array.from(document.querySelectorAll(sel)).slice(0, 50).find(shown); return el ? px(getComputedStyle(el).fontSize) : 0; };
   const cv = document.createElement('canvas'); cv.width = cv.height = 1; const g = cv.getContext('2d', {willReadFrequently: true});
   // Computed rgb()/rgba() is read as numbers; a canvas read can be off by one (#154).
@@ -2006,6 +2006,32 @@ for (const t of tabs) t.onclick = () => tabs.forEach(o => o.setAttribute('aria-s
         let out = dir.path().join("capture");
         e.call("web_site_capture", json!({"output_directory": out.display().to_string(), "widths": [1440]}), cli()).unwrap();
         serde_json::from_str(&std::fs::read_to_string(out.join("capture.json")).unwrap()).unwrap()
+    }
+
+    /// What is inside a closed `<details>` keeps a box but isn't seen: it is neither outlined nor
+    /// counted as a control without a name, and a journey can't click it. Opened, it is all three.
+    /// Live (`--ignored`).
+    #[test]
+    #[ignore]
+    fn what_a_closed_details_holds_is_not_shown_until_it_is_opened() {
+        const CLOSED: &str = r#"<!doctype html><html lang="en"><body><main><h1>Menus</h1>
+<details><summary>Web</summary><ul><li><a href="/saved">Saved pages</a></li></ul></details></main></body></html>"#;
+        const OPEN: &str = r#"<!doctype html><html lang="en"><body><main><h1>Menus</h1>
+<details open><summary>Web</summary><ul><li><a href="/saved">Saved pages</a></li></ul></details></main></body></html>"#;
+        let outlined = |c: &Value| c["outline"].as_array().unwrap().iter().any(|e| e["text"] == "Saved pages");
+        let (closed, open) = (capture_of(CLOSED), capture_of(OPEN));
+        assert!(!outlined(&closed) && outlined(&open), "closed: {}", closed["outline"]);
+        assert_eq!(closed["a11y"]["unnamed_controls"], 0, "a link with text is not a control without a name: {}", closed["a11y"]);
+        assert_eq!(open["a11y"]["unnamed_controls"], 0, "{}", open["a11y"]);
+
+        let e = serve_and_open(CLOSED);
+        let cli = || crate::CallOptions::new(crate::Caller::Cli).with_consent(crate::Consent::Granted);
+        let run = |steps: Value| e.call("web_site_journey_run", json!({"steps": steps}), cli()).unwrap().to_json()["result"].clone();
+        let hidden = run(json!([{"click": "Saved pages"}]));
+        assert!(hidden["passed"] == false && hidden["steps"][0]["note"].as_str().unwrap().contains("no control named"), "{hidden}");
+        let opened = run(json!([{"click": "Web"}, {"click": "Saved pages"}]));
+        assert_eq!(opened["steps"][1]["ok"], true, "{opened}");
+        let _ = e.call("web_site_close", json!({}), cli());
     }
 
     /// #155: a pill made with `calc(infinity * 1px)` (Tailwind's `rounded-full`) is recorded as

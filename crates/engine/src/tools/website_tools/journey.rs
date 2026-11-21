@@ -77,7 +77,7 @@ pub(super) fn tool() -> ToolSpec {
 const DEEP_JS: &str = r#"
   const all = (root, out) => { for (const el of root.querySelectorAll('*')) { out.push(el); if (el.shadowRoot) all(el.shadowRoot, out); } return out; };
   const norm = s => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase();
-  const shown = el => { const r = el.getBoundingClientRect(); if (r.width < 1 || r.height < 1) return false; const s = getComputedStyle(el); return s.visibility !== 'hidden' && s.display !== 'none'; };
+  const shown = el => { const r = el.getBoundingClientRect(); if (r.width < 1 || r.height < 1) return false; const s = getComputedStyle(el); return s.visibility !== 'hidden' && s.display !== 'none' && (!el.checkVisibility || el.checkVisibility()); };
   const labelled = el => { const root = el.getRootNode(); return (el.getAttribute('aria-labelledby') || '').split(/\s+/).filter(Boolean).map(id => root.getElementById ? root.getElementById(id) : null).filter(Boolean).map(e => e.innerText || e.textContent).join(' '); };
   const up = n => n.parentNode || n.host || null;
   const inside = (inner, outer) => { for (let n = inner; n; n = up(n)) if (n === outer) return true; return false; };
