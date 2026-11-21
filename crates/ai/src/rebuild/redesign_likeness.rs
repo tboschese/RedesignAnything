@@ -243,8 +243,13 @@ struct PageAddress {
 }
 
 /// The kept `(page, prototype path)` pairs; none when nothing was kept or the file can't be read.
+/// The page addresses a builder writes, inside the app it may change.
+pub const APP_PAGES_FILE: &str = "redesign-pages.json";
+
+/// The newer of the tool's file (redesign/prototype_capture/pages.json) and the builder's
+/// (app/redesign-pages.json).
 pub fn kept_pages(ws: &Workspace) -> Vec<(String, String)> {
-    let file = prototype_dir(ws).join(PAGES_FILE);
+    let Some(file) = super::redesign_journeys::newest([prototype_dir(ws).join(PAGES_FILE), ws.app_dir().join(APP_PAGES_FILE)]) else { return Vec::new() };
     let kept: PagesFile = fs::read(file).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default();
     kept.pages.into_iter().map(|p| (p.page, p.path)).collect()
 }
@@ -609,6 +614,14 @@ mod tests {
         assert_eq!(pages_without_address(&ws), ["busca"]);
         let targets = capture_targets(&ws, &kept_pages(&ws)).unwrap();
         assert!(targets.contains(&("artigo".to_string(), "/#/artigo?a=1".to_string())), "{targets:?}");
+        // A builder writes its addresses in the app; written later, they are the ones kept.
+        fs::create_dir_all(ws.app_dir()).unwrap();
+        let app_file = ws.app_dir().join(APP_PAGES_FILE);
+        fs::write(&app_file, json!({"pages": [{"page": "busca", "path": "/#/busca"}]}).to_string()).unwrap();
+        let later = fs::metadata(prototype_dir(&ws).join(PAGES_FILE)).unwrap().modified().unwrap() + std::time::Duration::from_secs(5);
+        fs::File::options().write(true).open(&app_file).unwrap().set_modified(later).unwrap();
+        assert_eq!(kept_pages(&ws), [("busca".to_string(), "/#/busca".to_string())]);
+        assert_eq!(pages_without_address(&ws), ["artigo"]);
     }
 
     #[test]

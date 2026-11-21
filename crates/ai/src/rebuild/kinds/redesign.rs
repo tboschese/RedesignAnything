@@ -136,7 +136,7 @@ impl TargetKind for RedesignKind {
 
 /// How the builder shows each scenario working, for [`JourneysCheck`].
 pub const JOURNEYS_BRIEF: &str = concat!(
-    "Show each scenario working in the built prototype: write redesign/quality/journeys.json as ",
+    "Show each scenario working in the built prototype: write app/redesign-journeys.json as ",
     "{\"journeys\": [{\"scenario_id\": \"<id>\", \"steps\": [...]}]}, one journey per scenario below. ",
     "Steps run in order in a real browser from the start page: {\"click\": \"<visible or accessible name>\"}, ",
     "{\"type\": \"<text>\", \"into\": \"<field label or placeholder>\"}, {\"press\": \"Enter\"}, ",
@@ -178,7 +178,7 @@ fn plan_changes(ws: &Workspace) -> Vec<String> {
 pub const CAPTURE_BRIEF: &str = concat!(
     "Each check round also photographs the built prototype and compares each page with the original's page. ",
     "Say which prototype address stands for each original page other than the start page in ",
-    "redesign/prototype_capture/pages.json as {\"pages\": [{\"page\": \"<page>\", \"path\": \"/#/<route>\"}]}."
+    "app/redesign-pages.json as {\"pages\": [{\"page\": \"<page>\", \"path\": \"/#/<route>\"}]}."
 );
 
 /// Photographs the built prototype the way `redesign_prototype_capture` does (the start page and
