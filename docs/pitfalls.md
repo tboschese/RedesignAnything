@@ -1395,3 +1395,8 @@ Check a reading of a picture another way (a pixel at a known place, a second too
 scored 23 of 100 in structure because the original has dozens of items the simulated data lacks.
 Compare variants of the same study with each other instead (`likeness_order` in
 `redesign_variants_show`), and report the raw numbers.
+
+**A `package.json` is not a build.** `build_scaffold` passed whenever `app/package.json` existed,
+so a scaffold nobody had built could be Prototype Ready. It now passes only when `app/` holds a
+built site that is as new as its sources, and says it ran no build itself. Never built, or edited
+since the last build, is `not_evaluated`: Concept Ready still stands, Prototype Ready does not.

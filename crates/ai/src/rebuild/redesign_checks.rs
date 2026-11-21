@@ -7,6 +7,7 @@ use craft_anything_evidence::ToolError;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::fs;
+use std::path::{Path, PathBuf};
 
 use super::redesign_ds;
 use super::redesign_plan;
@@ -134,25 +135,10 @@ pub fn primary_action_present(app_tsx: &str) -> bool {
 pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
     let mut checks = Vec::new();
 
-    // Build: presence of scaffold package.json (native, no WASM plugin).
+    // Build: what the files in app/ say about it. This check runs no build.
     let pkg = ws.app_dir().join("package.json");
-    let build = if pkg.is_file() {
-        CheckExec::Pass
-    } else if ws.app_dir().is_dir() {
-        CheckExec::Fail
-    } else {
-        CheckExec::NotEvaluated
-    };
-    checks.push(CheckResult {
-        id: "build_scaffold".into(),
-        status: build.as_status().into(),
-        summary: if build.is_pass() {
-            "app/package.json present; nothing was installed or built by this check".into()
-        } else {
-            "app scaffold missing package.json".into()
-        },
-        details: json!({"method": "file_present", "built": false}),
-    });
+    let (build, build_summary, build_details) = build_state(&ws.app_dir());
+    checks.push(CheckResult { id: "build_scaffold".into(), status: build.as_status().into(), summary: build_summary, details: build_details });
 
     // DS compliance if registry exists.
     let ds = match redesign_ds::load_registry(ws) {
@@ -367,6 +353,61 @@ pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
     Ok(report)
 }
 
+/// Whether `app` holds a built site that is at least as new as its sources, from the files alone.
+/// A scaffold that was never built, or was edited since its last build, is not evaluated: a
+/// `package.json` says a build is possible, not that one succeeded.
+fn build_state(app: &Path) -> (CheckExec, String, Value) {
+    let details = |built: bool, output: Option<&str>| json!({"method": "built_site_newer_than_sources", "ran_build": false, "built": built, "output": output});
+    if !app.is_dir() {
+        return (CheckExec::NotEvaluated, "no app/ folder yet".into(), details(false, None));
+    }
+    if !app.join("package.json").is_file() {
+        return (CheckExec::Fail, "app scaffold missing package.json".into(), details(false, None));
+    }
+    let Some(site) = super::site_dir(app) else {
+        let summary = "app/package.json present, but no built site (dist, build or out with an index.html): build the app first, this check runs no build";
+        return (CheckExec::NotEvaluated, summary.into(), details(false, None));
+    };
+    let output = site.strip_prefix(app).map(|p| p.display().to_string()).unwrap_or_default();
+    let Some(built_at) = modified(&site.join("index.html")) else {
+        return (CheckExec::NotEvaluated, format!("could not read when app/{output}/index.html was built"), details(false, Some(&output)));
+    };
+    let mut sources = vec![app.join("package.json"), app.join("index.html")];
+    files_under(&app.join("src"), 0, &mut sources);
+    match sources.iter().find(|p| modified(p).is_some_and(|at| at > built_at)) {
+        Some(newer) => {
+            let newer = newer.strip_prefix(app).unwrap_or(newer).display();
+            (
+                CheckExec::NotEvaluated,
+                format!("the built site in app/{output} is older than app/{newer}: build again, this check runs no build"),
+                details(false, Some(&output)),
+            )
+        }
+        None => {
+            (CheckExec::Pass, format!("the built site in app/{output} is as new as the app's sources; this check ran no build"), details(true, Some(&output)))
+        }
+    }
+}
+
+fn modified(path: &Path) -> Option<std::time::SystemTime> {
+    fs::metadata(path).and_then(|m| m.modified()).ok()
+}
+
+/// Every file under `dir`, to a depth no source tree needs more than.
+fn files_under(dir: &Path, depth: u32, out: &mut Vec<PathBuf>) {
+    let Ok(entries) = fs::read_dir(dir) else { return };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            if depth < 16 {
+                files_under(&path, depth + 1, out);
+            }
+        } else {
+            out.push(path);
+        }
+    }
+}
+
 fn scan_sources(ws: &Workspace) -> Vec<(String, String)> {
     let mut out = Vec::new();
     let app = ws.app_dir();
@@ -488,11 +529,53 @@ mod tests {
         .unwrap();
         super::super::redesign_build::scaffold_app(&ws, None).unwrap();
         let report = run_native_checks(&ws).unwrap();
-        assert!(report.checks.iter().any(|c| c.id == "build_scaffold" && c.status == "pass"));
         assert!(report.notes.iter().any(|n| n.contains("PluginJudge")));
         assert!(report.checks.iter().any(|c| c.id == "accessibility" && c.details["wcag_certified"] == false));
         // With only normal (non-critical) cap and no plan, prototype may still be false due to oracle proxy / unmapped.
         assert!(!report.engineering_ready || report.prototype_ready);
+    }
+
+    #[test]
+    fn a_build_passes_only_when_a_built_site_is_as_new_as_the_sources() {
+        let d = tempfile::tempdir().unwrap();
+        let app = d.path().join("app");
+        assert_eq!(build_state(&app).0, CheckExec::NotEvaluated, "no app yet");
+        fs::create_dir_all(app.join("src/routes")).unwrap();
+        assert_eq!(build_state(&app).0, CheckExec::Fail, "an app folder with no package.json");
+        fs::write(app.join("package.json"), "{}").unwrap();
+        fs::write(app.join("index.html"), "<div id=root></div>").unwrap();
+        fs::write(app.join("src/routes/Home.tsx"), "export const Home = 1;").unwrap();
+        let (never_built, summary, _) = build_state(&app);
+        assert_ne!(never_built, CheckExec::Pass, "a package.json alone is not a build: {summary}");
+        assert_ne!(never_built, CheckExec::Fail, "and not having built yet is not a failed build");
+
+        fs::create_dir_all(app.join("dist")).unwrap();
+        fs::write(app.join("dist/index.html"), "<div id=root></div>").unwrap();
+        let (built, _, details) = build_state(&app);
+        assert_eq!(built, CheckExec::Pass);
+        assert_eq!(details["ran_build"], false, "the check says it ran no build itself");
+
+        // An edit after the build: the built site no longer shows what the sources say.
+        let later = modified(&app.join("dist/index.html")).unwrap() + std::time::Duration::from_secs(60);
+        fs::File::options().write(true).open(app.join("src/routes/Home.tsx")).unwrap().set_modified(later).unwrap();
+        let (stale, summary, _) = build_state(&app);
+        assert_ne!(stale, CheckExec::Pass);
+        assert!(summary.contains("Home.tsx"), "it names the newer source: {summary}");
+    }
+
+    #[test]
+    fn a_scaffold_is_not_prototype_ready_until_it_is_built() {
+        let inp = |build_status| CheckInputs {
+            preview_available: true,
+            security_ok: true,
+            build_status,
+            ds_status: CheckExec::Pass,
+            functional: FunctionalSummary { critical_scenarios_total: 1, critical_scenarios_passed: 1, button_works: true },
+            ..Default::default()
+        };
+        assert!(concept_ready(&inp(CheckExec::NotEvaluated)), "a concept needs no build");
+        assert!(!prototype_ready(&inp(CheckExec::NotEvaluated), 0));
+        assert!(prototype_ready(&inp(CheckExec::Pass), 0));
     }
 
     #[test]
