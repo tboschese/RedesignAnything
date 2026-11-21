@@ -270,13 +270,24 @@ pub fn specs() -> Vec<ToolSpec> {
         ToolSpec {
             id: "redesign_variants_show",
             title: "Show redesign variants",
-            summary: "List a project's variants (asked on the source or on any variant) with each one's mode, whether it has a plan and an app, and what its last redesign_checks_run said: the Ready gates, identity_essence, identity_drift and mode_scope. Runs no checks. A listed folder that is not a project pointing back to the source is named under not_found.",
+            summary: "List a project's variants (asked on the source or on any variant) with each one's mode, whether it has a plan and an app, what its last redesign_checks_run said (the Ready gates, identity_essence, identity_drift and mode_scope) and its measured likeness to the original. likeness_order warns when a variant that changes less is less like the original than one that changes more, on the same page. Runs no checks. A listed folder that is not a project pointing back to the source is named under not_found.",
             beginner: "Shows the versions of a redesign side by side.",
             toolset: Toolset::Projects,
             effects: Effects::READ_ONLY,
             requires: Requires::Nothing,
             input_schema: schema_of::<ProjectParams>,
             run: redesign_variants_show,
+        },
+        ToolSpec {
+            id: "redesign_likeness_measure",
+            title: "Measure how alike the prototype is",
+            summary: "Compare each original page (the start page and every captured route) with the prototype page captured for it, and save redesign/prototype_capture/likeness.json: page structure, word overlap, and tile layout plus detail of the screenshots, each 0..=100. Capture the prototype first: open each page with web_site_open and save it with web_site_capture into redesign/prototype_capture/start/ or redesign/prototype_capture/<route slug>/ (this tool makes the parent folder and lists the pages it expects). A page that can't be compared is named with its reason, including a screenshot with large blank bands. The scores are reported, not judged against a limit; redesign_variants_show warns when a variant that changes less is less like the original than one that changes more. Opens no browser.",
+            beginner: "Measures how close the new design stays to the original, page by page.",
+            toolset: Toolset::Projects,
+            effects: Effects::WRITES_FILESYSTEM,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<ProjectParams>,
+            run: redesign_likeness_measure,
         },
         ToolSpec {
             id: "redesign_knowledge_retrieve",
@@ -1493,6 +1504,12 @@ fn redesign_variants_show(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutpu
     Ok(ToolOutput::Value(super::redesign_variants::show(&ws)?))
 }
 
+fn redesign_likeness_measure(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: ProjectParams = parse_params(params)?;
+    let ws = open(&p.project)?;
+    Ok(ToolOutput::Value(super::redesign_likeness::measure(&ws)?))
+}
+
 fn redesign_diagnose(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
     let p: DiagnoseParams = parse_params(params)?;
     Ok(ToolOutput::Value(super::redesign_plan::diagnose(
@@ -1919,6 +1936,7 @@ mod tests {
             "redesign_modes_list",
             "redesign_variants_create",
             "redesign_variants_show",
+            "redesign_likeness_measure",
             "redesign_knowledge_retrieve",
             "redesign_critic_recommend",
             "redesign_ds_ingest",
