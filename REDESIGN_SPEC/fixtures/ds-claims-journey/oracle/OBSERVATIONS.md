@@ -12,6 +12,6 @@ private browser against the built fixture (`npm run build`, `npm run preview`, p
 | `scenario_claims_submit_success` | type; Continue; approver "MGR-7"; Continue; expect "MGR-7"; Submit claim; expect "Claim submitted." | passed |
 | `scenario_claims_viewer_cannot_submit` | `?role=viewer`; type; Continue; Continue; expect the viewer message; click Submit claim | the message shows; the click is refused: "the button \"Submit claim\" is disabled" |
 
-The expected results are `observed_verified` on this synthetic fixture. They are not
-`human_confirmed` until Thiago Boschese confirms them; a confirmatory benchmark must not use them
-before that (`ORACLE_POLICY.md`, OP-07).
+The expected results are `observed_verified` on this synthetic fixture, the first oracle type in
+`ORACLE_POLICY.md`. By Thiago Boschese's decision of 2026-11-21 the benchmark uses them without
+human confirmation (`BENCHMARK_PROTOCOL.md`, addendum 2026-11-21).

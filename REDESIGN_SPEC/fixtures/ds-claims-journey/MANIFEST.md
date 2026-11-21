@@ -33,8 +33,8 @@ npm run preview    # http://127.0.0.1:8767/
 - Other currencies; validation of the approver code itself.
 
 ## Oracle
-`observed_verified` by replay on 2026-11-21 (`oracle/OBSERVATIONS.md`); human confirmation by
-Thiago Boschese pending.
+`observed_verified` by replay on 2026-11-21 (`oracle/OBSERVATIONS.md`); used without human
+confirmation by decision of 2026-11-21.
 
 ## Provenance
 Original work written for this repository (Thiago Boschese and coding agents, 2026-11-21). No

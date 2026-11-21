@@ -1,0 +1,175 @@
+{
+  "frozen_at": "2026-11-21",
+  "note": "Fixed checks per critical scenario. Texts in `shows` are the oracle's and never change. Controls and fields are named by their role; the evaluating agent writes the journey that reaches each check and names the control or field as it is labelled in the build under test, and the report lists those names for audit.",
+  "check_kinds": {
+    "shows": "this text shows on the page (case and spacing ignored)",
+    "alert": "an error is announced: an element with role alert or aria-live shows text",
+    "present": "a control or field with this role shows",
+    "absent": "no control with this role shows",
+    "enabled": "the control with this role can be used",
+    "disabled": "the control with this role shows but cannot be used",
+    "disabled_or_absent": "the control with this role cannot be used or does not show",
+    "value": "the field with this role holds `equals`"
+  },
+  "fixtures": {
+    "dense-form": {
+      "scenario_dense_amount_bounds": [
+        {
+          "disabled": "submit claim",
+          "after": "amount 0, other required fields valid"
+        },
+        {
+          "disabled": "submit claim",
+          "after": "amount 10000.01"
+        },
+        {
+          "enabled": "submit claim",
+          "after": "amount 42"
+        }
+      ],
+      "scenario_dense_submit_gate": [
+        {
+          "disabled": "submit claim",
+          "after": "fresh load"
+        },
+        {
+          "enabled": "submit claim",
+          "after": "amount, category and date valid"
+        }
+      ],
+      "scenario_dense_approver_button": [
+        {
+          "open": "/?role=approver"
+        },
+        {
+          "present": "approve claim"
+        },
+        {
+          "shows": "Approver"
+        }
+      ],
+      "scenario_dense_employee_no_approve": [
+        {
+          "open": "/"
+        },
+        {
+          "absent": "approve claim"
+        }
+      ],
+      "scenario_dense_attachments_empty": [
+        {
+          "shows": "No attachments yet."
+        }
+      ]
+    },
+    "multi-step-journey": {
+      "scenario_journey_profile_gate": [
+        {
+          "alert": true,
+          "after": "continue with empty profile"
+        },
+        {
+          "present": "full name field"
+        }
+      ],
+      "scenario_journey_permission_denied": [
+        {
+          "open": "/?denied=1"
+        },
+        {
+          "shows": "You do not have permission to create a workspace.",
+          "after": "valid profile, then continue with valid workspace fields"
+        },
+        {
+          "present": "workspace name field"
+        }
+      ],
+      "scenario_journey_back_preserves_profile": [
+        {
+          "value": "full name field",
+          "equals": "Ada Lovelace",
+          "after": "profile entered, continue, back"
+        },
+        {
+          "value": "work email field",
+          "equals": "ada@example.test"
+        }
+      ],
+      "scenario_journey_confirm_success": [
+        {
+          "shows": "Workspace ready.",
+          "after": "valid profile and workspace, confirm on review"
+        }
+      ]
+    },
+    "ds-claims-journey": {
+      "scenario_claims_details_gate": [
+        {
+          "shows": "Enter a description.",
+          "after": "continue with empty details"
+        },
+        {
+          "shows": "Enter an amount greater than 0."
+        }
+      ],
+      "scenario_claims_approver_required": [
+        {
+          "shows": "Claims over 500 need an approver code.",
+          "after": "description, amount 620, continue, continue with no approver code"
+        }
+      ],
+      "scenario_claims_no_approver_under_limit": [
+        {
+          "shows": "Claims up to 500 EUR need no approver.",
+          "after": "description, amount 40, continue"
+        },
+        {
+          "present": "submit claim",
+          "after": "continue"
+        }
+      ],
+      "scenario_claims_back_preserves": [
+        {
+          "value": "description field",
+          "equals": "Taxi",
+          "after": "description Taxi, amount 40, continue, back"
+        },
+        {
+          "value": "amount field",
+          "equals": "40"
+        }
+      ],
+      "scenario_claims_submit_success": [
+        {
+          "shows": "MGR-7",
+          "after": "amount 620, approver code MGR-7, continue to review"
+        },
+        {
+          "shows": "Claim submitted.",
+          "after": "submit"
+        }
+      ],
+      "scenario_claims_viewer_cannot_submit": [
+        {
+          "open": "/?role=viewer"
+        },
+        {
+          "shows": "Viewers cannot submit claims.",
+          "after": "description, amount 40, continue to review"
+        },
+        {
+          "disabled_or_absent": "submit claim"
+        }
+      ]
+    }
+  },
+  "error_scenarios": [
+    "scenario_dense_amount_bounds",
+    "scenario_dense_submit_gate",
+    "scenario_journey_profile_gate",
+    "scenario_journey_permission_denied",
+    "scenario_claims_details_gate",
+    "scenario_claims_approver_required",
+    "scenario_claims_viewer_cannot_submit"
+  ]
+}
