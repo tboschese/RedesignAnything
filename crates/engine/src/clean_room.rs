@@ -108,6 +108,7 @@ pub const TOOLS: &[&str] = &[
     "redesign_traceability_check",
     "redesign_scaffold_app",
     "redesign_checks_run",
+    "redesign_report_write",
     "redesign_quality_run",
     "redesign_fixture_smoke",
     "redesign_mcp_catalogue",

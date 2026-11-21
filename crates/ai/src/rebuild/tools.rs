@@ -466,6 +466,17 @@ pub fn specs() -> Vec<ToolSpec> {
             run: redesign_checks_run,
         },
         ToolSpec {
+            id: "redesign_report_write",
+            title: "Write the redesign project's report",
+            summary: "Run the native checks and write redesign/report/report.md and report.html for the project: its mode, what waits for the person's approval, what is not passing, each scenario with whether its journey was run or only a word was found, how alike each page is to the original, then every check as recorded. Starts no browser and no build: journeys and likeness are what redesign_journeys_run and redesign_prototype_capture last wrote.",
+            beginner: "Writes one page that says where the redesign stands.",
+            toolset: Toolset::Projects,
+            effects: Effects::WRITES_FILESYSTEM,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<ProjectParams>,
+            run: redesign_report_write,
+        },
+        ToolSpec {
             id: "redesign_quality_run",
             title: "Run redesign quality runners",
             summary: "Evaluate oracle scenarios against app sources; ingest optional Playwright/axe JSON under redesign/quality/. Missing runners stay not_evaluated; errors fail closed. Never claims WCAG certification.",
@@ -1756,6 +1767,20 @@ fn redesign_checks_run(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, 
     Ok(ToolOutput::Value(serde_json::to_value(report).map_err(|e| ToolError::internal(e.to_string()))?))
 }
 
+fn redesign_report_write(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: ProjectParams = parse_params(params)?;
+    let ws = open(&p.project)?;
+    let ready = super::redesign_checks::run_native_checks(&ws)?;
+    let quality = super::redesign_quality::run_quality(&ws, None)?;
+    let sections = super::redesign_report::project_sections(&ws, &ready);
+    let mut out = super::redesign_report::write_reports(&ws, None, &ready, &quality, &sections, &json!({}))?;
+    out["concept_ready"] = json!(ready.concept_ready);
+    out["prototype_ready"] = json!(ready.prototype_ready);
+    out["engineering_ready"] = json!(ready.engineering_ready);
+    out["waiting_for_you"] = json!(sections.iter().find(|(title, _)| title == "Waiting for you").map(|(_, lines)| lines));
+    Ok(ToolOutput::Value(out))
+}
+
 fn redesign_quality_run(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
     let p: QualityRunParams = parse_params(params)?;
     let ws = open(&p.project)?;
@@ -1801,7 +1826,8 @@ fn redesign_fixture_smoke(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutpu
     let _ = super::redesign_study::import_oracle_file(&ws, &oracle)?;
     let quality = super::redesign_quality::run_quality(&ws, Some(&oracle))?;
     let ready = super::redesign_checks::run_native_checks(&ws)?;
-    let report = super::redesign_report::write_reports(&ws, Some(fixture_id), &ready, &quality, &json!({"nested_builder_started": false}))?;
+    let sections = super::redesign_report::project_sections(&ws, &ready);
+    let report = super::redesign_report::write_reports(&ws, Some(fixture_id), &ready, &quality, &sections, &json!({"nested_builder_started": false}))?;
     Ok(ToolOutput::Value(json!({
         "fixture_id": fixture_id,
         "project": ws.root,
@@ -2222,6 +2248,7 @@ mod tests {
             "redesign_traceability_check",
             "redesign_scaffold_app",
             "redesign_checks_run",
+            "redesign_report_write",
             "redesign_quality_run",
             "redesign_fixture_smoke",
             "redesign_mcp_catalogue",
