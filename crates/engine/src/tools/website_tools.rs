@@ -721,6 +721,17 @@ const BLUEPRINT_JS: &str = r#"(() => {
   const all = composed(document, 200000);
   const deepAll = (sel, n) => { const out = []; for (const el of all) { if (out.length >= n) break; if (el.matches(sel)) out.push(el); } return out; };
   const up = n => n.parentElement || (n.parentNode && n.parentNode.host) || null;
+  // The visible text: innerText stops at a shadow root, so each open root's own text follows the
+  // page's, in the order of their hosts (a nested root's text comes after its parent's).
+  const pageText = () => {
+    const parts = [document.body ? document.body.innerText : ''];
+    let size = parts[0] ? parts[0].length : 0;
+    for (const r of openRoots) {
+      if (size >= 30000) break;
+      for (const c of r.children) { if (['STYLE', 'SCRIPT', 'TEMPLATE'].includes(c.tagName)) continue; const t = c.innerText; if (t && t.trim()) { parts.push(t); size += t.length; } }
+    }
+    return parts.filter(t => t && t.trim()).join('\n');
+  };
   let closedHosts = 0;
   for (const el of all) { if (closedHosts >= 1000) break; if (el.tagName.includes('-') && !el.shadowRoot && !el.childElementCount && !el.textContent.trim() && shown(el)) closedHosts++; }
   const els = [document.documentElement, document.body, ...composed(document.body, 12000)].filter(Boolean);
@@ -820,7 +831,7 @@ const BLUEPRINT_JS: &str = r#"(() => {
       requests: resources.slice(0, 300)
     },
     headings: deepAll('h1,h2,h3', 120).map(h => ({level: Number(h.tagName[1]), text: cap(h.innerText, 160)})),
-    text: cap(document.body ? document.body.innerText : '', 30000)
+    text: cap(pageText(), 30000)
   };
 })()"#;
 
@@ -1861,6 +1872,9 @@ customElements.define('x-locked', class extends HTMLElement { constructor() { su
         assert!(hrefs.iter().any(|h| h.ends_with("/inside")), "{hrefs:?}");
         let headings: Vec<&str> = capture["headings"].as_array().unwrap().iter().filter_map(|h| h["text"].as_str()).collect();
         assert!(headings.contains(&"Light title") && headings.contains(&"Shadow title"), "{headings:?}");
+        let text = capture["text"].as_str().unwrap_or_default();
+        assert!(text.contains("Light title") && text.contains("Shadow button"), "the visible text reads through open roots: {text:?}");
+        assert!(!text.contains("Locked"), "and not into a closed one: {text:?}");
         assert!(capture["shadow"]["open_roots"].as_u64() >= Some(1) && capture["shadow"]["closed_hosts"].as_u64() >= Some(1), "{}", capture["shadow"]);
     }
 }
