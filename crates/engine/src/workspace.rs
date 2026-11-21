@@ -778,8 +778,8 @@ impl Workspace {
     }
 
     /// A copy of the project beside it, named `name`, to try something else from where this one
-    /// is: what was built, the pictures of the original and the study, not the conversation,
-    /// questions or usage. An app edited in place is copied into the copy's app/. What a build
+    /// is: what was built, the pictures of the original and the study (with its kind), not the
+    /// conversation, questions or usage. An app edited in place is copied into the copy's app/. What a build
     /// makes again (dependencies, compiler output) is left out.
     pub fn duplicate(&self, name: &str) -> Result<Workspace, ToolError> {
         let parent = self.root.parent().ok_or_else(|| ToolError::invalid(format!("{} has no parent folder to copy it into.", self.root.display())))?;
@@ -790,12 +790,15 @@ impl Workspace {
         if app.is_dir() {
             copy_tree(&app, &copy.app_dir(), &|p| rebuilt(p) || (in_place && self.is_own_record(p)), 0)?;
         }
-        for dir in ["reference", "capture"] {
+        // The study: the pictures of the original and, for a redesign, its store (evidence,
+        // capabilities, identity, decisions and plan). Without it the copy isn't the same kind of project.
+        for dir in ["reference", "capture", "redesign"] {
             let from = self.root.join(dir);
             if from.is_dir() {
                 copy_tree(&from, &copy.root.join(dir), &rebuilt, 0)?;
             }
         }
+        copy.manifest.kind.clone_from(&m.kind);
         copy.manifest.stack.clone_from(&m.stack);
         copy.manifest.checks.clone_from(&m.checks);
         copy.manifest.last_reply.clone_from(&m.last_reply);
@@ -1759,6 +1762,19 @@ mod tests {
         assert_eq!(std::fs::read_to_string(copy.join("assets/obj/hero.obj")).unwrap(), "v 0 0 0\n");
         assert!(copy.join("managed/Viewer.csproj").is_file());
         assert!(!copy.join("managed/obj").exists());
+    }
+
+    #[test]
+    fn a_copy_of_a_redesign_project_keeps_its_kind_and_its_study() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut ws = Workspace::create(dir.path(), "Catalogue", "kind=redesign", TargetRef::None).unwrap();
+        ws.manifest.kind = Some("redesign".into());
+        ws.save().unwrap();
+        std::fs::create_dir_all(ws.root.join("redesign/capabilities")).unwrap();
+        std::fs::write(ws.root.join("redesign/capabilities/cap_search.json"), "{}").unwrap();
+        let copy = Workspace::open(&ws.duplicate("Catalogue copy").unwrap().root).unwrap();
+        assert_eq!(copy.manifest.kind, ws.manifest.kind);
+        assert!(copy.root.join("redesign/capabilities/cap_search.json").is_file(), "a redesign copy without its study can't be planned or scaffolded");
     }
 
     /// Older check records are judged by the fields they have.
