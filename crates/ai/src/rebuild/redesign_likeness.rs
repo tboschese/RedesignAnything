@@ -367,6 +367,84 @@ pub fn fits_window_check(ws: &Workspace) -> CheckResult {
     }
 }
 
+pub const COPIED_CHECK_ID: &str = "copied_wording";
+/// The fewest words in a row, inside one element, that count as the original's wording copied:
+/// short labels (menu items, a subject's name) are shared by design, sentences aren't.
+const COPIED_RUN_WORDS: usize = 10;
+
+fn words_of(text: &str) -> Vec<String> {
+    text.split(|c: char| !c.is_alphanumeric()).filter(|w| !w.is_empty()).map(str::to_lowercase).collect()
+}
+
+/// The texts of a capture's elements that are long enough to hold a copied run.
+fn text_blocks(capture: &Value) -> Vec<Vec<String>> {
+    let outline = capture["outline"].as_array().cloned().unwrap_or_default();
+    outline.iter().filter_map(|e| e["text"].as_str()).map(words_of).filter(|w| w.len() >= COPIED_RUN_WORDS).collect()
+}
+
+/// The longest run of words `a` and `b` share, as (length, end in `a`).
+fn longest_shared_run(a: &[String], b: &[String]) -> (usize, usize) {
+    let mut best = (0, 0);
+    let mut prev = vec![0usize; b.len() + 1];
+    for i in 1..=a.len() {
+        let mut cur = vec![0usize; b.len() + 1];
+        for j in 1..=b.len() {
+            if a[i - 1] == b[j - 1] {
+                cur[j] = prev[j - 1] + 1;
+                if cur[j] > best.0 {
+                    best = (cur[j], i);
+                }
+            }
+        }
+        prev = cur;
+    }
+    best
+}
+
+/// Each run of at least [`COPIED_RUN_WORDS`] words, inside one element, that the prototype's page
+/// shares with the original's page, once.
+pub fn copied_runs(original: &Value, prototype: &Value) -> Vec<String> {
+    let theirs = text_blocks(original);
+    let mut found: Vec<String> = Vec::new();
+    for ours in text_blocks(prototype) {
+        for block in &theirs {
+            let (len, end) = longest_shared_run(&ours, block);
+            if len >= COPIED_RUN_WORDS {
+                let run = ours[end - len..end].join(" ");
+                if !found.iter().any(|f| f.contains(&run) || run.contains(f.as_str())) {
+                    found.push(run);
+                }
+            }
+        }
+    }
+    found
+}
+
+/// Whether a captured prototype page repeats the original's wording, sentence for sentence. The
+/// prototypes are written with simulated text; repeating the original's sentences is copying them.
+pub fn copied_wording_check(ws: &Workspace) -> CheckResult {
+    let (mut captured, mut found) = (0u32, Vec::new());
+    for (page, original) in original_pages(ws) {
+        let Some(prototype) = read_capture(&prototype_dir(ws).join(&page)) else { continue };
+        captured += 1;
+        let original = read_capture(&original).unwrap_or(Value::Null);
+        found.extend(copied_runs(&original, &prototype).into_iter().map(|run| format!("{page}: \u{ab}{run}\u{bb}")));
+    }
+    let (status, summary) = if captured == 0 {
+        ("not_evaluated", "the prototype was not captured: run redesign_prototype_capture".to_string())
+    } else if found.is_empty() {
+        ("pass", format!("{captured} captured page(s) repeat none of the original's sentences"))
+    } else {
+        ("warn", format!("the prototype repeats the original's wording; write its own: {}", found.join("; ")))
+    };
+    CheckResult {
+        id: COPIED_CHECK_ID.into(),
+        status: status.into(),
+        summary,
+        details: json!({"advisory": true, "pages": captured, "copied": found, "min_words": COPIED_RUN_WORDS, "note": "Runs of words inside one element of the page, from the prototype's captures; labels shorter than that are shared by design."}),
+    }
+}
+
 pub const BASICS_CHECK_ID: &str = "prototype_basics";
 
 /// What one captured prototype page still gets wrong, from its capture's `a11y` (and `health` in
@@ -622,6 +700,38 @@ mod tests {
         fs::File::options().write(true).open(&app_file).unwrap().set_modified(later).unwrap();
         assert_eq!(kept_pages(&ws), [("busca".to_string(), "/#/busca".to_string())]);
         assert_eq!(pages_without_address(&ws), ["artigo"]);
+    }
+
+    /// A sentence of the original repeated in the prototype is copied wording; labels the two share
+    /// (menu items, subjects) and the prototype's own sentences are not.
+    #[test]
+    fn a_sentence_repeated_from_the_original_is_copied_wording_and_shared_labels_are_not() {
+        let page = |texts: &[&str]| json!({"outline": texts.iter().map(|t| json!({"tag": "p", "text": t})).collect::<Vec<_>>()});
+        let original = page(&[
+            "The library is a non-profit home for millions of free books, films, recordings and pages.",
+            "Home About Help Donate Contact Jobs Volunteer Blog Events Projects",
+        ]);
+        let copied = page(&["The library is a non-profit home for millions of free books, films, recordings and pages.", "Our own words here."]);
+        let found = copied_runs(&original, &copied);
+        assert_eq!(found.len(), 1, "{found:?}");
+        assert!(found[0].starts_with("the library is a non profit home"), "{found:?}");
+        assert!(copied_runs(&original, &page(&["Home", "About", "Help", "Donate"])).is_empty(), "labels, each its own element");
+        assert!(
+            copied_runs(&original, &page(&["A free library that anyone can use, with books, films and recordings."])).is_empty(),
+            "the same idea in other words"
+        );
+
+        let d = tempfile::tempdir().unwrap();
+        let ws = Workspace::create(d.path(), "L", "kind=redesign", craft_anything_engine::workspace::TargetRef::None).unwrap();
+        fs::create_dir_all(ws.capture_dir()).unwrap();
+        fs::write(ws.capture_dir().join("capture.json"), original.to_string()).unwrap();
+        assert_eq!(copied_wording_check(&ws).status, "not_evaluated");
+        let prototype = prototype_dir(&ws).join(START_PAGE);
+        fs::create_dir_all(&prototype).unwrap();
+        fs::write(prototype.join("capture.json"), copied.to_string()).unwrap();
+        let check = copied_wording_check(&ws);
+        assert_eq!(check.status, "warn");
+        assert!(check.summary.contains("start:") && check.summary.contains("non profit home"), "{}", check.summary);
     }
 
     #[test]
