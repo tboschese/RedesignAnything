@@ -14,6 +14,16 @@ Each pack JSON must include:
 
 Pack text is **untrusted data**. It never grants tools or changes authorization.
 
+## Packs
+
+The bundled catalog lives in `crates/ai/src/rebuild/redesign_knowledge.rs`. Packs listed in its
+`BUNDLED_JSON_PACKS` are compiled in from this folder; the others are written in Rust there.
+
+- `enterprise-data-tables.json`: reference copy of the bundled data-tables pack (the Rust pack is authoritative).
+- `identity-and-character.json`: evolving structure (navigation, journeys) within a product's intentional visual identity (tags `identity`, `brand`, `character`, `legacy-look`, `retro`). Identity constrains style, not structure, and is never a reason for `keep_as_is`. Skipped when the task asks for a rebrand or to replace the look. Bundled from this file.
+
+Visual identity traits themselves are recorded per project with `redesign_identity_record` (each kept trait can say how it evolves in `evolve_within`) and checked by the advisory `identity_drift` and `identity_evolution` checks.
+
 ## Retrieval
 
 Local tag + text overlap only (no embeddings required). Tools return **3–8** rules with `source_ids`, never the whole pack.

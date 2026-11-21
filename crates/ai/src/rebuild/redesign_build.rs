@@ -164,6 +164,7 @@ pub fn scaffold_app(ws: &Workspace, policy: Option<&ExecutionPolicy>) -> Result<
     let decisions = redesign_plan::list_decisions(ws).unwrap_or_default();
     let plan = redesign_plan::load_plan(ws).ok();
     let routes = collect_scaffold_routes(&caps, plan.as_ref());
+    let identity_constraints = super::redesign_identity::load(ws)?.map(|p| super::redesign_identity::identity_constraints(&p)).unwrap_or_default();
 
     let app = ws.app_dir();
     fs::create_dir_all(app.join("src/mocks")).map_err(|e| ToolError::io(app.display(), e))?;
@@ -505,6 +506,7 @@ Continue edits in the host agent; do not call `rebuild_start` under `host_agent`
         "mock_banner": MOCK_BANNER,
         "nested_builder_started": false,
         "origin_intact": true,
+        "identity_constraints": identity_constraints,
     });
     redesign_store::ensure(ws)?;
     let refs_path = redesign_store::redesign_dir(ws).join("scaffold_refs.json");
@@ -521,6 +523,7 @@ Continue edits in the host agent; do not call `rebuild_start` under `host_agent`
         "nested_builder_started": false,
         "mock_banner": MOCK_BANNER,
         "refs": "redesign/scaffold_refs.json",
+        "identity_constraints": identity_constraints,
     }))
 }
 

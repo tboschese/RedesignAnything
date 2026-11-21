@@ -65,6 +65,14 @@ impl TargetKind for RedesignKind {
              Prefer redesign_scaffold_app under host_agent instead of nested rebuild_start."
                 .into(),
         );
+        match crate::rebuild::redesign_identity::load(cx.ws) {
+            Ok(Some(profile)) if !profile.traits.is_empty() => out.push(format!(
+                "Visual identity (redesign/identity.json; keep traits are checked by identity_drift):\n- {}",
+                crate::rebuild::redesign_identity::identity_constraints(&profile).join("\n- ")
+            )),
+            Ok(_) => {}
+            Err(e) => out.push(format!("redesign/identity.json could not be read ({}); ask before changing the original's look.", e.message)),
+        }
         // Reuse website capture notes when Study photographed the target.
         let routes = website::routes(cx.ws);
         if !routes.is_empty() {

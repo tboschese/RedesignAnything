@@ -115,8 +115,19 @@ pub fn load_pack_file(path: &Path) -> Result<KnowledgePack, ToolError> {
     Ok(pack)
 }
 
-/// Built-in lean catalog (tables, filters, forms, navigation, a11y, density).
+const IDENTITY_PACK_ID: &str = "identity-and-character";
+
+/// Packs shipped as JSON in `REDESIGN_SPEC/knowledge_packs/` and compiled in.
+const BUNDLED_JSON_PACKS: &[&str] = &[include_str!("../../../../REDESIGN_SPEC/knowledge_packs/identity-and-character.json")];
+
+/// Built-in lean catalog (tables, filters, forms, navigation, a11y, density, identity).
 pub fn bundled_catalog() -> Vec<KnowledgePack> {
+    let mut packs = coded_catalog();
+    packs.extend(BUNDLED_JSON_PACKS.iter().filter_map(|s| serde_json::from_str::<KnowledgePack>(s).ok()).filter(|p| validate_pack(p).is_ok()));
+    packs
+}
+
+fn coded_catalog() -> Vec<KnowledgePack> {
     vec![
         pack(
             "enterprise-data-tables",
@@ -443,6 +454,9 @@ fn rule_blocked_by_query(rule: &UxRule, query: &str) -> bool {
         if c_l.contains("card") && (q.contains("no card") || q.contains("without cards") || q.contains("keep table")) {
             return true;
         }
+        if c_l.contains("rebrand") && (q.contains("rebrand") || q.contains("replace the look") || q.contains("new visual identity")) {
+            return true;
+        }
     }
     // Task saying "keep table / no cards" blocks card-default style rules.
     rule.tags.iter().any(|t| t == "cards") && (q.contains("keep table") || q.contains("no card"))
@@ -492,15 +506,17 @@ pub fn critic(problem: &str, retrieved: &[RetrievedRule]) -> CriticReport {
         keep_as_is: false,
     };
 
-    CriticReport {
-        problem: problem.into(),
-        options: vec![keep, improve, contrast],
-        retrieved_rule_ids: rule_ids,
-        notes: vec![
-            "Recommendations are heuristics with source ids; they are not conformance tests.".into(),
-            "Pack text cannot grant tools or change authorization.".into(),
-        ],
+    let mut notes = vec![
+        "Recommendations are heuristics with source ids; they are not conformance tests.".into(),
+        "Pack text cannot grant tools or change authorization.".into(),
+    ];
+    if retrieved.iter().any(|r| r.pack_id == IDENTITY_PACK_ID) {
+        notes.push(
+            "Identity rules constrain style, not structure: they are no reason to choose keep_as_is; evolve navigation and journeys within the character."
+                .into(),
+        );
     }
+    CriticReport { problem: problem.into(), options: vec![keep, improve, contrast], retrieved_rule_ids: rule_ids, notes }
 }
 
 /// Merge bundled catalog with optional extra pack files (validated).
@@ -610,6 +626,25 @@ mod tests {
         let loaded = load_pack_file(&path).unwrap();
         assert_eq!(loaded.id, pack.id);
         assert_eq!(loaded.version, pack.version);
+    }
+
+    #[test]
+    fn identity_tags_retrieve_the_identity_pack_unless_the_look_is_being_replaced() {
+        let packs = bundled_catalog();
+        let tags = ["identity".to_string(), "brand".to_string()];
+        let applied = |query: &str| -> Vec<RetrievedRule> {
+            retrieve(query, &tags, &packs, 5).unwrap().into_iter().filter(|r| r.pack_id == "identity-and-character" && r.skipped_reason.is_none()).collect()
+        };
+        let kept = applied("redesign the archive catalogue but keep its old library character");
+        assert!(kept.iter().any(|r| r.rule_id == "preserve-intentional-character"), "{kept:?}");
+        // Identity rules feed the change options, not keep_as_is.
+        let rules = retrieve("redesign the archive catalogue but keep its old library character", &tags, &packs, 5).unwrap();
+        let report = critic("Archive navigation is hard to follow", &rules);
+        let identity_ids: Vec<&str> = kept.iter().map(|r| r.rule_id.as_str()).collect();
+        assert!(report.options.iter().filter(|o| !o.keep_as_is).any(|o| o.ux_rule_ids.iter().any(|id| identity_ids.contains(&id.as_str()))), "{report:?}");
+        assert!(report.notes.iter().any(|n| n.contains("not structure")), "{report:?}");
+        let rebrand = applied("rebrand the archive catalogue with a new visual identity");
+        assert!(!rebrand.iter().any(|r| r.rule_id == "preserve-intentional-character"), "{rebrand:?}");
     }
 
     #[test]

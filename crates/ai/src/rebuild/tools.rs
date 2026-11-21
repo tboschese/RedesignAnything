@@ -224,6 +224,28 @@ pub fn specs() -> Vec<ToolSpec> {
             run: redesign_study_map,
         },
         ToolSpec {
+            id: "redesign_identity_record",
+            title: "Record visual identity traits",
+            summary: "Write look-and-feel traits of the original into redesign/identity.json: category, what was observed, whether it is intentional, and whether the redesign keeps, evolves or replaces it, with optional static checks (fonts, corner radius, shadows, colours). Upserts by trait id unless replace_all. Replacing an intentional trait needs a rationale; an intentional trait left undecided is kept.",
+            beginner: "Saves which parts of the original's look should stay.",
+            toolset: Toolset::Projects,
+            effects: Effects::WRITES_FILESYSTEM,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<IdentityRecordParams>,
+            run: redesign_identity_record,
+        },
+        ToolSpec {
+            id: "redesign_identity_show",
+            title: "Show visual identity traits",
+            summary: "Show redesign/identity.json with counts by intent and decision and the plain-English constraints given to the builder. With nothing recorded, an empty profile that says so.",
+            beginner: "Shows which parts of the original's look the redesign keeps.",
+            toolset: Toolset::Projects,
+            effects: Effects::READ_ONLY,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<ProjectParams>,
+            run: redesign_identity_show,
+        },
+        ToolSpec {
             id: "redesign_knowledge_retrieve",
             title: "Retrieve UX knowledge rules",
             summary: "Local tag+text retrieval over licensed UX knowledge packs. Returns 3–8 rules with source ids; never injects a whole pack. No embeddings required.",
@@ -525,6 +547,19 @@ struct EvidencePutParams {
 struct CapabilityPutParams {
     pub project: PathBuf,
     pub capability: super::redesign_store::Capability,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct IdentityRecordParams {
+    pub project: PathBuf,
+    pub traits: Vec<super::redesign_identity::IdentityTrait>,
+    /// Replace every recorded trait instead of upserting by id.
+    #[serde(default)]
+    pub replace_all: bool,
+    /// Replace the profile's notes.
+    #[serde(default)]
+    pub notes: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -1380,6 +1415,18 @@ fn redesign_coverage_show(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutpu
     Ok(ToolOutput::Value(serde_json::to_value(super::redesign_study::coverage_of(&ws)?).map_err(|e| ToolError::internal(e.to_string()))?))
 }
 
+fn redesign_identity_record(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: IdentityRecordParams = parse_params(params)?;
+    let ws = open(&p.project)?;
+    Ok(ToolOutput::Value(super::redesign_identity::record(&ws, p.traits, p.replace_all, p.notes)?))
+}
+
+fn redesign_identity_show(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: ProjectParams = parse_params(params)?;
+    let ws = open(&p.project)?;
+    Ok(ToolOutput::Value(super::redesign_identity::show(&ws)?))
+}
+
 fn redesign_diagnose(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
     let p: DiagnoseParams = parse_params(params)?;
     Ok(ToolOutput::Value(super::redesign_plan::diagnose(
@@ -1791,6 +1838,8 @@ mod tests {
             "redesign_capabilities_list",
             "redesign_coverage_show",
             "redesign_study_map",
+            "redesign_identity_record",
+            "redesign_identity_show",
             "redesign_knowledge_retrieve",
             "redesign_critic_recommend",
             "redesign_ds_ingest",
