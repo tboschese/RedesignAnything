@@ -105,6 +105,12 @@ impl TargetKind for RedesignKind {
         out
     }
 
+    /// The redesign tools made the study (capture, capabilities, oracle, plan); studying the site
+    /// again would replace the pages the plan is about.
+    fn keeps_its_study(&self, ws: &Workspace) -> bool {
+        ws.capture_dir().join("capture.json").is_file() && crate::rebuild::redesign_store::list_capabilities(ws).is_ok_and(|caps| !caps.is_empty())
+    }
+
     fn checks(&self, _ws: &Workspace) -> Vec<Box<dyn Check>> {
         // No WebVisualCheck / pixel-similarity gate. Build + native Ready (fail-closed).
         vec![Box::new(BuildCheck), Box::new(RedesignReadyCheck)]
@@ -192,6 +198,33 @@ mod tests {
         assert_eq!(kinds.detect("Redesign this website please", &web, "").unwrap().id(), "website");
         assert_eq!(kinds.detect("Clone this website kind=redesign", &web, "").unwrap().id(), "redesign");
         assert_eq!(kinds.get("redesign").unwrap().default_stack(&DetectCx::new("", &web, "")), RedesignKind::DEFAULT_STACK);
+    }
+
+    #[test]
+    fn a_redesign_keeps_its_study_once_it_has_a_capture_and_capabilities() {
+        let d = tempfile::tempdir().unwrap();
+        let ws = Workspace::create(d.path(), "R", "kind=redesign", TargetRef::Website { url: "https://example.test".into() }).unwrap();
+        assert!(!RedesignKind.keeps_its_study(&ws), "nothing studied yet: the builder studies");
+        std::fs::create_dir_all(ws.capture_dir()).unwrap();
+        std::fs::write(ws.capture_dir().join("capture.json"), "{}").unwrap();
+        assert!(!RedesignKind.keeps_its_study(&ws), "a capture alone is not a redesign study");
+        let cap = crate::rebuild::redesign_store::Capability {
+            id: "cap_search".into(),
+            title: "Search".into(),
+            task: "find".into(),
+            actor_roles: vec![],
+            original_routes: vec!["/".into()],
+            inputs: vec![],
+            actions: vec![],
+            outcomes: vec![],
+            criticality: "critical".into(),
+            knowledge_status: "observed".into(),
+            source_refs: vec![],
+            unknowns: vec![],
+        };
+        crate::rebuild::redesign_store::put_capability(&ws, cap).unwrap();
+        assert!(RedesignKind.keeps_its_study(&ws));
+        assert!(!WebsiteKind.keeps_its_study(&ws), "other kinds study as before");
     }
 
     #[test]

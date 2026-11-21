@@ -889,7 +889,13 @@ impl Worker {
         let api_resumed = api.as_ref().is_some_and(crate::agent::ApiConversation::resumed);
         let kept = KeptHistory { in_mode: kept_without_api.in_mode || api_resumed, elsewhere: kept_without_api.elsewhere };
         let carrying_on = is_carrying_on(opts, kept.in_mode);
-        let first = starts_with_study(opts, kept, capture_in_mode(ws, run_deep));
+        // A study other tools made (a redesign's) is the plan's ground: build from it.
+        let keeps_study = kind.keeps_its_study(ws);
+        let first = !keeps_study && starts_with_study(opts, kept, capture_in_mode(ws, run_deep));
+        if keeps_study {
+            study::keep_kinds_study(ws, run_deep)?;
+            self.step(ws, Step::Study, Status::Inspecting, "Building from the study already in the project; the site isn't captured again.")?;
+        }
         if first {
             self.study(ws, kind, run_deep)?;
             if let Some((name, ex)) = extractor {

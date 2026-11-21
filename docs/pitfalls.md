@@ -1412,3 +1412,9 @@ a scenario rests on a word hint.
 its box in current browsers and has no text to read, so a link in a closed menu was outlined as
 shown and counted as a control without a name. The capture, the states tool and the journey tool
 now also ask the browser (`Element.checkVisibility()`) before they call an element shown.
+
+**A capture the builder didn't make looks unusable to it.** The builder reuses a capture only when
+`craft.json` records the mode its own study took it in. A redesign's study is made by the redesign
+tools, which record no such thing, so the first builder run deleted `capture/` and picked other
+pages than the ones the plan was about. The redesign kind now keeps its study
+(`TargetKind::keeps_its_study`); a Clean room run still removes what only Deep mode may keep.
