@@ -1368,10 +1368,11 @@ const KEYBOARD_FOCUS_JS: &str = r#"(() => {
   if (!a || a === document.body || a === document.documentElement) return {on_page: false};
   const again = a.hasAttribute('data-craft-tab');
   if (!again) a.setAttribute('data-craft-tab', '__N__');
+  const mark = a.getAttribute('data-craft-tab');
   const ring = el => { if (!el || !el.getBoundingClientRect) return false; const s = getComputedStyle(el); return (s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0) || (s.boxShadow && s.boxShadow !== 'none'); };
   const up = a.parentElement || (a.getRootNode() && a.getRootNode().host) || null;
   const cls = typeof a.className === 'string' && a.className.trim() ? '.' + a.className.trim().split(/\s+/)[0] : '';
-  return {on_page: true, again, element: a.tagName.toLowerCase() + cls, visible: ring(a) || ring(up)};
+  return {on_page: true, again, mark, element: a.tagName.toLowerCase() + cls, visible: ring(a) || ring(up)};
 })()"#;
 
 /// Press Tab through the page from its top and say where the focus went: how many of the page's
@@ -1382,6 +1383,9 @@ fn keyboard_walk(client: &mut CdpClient, dl: &Deadline) -> Result<Value, ToolErr
     let start = eval(client, &deep(KEYBOARD_START_JS), dl)?;
     let (mut reached, mut not_visible, mut examples) = (0u64, 0u64, Vec::<String>::new());
     let mut stopped = "limit";
+    // The control the last press reached: a date or time field takes several presses (day, month,
+    // year) while the focus stays on it, which is not the walk coming round again.
+    let mut last_mark = Value::Null;
     for n in 0..KEYBOARD_TABS {
         if dl.expired() {
             stopped = "time";
@@ -1405,9 +1409,13 @@ fn keyboard_walk(client: &mut CdpClient, dl: &Deadline) -> Result<Value, ToolErr
             continue;
         }
         if f["again"] == true {
+            if f["mark"] == last_mark {
+                continue;
+            }
             stopped = "wrapped";
             break;
         }
+        last_mark = f["mark"].clone();
         reached += 1;
         if f["visible"] != true {
             not_visible += 1;
@@ -2396,6 +2404,7 @@ for (const t of tabs) t.onclick = () => tabs.forEach(o => o.setAttribute('aria-s
     fn the_keyboard_walk_counts_reached_controls_and_invisible_focus() {
         const PAGE: &str = r#"<!doctype html><html lang="en"><body><main>
 <a href="/one">One</a>
+<label>Day <input type="date"></label>
 <button>Two</button>
 <button class="bare" style="outline:none">Three</button>
 <button tabindex="-1">Skipped</button>
@@ -2406,8 +2415,8 @@ for (const t of tabs) t.onclick = () => tabs.forEach(o => o.setAttribute('aria-s
 }});</script>
 </main></body></html>"#;
         let k = capture_of(PAGE)["a11y"]["keyboard"].clone();
-        assert_eq!(k["controls"], 4, "{k}");
-        assert_eq!(k["reached"], 4, "each control once: {k}");
+        assert_eq!(k["controls"], 5, "{k}");
+        assert_eq!(k["reached"], 5, "each control once, a date field's day, month and year not ending the walk: {k}");
         assert_eq!(k["focus_not_visible"], 1, "{k}");
         assert!(k["not_visible_examples"][0].as_str().unwrap().starts_with("button"), "{k}");
         assert_ne!(k["stopped"], "limit", "{k}");
