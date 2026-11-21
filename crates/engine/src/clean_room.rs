@@ -91,6 +91,7 @@ pub const TOOLS: &[&str] = &[
     "redesign_modes_list",
     "redesign_variants_create",
     "redesign_variants_show",
+    "redesign_prototype_capture",
     "redesign_likeness_measure",
     "redesign_knowledge_retrieve",
     "redesign_critic_recommend",
