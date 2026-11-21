@@ -501,12 +501,28 @@ pub(crate) fn unix_now() -> u64 {
 
 /// What to do about a used-up plan limit (`kind` as Claude Code names it), `resets_at` being
 /// Unix seconds and `now` the time it's said.
-pub(crate) fn plan_limit_fix(kind: &str, resets_at: Option<u64>, now: u64) -> String {
+/// `said` is what Claude Code said: a limit that is one model's (its type names a model family, or
+/// Claude Code asks to switch model) leaves the plan's other models usable, so the fix says to
+/// choose another model before saying to wait or choose another AI.
+pub(crate) fn plan_limit_fix(kind: &str, resets_at: Option<u64>, now: u64, said: &str) -> String {
     let which = match kind {
         "five_hour" => "5-hour",
         k if k.starts_with("seven_day") => "weekly",
         _ => "usage",
     };
+    let family = kind.strip_prefix("seven_day_").filter(|f| !f.is_empty());
+    let one_model = family.is_some() || said.to_ascii_lowercase().contains("another model");
+    if one_model {
+        let whose = family.map_or("the model it was asked to use".to_string(), |f| format!("{f} models"));
+        let when = match resets_at.map(|at| at.saturating_sub(now)) {
+            Some(s) if s >= 2 * 3600 => format!(" (it resets in about {} hours)", s.div_ceil(3600)),
+            Some(s) if s > 60 => format!(" (it resets in about {} minutes)", s.div_ceil(60)),
+            _ => String::new(),
+        };
+        return format!(
+            "Claude's limit for {whose} is used up{when}, so the build stopped instead of trying again. Other models of the same plan may still work: choose one for this AI in Settings → AI (or `craft-anything-cli ai model <name> <model>`) and press Try again, or choose another AI."
+        );
+    }
     let when = match resets_at.map(|at| at.saturating_sub(now)) {
         Some(s) if s >= 2 * 3600 => format!(" It resets in about {} hours.", s.div_ceil(3600)),
         Some(s) if s > 60 => format!(" It resets in about {} minutes.", s.div_ceil(60)),
@@ -1701,12 +1717,24 @@ mod tests {
 
     #[test]
     fn plan_limit_fix_names_the_limit_and_how_long() {
-        assert!(plan_limit_fix("five_hour", Some(10_000 + 3 * 3600), 10_000).contains("5-hour limit is used up"));
-        assert!(plan_limit_fix("five_hour", Some(10_000 + 3 * 3600), 10_000).contains("about 3 hours"));
-        assert!(plan_limit_fix("seven_day_opus", Some(10_000 + 90 * 60), 10_000).contains("weekly limit"));
-        assert!(plan_limit_fix("seven_day_opus", Some(10_000 + 90 * 60), 10_000).contains("about 90 minutes"));
-        assert!(plan_limit_fix("x", Some(5), 10_000).contains("a minute or so"), "a reset already past");
-        assert!(!plan_limit_fix("x", None, 10_000).contains("resets in"));
+        assert!(plan_limit_fix("five_hour", Some(10_000 + 3 * 3600), 10_000, "").contains("5-hour limit is used up"));
+        assert!(plan_limit_fix("five_hour", Some(10_000 + 3 * 3600), 10_000, "").contains("about 3 hours"));
+        assert!(plan_limit_fix("seven_day", Some(10_000 + 90 * 60), 10_000, "").contains("weekly limit"));
+        assert!(plan_limit_fix("seven_day_opus", Some(10_000 + 90 * 60), 10_000, "").contains("about 90 minutes"));
+        assert!(plan_limit_fix("x", Some(5), 10_000, "").contains("a minute or so"), "a reset already past");
+        assert!(!plan_limit_fix("x", None, 10_000, "").contains("resets in"));
+    }
+
+    /// A limit that is one model's leaves the plan's other models usable: the fix says so before
+    /// saying to wait, whether the limit's type names the model family or Claude Code asks to switch.
+    #[test]
+    fn a_used_up_limit_of_one_model_says_another_model_may_still_work() {
+        let named = plan_limit_fix("seven_day_opus", Some(10_000 + 57 * 3600), 10_000, "");
+        assert!(named.contains("limit for opus models is used up") && named.contains("Other models") && named.contains("about 57 hours"), "{named}");
+        let said = plan_limit_fix("seven_day", Some(10_000 + 57 * 3600), 10_000, "You've hit your monthly spend limit. Switch to another model to continue.");
+        assert!(said.contains("the model it was asked to use") && said.contains("ai model"), "{said}");
+        let plan = plan_limit_fix("seven_day", Some(10_000 + 57 * 3600), 10_000, "You've hit your weekly limit · resets 6pm");
+        assert!(plan.contains("plan's weekly limit is used up") && !plan.contains("Other models"), "a whole plan's limit is told as before: {plan}");
     }
 
     #[test]
