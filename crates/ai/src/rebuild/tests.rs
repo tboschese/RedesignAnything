@@ -3796,6 +3796,11 @@ fn a_redesign_brief_follows_its_mode_instead_of_asking_for_an_exact_match() {
     super::redesign_plan::build_plan(&ws, "refresh", vec![], vec![]).unwrap();
     let tidy = brief(&ws, "redesign", false, false, None, false, None);
     assert!(tidy.contains(RedesignMode::Refresh.capture_guidance()) && !tidy.contains(RedesignMode::Redesign.capture_guidance()), "{tidy}");
+    // New flows may change the design too, and is told so; it is still told to keep the identity.
+    super::redesign_plan::build_plan(&ws, "reimagine", vec![], vec![]).unwrap();
+    let new_flows = brief(&ws, "redesign", false, false, None, false, None);
+    assert!(new_flows.contains(RedesignMode::Reimagine.capture_guidance()) && !new_flows.contains(RedesignMode::Redesign.capture_guidance()), "{new_flows}");
+    assert!(RedesignMode::Reimagine.capture_guidance().contains("identity.json"), "freedom in the design, not from the essence");
 }
 
 #[test]

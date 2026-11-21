@@ -1,5 +1,9 @@
 # Changelog — Redesign Anything specification
 
+## Documentation 1.4.6 — 2026-11-20
+
+- `SPEC.md` scope: `reimagine` may propose a new visual design as well as new flows. The intentional identity traits stay, kept or evolved.
+
 ## Documentation 1.4.5 — 2026-11-20
 
 - Likeness to the original is measured per page and reported, not judged against a limit; variants of one study are compared by order. See `docs/PR16_LIKENESS.md`. No contract or schema change.
