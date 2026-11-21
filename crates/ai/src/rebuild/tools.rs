@@ -290,6 +290,17 @@ pub fn specs() -> Vec<ToolSpec> {
             run: redesign_prototype_capture,
         },
         ToolSpec {
+            id: "redesign_journeys_run",
+            title: "Run the prototype's journeys",
+            summary: "Serve the project's built prototype, and in the private browser do each journey's steps the way a visitor would (web_site_journey_run: {\"click\": name}, {\"type\": text, \"into\": field}, {\"press\": key}, {\"open\": path}, {\"expect\": text}), each from a freshly loaded start page. A journey shows one scenario of redesign/oracle/scenarios.json in this prototype and ends with an expect. `journeys` replaces the ones the project keeps (redesign/quality/journeys.json); without it the kept ones run again. Writes redesign/quality/journeys-report.json and a picture of where each journey ended; redesign_checks_run then judges those scenarios by their journey instead of a word hint, for as long as the prototype is not built again. Build the prototype first: this tool runs no build. It closes any site this session has open. Runs the prototype's scripts, so it needs your approval.",
+            beginner: "Clicks and types through the new design to check that each task still works.",
+            toolset: Toolset::Projects,
+            effects: Effects::WRITES_FILESYSTEM.union(Effects::EXECUTES_FOREIGN_CODE).union(Effects::ACCESSES_NETWORK).union(Effects::LAUNCHES_PROCESS),
+            requires: Requires::Engine("chromium"),
+            input_schema: schema_of::<JourneysRunParams>,
+            run: redesign_journeys_run,
+        },
+        ToolSpec {
             id: "redesign_likeness_measure",
             title: "Measure how alike the prototype is",
             summary: "Compare each original page (the start page and every captured route) with the prototype page captured for it, and save redesign/prototype_capture/likeness.json: page structure, word overlap, and tile layout plus detail of the screenshots, each 0..=100. Capture the prototype first: open each page with web_site_open and save it with web_site_capture into redesign/prototype_capture/start/ or redesign/prototype_capture/<route slug>/ (this tool makes the parent folder and lists the pages it expects). A page that can't be compared is named with its reason, including a screenshot with large blank bands. The scores are reported, not judged against a limit; redesign_variants_show warns when a variant that changes less is less like the original than one that changes more. Opens no browser.",
@@ -623,6 +634,18 @@ struct PrototypeCaptureParams {
     /// Window widths; the original's when omitted.
     #[serde(default)]
     pub widths: Option<Vec<u32>>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct JourneysRunParams {
+    pub project: PathBuf,
+    /// The journeys to keep and run, one per scenario. Omitted: the ones the project keeps.
+    #[serde(default)]
+    pub journeys: Option<Vec<super::redesign_journeys::Journey>>,
+    /// Window width in CSS pixels (default 1440).
+    #[serde(default)]
+    pub width: Option<u32>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -1578,6 +1601,66 @@ fn redesign_prototype_capture(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOu
     Ok(ToolOutput::Value(out))
 }
 
+fn redesign_journeys_run(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    use super::redesign_journeys as journeys;
+    let p: JourneysRunParams = parse_params(params)?;
+    let ws = open(&p.project)?;
+    let engine = engine(ctx).ok_or_else(|| {
+        ToolError::new(ErrorCode::FeatureMissing, "Running a prototype's journeys isn't available in this engine.")
+            .with_remediation("Use the app or `craft-anything-cli`.")
+    })?;
+    if let Some(given) = &p.journeys {
+        journeys::save(&ws, given)?;
+    }
+    let kept = journeys::load(&ws)?;
+    if kept.is_empty() {
+        return Err(ToolError::invalid("this project keeps no journeys yet").with_remediation(
+            "Pass `journeys`: for each scenario in redesign/oracle/scenarios.json, the steps that show it in this prototype, ending with an expect.",
+        ));
+    }
+    journeys::check(&ws, &kept)?;
+    let width = p.width.unwrap_or(1440);
+    let server = super::preview(&ws)
+        .map_err(|e| e.with_remediation("Build the prototype first (for the scaffold: npm install and npm run build in app/), then call this again."))?;
+    let built = journeys::built_fingerprint(&ws).ok_or_else(|| ToolError::internal("the built prototype could not be read"))?;
+    // The browser tools are run as this call's own steps, as in redesign_prototype_capture: the
+    // session is this call's while it runs, and this tool's effects are theirs.
+    let step = |ctx: &mut Ctx<'_>, id: &str, args: Value| -> Result<ToolOutput, ToolError> {
+        let spec = engine.registry().get(id).ok_or_else(|| ToolError::internal(format!("{id} is not registered")))?;
+        (spec.run)(ctx, args)
+    };
+    let _ = step(ctx, "web_site_close", json!({}));
+    let opened = step(ctx, "web_site_open", json!({"url": server.url(), "width": width}));
+    let mut results = Vec::new();
+    if opened.is_ok() {
+        for (i, j) in kept.iter().enumerate() {
+            ctx.report(Some(i as f32 / kept.len() as f32), format!("Running the journey for {}…", j.scenario_id));
+            let ran = journeys::fresh_picture_dir(&ws, &j.scenario_id)
+                .and_then(|out| step(ctx, "web_site_journey_run", json!({"steps": j.steps, "width": width, "output_directory": out.display().to_string()})));
+            results.push(journeys::result_of(&j.scenario_id, ran.map(|o| o.to_json()["result"].clone())));
+        }
+    }
+    let _ = step(ctx, "web_site_close", json!({}));
+    drop(server);
+    opened?;
+    let report = journeys::Report { built, width, journeys: results };
+    let path = journeys::write_report(&ws, &report)?;
+    let passed = report.journeys.iter().filter(|j| j.passed).count();
+    let without: Vec<String> = {
+        let have: Vec<&str> = kept.iter().map(|j| j.scenario_id.as_str()).collect();
+        let (_, evals) = super::redesign_quality::evaluate_oracle_file(&ws, &super::redesign_store::redesign_dir(&ws).join("oracle/scenarios.json"))?;
+        evals.into_iter().filter(|e| e.status != "not_evaluated" && !have.contains(&e.scenario_id.as_str())).map(|e| e.scenario_id).collect()
+    };
+    Ok(ToolOutput::Value(json!({
+        "passed": passed,
+        "failed": report.journeys.len() - passed,
+        "journeys": report.journeys.iter().map(|j| json!({"scenario_id": j.scenario_id, "passed": j.passed, "note": j.note()})).collect::<Vec<_>>(),
+        "scenarios_without_a_journey": without,
+        "report": path.strip_prefix(&ws.root).unwrap_or(&path).display().to_string(),
+        "note": "redesign_checks_run judges these scenarios by their journey until the prototype is built again; scenarios without a journey are still judged by a word hint. A journey shows that its steps passed; whether they are the right steps for the scenario is for a person to read in the report.",
+    })))
+}
+
 fn redesign_likeness_measure(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
     let p: ProjectParams = parse_params(params)?;
     let ws = open(&p.project)?;
@@ -2037,6 +2120,66 @@ mod tests {
     }
 
     #[test]
+    fn running_journeys_is_refused_until_the_person_approves_it() {
+        let d = tempfile::tempdir().unwrap();
+        let mut session = craft_anything_engine::testing::session();
+        session.settings.engines.tools.chromium = Some(std::env::current_exe().unwrap());
+        let e = Engine::shared(session, specs());
+        let err = e.call("redesign_journeys_run", json!({"project": d.path()}), CallOptions::new(Caller::Mcp)).unwrap_err();
+        assert_eq!(err.code, ErrorCode::ConsentRequired, "{err:?}");
+    }
+
+    /// A built prototype whose search works and whose "Donate" does nothing: the journeys tell
+    /// them apart, where a word in the sources passes both, and the checks then use the journeys.
+    /// Live (`--ignored`): needs a browser.
+    #[test]
+    #[ignore]
+    fn journeys_run_in_the_built_prototype_decide_its_scenarios() {
+        let d = tempfile::tempdir().unwrap();
+        let e = Engine::shared(craft_anything_engine::testing::live_session(), specs());
+        let ok = || CallOptions::new(Caller::Cli).with_consent(Consent::Granted);
+        let mut ws = Workspace::create(d.path(), "Catalogue", "kind=redesign", craft_anything_engine::workspace::TargetRef::None).unwrap();
+        ws.manifest.kind = Some("redesign".into());
+        ws.save().unwrap();
+        let page = "<!doctype html><html><body><form id=f><label for=q>Search the catalogue</label> <input id=q> <button>Search</button></form>\
+                    <button>Donate</button><p id=out></p>\
+                    <script>document.getElementById('f').onsubmit = ev => { ev.preventDefault(); document.getElementById('out').textContent = 'Results for ' + document.getElementById('q').value; };</script></body></html>";
+        std::fs::create_dir_all(ws.app_dir().join("dist")).unwrap();
+        std::fs::write(ws.app_dir().join("dist/index.html"), page).unwrap();
+        std::fs::create_dir_all(ws.app_dir().join("src")).unwrap();
+        std::fs::write(ws.app_dir().join("src/App.tsx"), page).unwrap();
+        let oracle = ws.root.join("redesign/oracle");
+        std::fs::create_dir_all(&oracle).unwrap();
+        let scenarios = json!({"scenarios": [
+            {"id": "search", "capability_id": "c1", "executable": true, "then": ["Search returns results"]},
+            {"id": "donate", "capability_id": "c2", "executable": true, "then": ["Donate control opens the donation form"]},
+        ]});
+        std::fs::write(oracle.join("scenarios.json"), scenarios.to_string()).unwrap();
+        let project = ws.root.display().to_string();
+        let scenario_statuses = |ws: &Workspace| {
+            let (_, evals) = crate::rebuild::redesign_quality::evaluate_oracle(ws, &scenarios).unwrap();
+            evals.into_iter().map(|e| (e.status, e.method)).collect::<Vec<_>>()
+        };
+        let both = |status: &str, method: &str| (status.to_string(), method.to_string());
+        assert_eq!(scenario_statuses(&ws), [both("pass", "word_hint"), both("pass", "word_hint")], "both words are in the sources");
+
+        let none_yet = e.call("redesign_journeys_run", json!({"project": project}), ok()).unwrap_err();
+        assert_eq!(none_yet.code, ErrorCode::BadInput, "{none_yet:?}");
+        let journeys = json!([
+            {"scenario_id": "search", "steps": [{"type": "maps", "into": "Search the catalogue"}, {"press": "Enter"}, {"expect": "Results for maps"}]},
+            {"scenario_id": "donate", "steps": [{"click": "Donate"}, {"expect": "Donation form"}]},
+        ]);
+        let ran = e.call("redesign_journeys_run", json!({"project": project, "journeys": journeys}), ok()).unwrap().to_json();
+        assert_eq!((&ran["result"]["passed"], &ran["result"]["failed"]), (&json!(1), &json!(1)), "{ran}");
+        assert_eq!(scenario_statuses(&ws), [both("pass", "journey_run"), both("fail", "journey_run")]);
+        assert!(ws.root.join("redesign/quality/journeys/search/end.png").is_file(), "a picture of where the journey ended");
+
+        // The kept journeys run again without being passed, and replace the report.
+        let again = e.call("redesign_journeys_run", json!({"project": project}), ok()).unwrap().to_json();
+        assert_eq!(again["result"]["journeys"], ran["result"]["journeys"], "{again}");
+    }
+
+    #[test]
     fn rebuild_tools_are_registered_from_the_ai_layer_and_check_their_input() {
         let d = tempfile::tempdir().unwrap();
         let e = Engine::shared(craft_anything_engine::testing::session(), specs());
@@ -2063,6 +2206,7 @@ mod tests {
             "redesign_variants_create",
             "redesign_variants_show",
             "redesign_prototype_capture",
+            "redesign_journeys_run",
             "redesign_likeness_measure",
             "redesign_knowledge_retrieve",
             "redesign_critic_recommend",

@@ -1400,3 +1400,9 @@ Compare variants of the same study with each other instead (`likeness_order` in
 so a scaffold nobody had built could be Prototype Ready. It now passes only when `app/` holds a
 built site that is as new as its sources, and says it ran no build itself. Never built, or edited
 since the last build, is `not_evaluated`: Concept Ready still stands, Prototype Ready does not.
+
+**A word in the sources is not a working journey.** `functional_scenarios` passed a scenario when
+one word of its "then" appeared anywhere in the app's sources, mock data included. On a real study
+it passed two scenarios about an item page for a prototype that has no item page. Scenarios are now
+judged by a journey run in the built prototype when one exists (`redesign_journeys_run`), and the
+check says for each scenario whether it was a journey or a word hint. Read that before trusting a pass.

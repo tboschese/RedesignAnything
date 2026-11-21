@@ -1,5 +1,9 @@
 # Changelog — Redesign Anything specification
 
+## Documentation 1.4.8 — 2026-11-20
+
+- Critical scenarios can be judged by a journey run in the built prototype (`redesign_journeys_run`) instead of a word hint. See `docs/PR17_JOURNEYS.md`. No contract or schema change: the gate in CONTRACTS.md §7 still counts passed scenarios.
+
 ## Documentation 1.4.7 — 2026-11-20
 
 - Prototype Ready's `build.status === 'pass'` (CONTRACTS.md §7) now means a built site that is as new as the app's sources, not a `package.json`. No contract or schema change.
