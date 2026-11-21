@@ -279,6 +279,17 @@ pub fn specs() -> Vec<ToolSpec> {
             run: redesign_variants_show,
         },
         ToolSpec {
+            id: "redesign_prototype_capture",
+            title: "Capture the prototype and measure it",
+            summary: "Serve the project's built prototype (app/dist, build or out), open it in the private browser and save a capture of its start page into redesign/prototype_capture/start/ (and of every original route at `/`), at the widths the original was captured at, then run redesign_likeness_measure. `pages` says which prototype address stands for another original page, e.g. {page: \"details\", path: \"/#/library\"}. Build the prototype first: this tool runs no build. It closes any site this session has open. Runs the prototype's scripts, so it needs your approval.",
+            beginner: "Photographs the new design and measures how close it is to the original.",
+            toolset: Toolset::Projects,
+            effects: Effects::WRITES_FILESYSTEM.union(Effects::EXECUTES_FOREIGN_CODE).union(Effects::ACCESSES_NETWORK).union(Effects::LAUNCHES_PROCESS),
+            requires: Requires::Engine("chromium"),
+            input_schema: schema_of::<PrototypeCaptureParams>,
+            run: redesign_prototype_capture,
+        },
+        ToolSpec {
             id: "redesign_likeness_measure",
             title: "Measure how alike the prototype is",
             summary: "Compare each original page (the start page and every captured route) with the prototype page captured for it, and save redesign/prototype_capture/likeness.json: page structure, word overlap, and tile layout plus detail of the screenshots, each 0..=100. Capture the prototype first: open each page with web_site_open and save it with web_site_capture into redesign/prototype_capture/start/ or redesign/prototype_capture/<route slug>/ (this tool makes the parent folder and lists the pages it expects). A page that can't be compared is named with its reason, including a screenshot with large blank bands. The scores are reported, not judged against a limit; redesign_variants_show warns when a variant that changes less is less like the original than one that changes more. Opens no browser.",
@@ -591,6 +602,27 @@ struct EvidencePutParams {
 struct CapabilityPutParams {
     pub project: PathBuf,
     pub capability: super::redesign_store::Capability,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct PrototypePage {
+    /// A page of the original: `start` or a route's slug.
+    pub page: String,
+    /// The prototype address that stands for it, e.g. `/` or `/#/library`.
+    pub path: String,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct PrototypeCaptureParams {
+    pub project: PathBuf,
+    /// Prototype addresses for original pages other than the start page.
+    #[serde(default)]
+    pub pages: Vec<PrototypePage>,
+    /// Window widths; the original's when omitted.
+    #[serde(default)]
+    pub widths: Option<Vec<u32>>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -1504,6 +1536,48 @@ fn redesign_variants_show(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutpu
     Ok(ToolOutput::Value(super::redesign_variants::show(&ws)?))
 }
 
+fn redesign_prototype_capture(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: PrototypeCaptureParams = parse_params(params)?;
+    let ws = open(&p.project)?;
+    let engine = engine(ctx).ok_or_else(|| {
+        ToolError::new(ErrorCode::FeatureMissing, "Capturing a prototype isn't available in this engine.")
+            .with_remediation("Use the app or `craft-anything-cli`.")
+    })?;
+    let extra: Vec<(String, String)> = p.pages.into_iter().map(|x| (x.page, x.path)).collect();
+    let targets = super::redesign_likeness::capture_targets(&ws, &extra)?;
+    let widths = p.widths.unwrap_or_else(|| super::redesign_likeness::original_widths(&ws));
+    let server = super::preview(&ws)
+        .map_err(|e| e.with_remediation("Build the prototype first (for the scaffold: npm install and npm run build in app/), then call this again."))?;
+    let base = server.url();
+    // The browser tools are run as this call's own steps: the session is this call's while it runs,
+    // so asking the engine for them would wait on it. This tool's effects are theirs, so the same
+    // approval was asked for.
+    let step = |ctx: &mut Ctx<'_>, id: &str, args: Value| -> Result<ToolOutput, ToolError> {
+        let spec = engine.registry().get(id).ok_or_else(|| ToolError::internal(format!("{id} is not registered")))?;
+        (spec.run)(ctx, args)
+    };
+    let (mut captured, mut not_captured) = (Vec::new(), Vec::new());
+    for (i, (page, path)) in targets.iter().enumerate() {
+        ctx.report(Some(i as f32 / targets.len() as f32), format!("Capturing the prototype's {page} page…"));
+        let done = super::redesign_likeness::fresh_page_dir(&ws, page).and_then(|out| {
+            step(ctx, "web_site_open", json!({"url": format!("{}{}", base.trim_end_matches('/'), path)}))?;
+            step(ctx, "web_site_capture", json!({"output_directory": out.display().to_string(), "widths": widths}))
+        });
+        // A page opened with only its `#…` changed doesn't load again, so each page gets its own browser.
+        let _ = step(ctx, "web_site_close", json!({}));
+        match done {
+            Ok(_) => captured.push(json!({"page": page, "path": path})),
+            Err(e) => not_captured.push(json!({"page": page, "path": path, "why": e.message})),
+        }
+    }
+    drop(server);
+    let mut out = super::redesign_likeness::measure(&ws)?;
+    out["captured"] = json!(captured);
+    out["not_captured"] = json!(not_captured);
+    out["widths"] = json!(widths);
+    Ok(ToolOutput::Value(out))
+}
+
 fn redesign_likeness_measure(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
     let p: ProjectParams = parse_params(params)?;
     let ws = open(&p.project)?;
@@ -1910,6 +1984,58 @@ mod tests {
         assert!(r.is_err(), "{r:?}");
     }
 
+    /// The capture runs the prototype's scripts in a browser, so it is asked for like the browser
+    /// tools it uses, which it runs without going back through the engine.
+    #[test]
+    fn capturing_a_prototype_is_refused_until_the_person_approves_it() {
+        let d = tempfile::tempdir().unwrap();
+        // Any program stands in for the browser: the call must stop before one is started.
+        let mut session = craft_anything_engine::testing::session();
+        session.settings.engines.tools.chromium = Some(std::env::current_exe().unwrap());
+        let e = Engine::shared(session, specs());
+        let err = e.call("redesign_prototype_capture", json!({"project": d.path()}), CallOptions::new(Caller::Mcp)).unwrap_err();
+        assert_eq!(err.code, ErrorCode::ConsentRequired, "{err:?}");
+    }
+
+    /// A built site that is both the original and the prototype is captured and found fully alike.
+    /// Live (`--ignored`): needs a browser.
+    #[test]
+    #[ignore]
+    fn a_built_prototype_is_captured_and_measured_in_one_call() {
+        let d = tempfile::tempdir().unwrap();
+        let e = Engine::shared(craft_anything_engine::testing::live_session(), specs());
+        let ok = || CallOptions::new(Caller::Cli).with_consent(Consent::Granted);
+        let mut ws = Workspace::create(d.path(), "Catalogue", "kind=redesign", craft_anything_engine::workspace::TargetRef::None).unwrap();
+        ws.manifest.kind = Some("redesign".into());
+        ws.save().unwrap();
+        let dist = ws.app_dir().join("dist");
+        std::fs::create_dir_all(&dist).unwrap();
+        // A page drawn all the way down: stripes, so no band of it is one flat colour.
+        let page = "<!doctype html><html><body style=\"margin:0\"><header style=\"height:80px;background:repeating-linear-gradient(90deg,#222 0 20px,#555 20px 40px)\"></header>\
+                    <main style=\"min-height:700px;background:repeating-linear-gradient(90deg,#fff 0 30px,#ddd 30px 60px)\"><h1>Catalogue</h1><p>Books, films and recordings.</p>\
+                    <ul><li>One</li><li>Two</li></ul></main><footer style=\"height:120px;background:repeating-linear-gradient(90deg,#888 0 20px,#aaa 20px 40px)\"></footer></body></html>";
+        std::fs::write(dist.join("index.html"), page).unwrap();
+        let project = ws.root.display().to_string();
+
+        let first = e.call("redesign_prototype_capture", json!({"project": project, "widths": [800]}), ok()).unwrap().to_json();
+        assert_eq!(first["result"]["captured"][0]["page"], "start", "{first}");
+        // Its own capture becomes the original, so the next capture is compared with the same page.
+        let made = ws.root.join("redesign/prototype_capture/start");
+        std::fs::create_dir_all(ws.capture_dir()).unwrap();
+        for f in ["capture.json", "screenshot-800.png"] {
+            std::fs::copy(made.join(f), ws.capture_dir().join(f)).unwrap();
+        }
+        let again = e.call("redesign_prototype_capture", json!({"project": project}), ok()).unwrap().to_json();
+        assert_eq!(again["result"]["widths"], json!([800]), "the original's widths are used: {again}");
+        let start = &again["result"]["pages"][0];
+        assert_eq!(
+            (start["page"].as_str(), start["structure"].as_f64(), start["not_measured"].as_array().map(Vec::len)),
+            (Some("start"), Some(100.0), Some(0)),
+            "{again}"
+        );
+        assert!(start["picture"].as_f64() > Some(99.0), "{again}");
+    }
+
     #[test]
     fn rebuild_tools_are_registered_from_the_ai_layer_and_check_their_input() {
         let d = tempfile::tempdir().unwrap();
@@ -1936,6 +2062,7 @@ mod tests {
             "redesign_modes_list",
             "redesign_variants_create",
             "redesign_variants_show",
+            "redesign_prototype_capture",
             "redesign_likeness_measure",
             "redesign_knowledge_retrieve",
             "redesign_critic_recommend",

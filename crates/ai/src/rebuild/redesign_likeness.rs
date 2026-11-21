@@ -3,9 +3,10 @@
 //! `capture.json` files, and the tile and SSIM scores of `web_common` over the screenshots.
 //!
 //! The original's pages are the start page (`capture/`) and each captured route
-//! (`capture/routes/<slug>/`). The prototype page that stands for each one is captured by the agent
-//! with `web_site_open` + `web_site_capture` into `redesign/prototype_capture/start/` or
-//! `redesign/prototype_capture/<slug>/`. Nothing here opens a browser.
+//! (`capture/routes/<slug>/`). The prototype page that stands for each one is captured into
+//! `redesign/prototype_capture/start/` or `redesign/prototype_capture/<slug>/`, by
+//! `redesign_prototype_capture` or by the agent with `web_site_open` + `web_site_capture`. Nothing in
+//! this module opens a browser.
 //!
 //! A page that can't be compared is named with its reason and never counts as alike or unlike. That
 //! includes a screenshot with large blank bands: a page that draws only what is in view comes out
@@ -106,7 +107,7 @@ fn picture(dir: &Path, width: u32, whose: &str) -> Result<Image, String> {
     let blank = blank_share(&img);
     if blank > MAX_BLANK_SHARE {
         return Err(format!(
-            "{whose} screenshot is blank over {:.0}% of its height; a page that draws only what is in view photographs like that",
+            "{whose} screenshot is flat over {:.0}% of its height, too little drawn to compare (a page that draws only what is in view looks like that when it is photographed in one picture)",
             blank * 100.0
         ));
     }
@@ -163,6 +164,51 @@ fn original_pages(ws: &Workspace) -> Vec<(String, PathBuf)> {
 
 fn prototype_dir(ws: &Workspace) -> PathBuf {
     redesign_dir(ws).join(PROTOTYPE_CAPTURE_DIR)
+}
+
+/// The widths the original was photographed at; the usual two when it has no screenshots.
+pub fn original_widths(ws: &Workspace) -> Vec<u32> {
+    let found = widths(&ws.capture_dir());
+    if found.is_empty() { vec![1440, 390] } else { found }
+}
+
+/// Which prototype addresses to capture, as `(page, path)`: the start page and every original route
+/// at `/` from the prototype's own `/`, then what the caller says stands for the other pages. A page
+/// that isn't one of the original's is refused: there would be nothing to compare it with.
+pub fn capture_targets(ws: &Workspace, extra: &[(String, String)]) -> Result<Vec<(String, String)>, ToolError> {
+    let mut known = vec![START_PAGE.to_string()];
+    let mut targets = vec![(START_PAGE.to_string(), "/".to_string())];
+    for r in website::routes(ws).into_iter().filter(|r| r.slug != START_PAGE) {
+        if r.path.trim_end_matches('/').is_empty() {
+            targets.push((r.slug.clone(), "/".to_string()));
+        }
+        known.push(r.slug);
+    }
+    for (page, path) in extra {
+        if !known.contains(page) {
+            return Err(ToolError::invalid(format!("`{page}` is not a page of the original; its pages are: {}", known.join(", "))));
+        }
+        if !path.starts_with('/') || path.contains("://") {
+            return Err(ToolError::invalid(format!("the address for `{page}` must be a path in the prototype, like `/` or `/#/library`")));
+        }
+        targets.retain(|(p, _)| p != page);
+        targets.push((page.clone(), path.clone()));
+    }
+    Ok(targets)
+}
+
+/// An empty folder for one page's prototype capture: `web_site_capture` wants one that isn't there.
+pub fn fresh_page_dir(ws: &Workspace, page: &str) -> Result<PathBuf, ToolError> {
+    redesign_store::ensure(ws)?;
+    let root = prototype_dir(ws);
+    reject_symlink(&root)?;
+    fs::create_dir_all(&root).map_err(|e| ToolError::io(root.display(), e))?;
+    let dir = safe_child(&root, page)?;
+    reject_symlink(&dir)?;
+    if dir.is_dir() {
+        fs::remove_dir_all(&dir).map_err(|e| ToolError::io(dir.display(), e))?;
+    }
+    Ok(dir)
 }
 
 /// Compare every original page with its prototype capture and save the report.
@@ -254,9 +300,24 @@ mod tests {
         capture(&at("blank"), &PAGE, Some(PART_PX));
         let cut = compare_page("p", &at("blank"), &at("drawn"));
         assert_eq!(cut.picture, None, "{cut:?}");
-        assert!(cut.not_measured.iter().any(|r| r.contains("blank")), "{cut:?}");
+        assert!(cut.not_measured.iter().any(|r| r.contains("flat")), "{cut:?}");
         assert!(cut.structure.is_some(), "the outline is still compared: {cut:?}");
         assert!(compare_page("p", &at("drawn"), &at("drawn")).picture.is_some(), "a drawn page with white space is compared");
+    }
+
+    #[test]
+    fn the_start_page_is_always_captured_and_only_the_originals_pages_are_accepted() {
+        let d = tempfile::tempdir().unwrap();
+        let ws = Workspace::create(d.path(), "L", "kind=redesign", craft_anything_engine::workspace::TargetRef::None).unwrap();
+        fs::create_dir_all(ws.capture_dir()).unwrap();
+        let routes = json!([{"path": "/", "slug": "home", "url": "https://example.test/"}, {"path": "/details/", "slug": "details", "url": "https://example.test/details/"}]);
+        fs::write(ws.capture_dir().join("routes.json"), routes.to_string()).unwrap();
+        let pages = |extra: &[(&str, &str)]| capture_targets(&ws, &extra.iter().map(|(a, b)| (a.to_string(), b.to_string())).collect::<Vec<_>>());
+        let plain: Vec<String> = pages(&[]).unwrap().into_iter().map(|(p, _)| p).collect();
+        assert_eq!(plain, [START_PAGE, "home"], "the page at / needs no address; the one elsewhere does");
+        assert!(pages(&[("details", "/#/library")]).unwrap().contains(&("details".to_string(), "/#/library".to_string())));
+        assert!(pages(&[("pricing", "/")]).is_err(), "nothing to compare it with");
+        assert!(pages(&[("details", "https://elsewhere.test/")]).is_err(), "only the prototype is opened");
     }
 
     #[test]
