@@ -318,6 +318,73 @@ pub fn fits_window_check(ws: &Workspace) -> CheckResult {
     }
 }
 
+pub const BASICS_CHECK_ID: &str = "prototype_basics";
+
+/// What one captured prototype page still gets wrong, from its capture's `a11y` (and `health` in
+/// Deep mode): what is worse than the original ([`website::health_notes`]), then what it has at
+/// all, since a redesign is not excused by the original's own gaps.
+fn basics_of(original: &Value, prototype: &Value) -> Vec<String> {
+    let mut out = website::health_notes(original, prototype);
+    let Some(a11y) = prototype.get("a11y") else { return out };
+    let count = |v: &Value, key: &str| v.pointer(&format!("/a11y/{key}")).and_then(Value::as_u64).unwrap_or(0);
+    for (key, what) in [("unnamed_controls", "control(s) without a name"), ("images_without_alt", "picture(s) without alt text")] {
+        let (now, before) = (count(prototype, key), count(original, key));
+        // health_notes already said it when the prototype has more than the original.
+        if now > 0 && now <= before {
+            let examples: Vec<&str> = if key == "unnamed_controls" {
+                a11y["unnamed_examples"].as_array().into_iter().flatten().filter_map(Value::as_str).collect()
+            } else {
+                Vec::new()
+            };
+            let shown = if examples.is_empty() { String::new() } else { format!(": {}", examples.join(", ")) };
+            out.push(format!("{now} {what}{shown} (the original has {before})"));
+        }
+    }
+    let lang = |v: &Value| v.pointer("/a11y/lang").and_then(Value::as_str).unwrap_or_default().trim().to_string();
+    if lang(prototype).is_empty() && lang(original).is_empty() {
+        out.push("the page language isn't set (nor is the original's)".into());
+    }
+    let landmarks =
+        |v: &Value| -> Vec<String> { v.pointer("/a11y/landmarks").and_then(Value::as_object).map(|m| m.keys().cloned().collect()).unwrap_or_default() };
+    let ours = landmarks(prototype);
+    let missing: Vec<String> = landmarks(original).into_iter().filter(|l| !ours.contains(l)).collect();
+    if !missing.is_empty() {
+        out.push(format!("no {} landmark, which the original has", missing.join(", ")));
+    }
+    out
+}
+
+/// Advisory: the basics each captured prototype page gets wrong (controls without a name, pictures
+/// without alt text, no page language, a landmark of the original it lacks, and errors or failed
+/// requests when the captures recorded them). As old as the prototype captures; no certification.
+pub fn basics_check(ws: &Workspace) -> CheckResult {
+    let (mut captured, mut found) = (0u32, Vec::new());
+    for (page, original) in original_pages(ws) {
+        let Some(prototype) = read_capture(&prototype_dir(ws).join(&page)) else { continue };
+        captured += 1;
+        let original = read_capture(&original).unwrap_or(Value::Null);
+        found.extend(basics_of(&original, &prototype).into_iter().map(|note| format!("{page}: {note}")));
+    }
+    let (status, summary) = if captured == 0 {
+        ("not_evaluated", "the prototype was not captured: run redesign_prototype_capture".to_string())
+    } else if found.is_empty() {
+        (
+            "pass",
+            format!(
+                "{captured} captured page(s): every control has a name, every picture has alt text, the language is set and the original's landmarks are there"
+            ),
+        )
+    } else {
+        ("warn", found.join("; "))
+    };
+    CheckResult {
+        id: BASICS_CHECK_ID.into(),
+        status: status.into(),
+        summary,
+        details: json!({"advisory": true, "wcag_certified": false, "pages": captured, "found": found, "note": "Advisory: read from the prototype's captures, which are as old as the last redesign_prototype_capture. Not an accessibility audit."}),
+    }
+}
+
 /// The saved report, if any. A report that can't be read counts as none.
 pub fn load(ws: &Workspace) -> Option<LikenessReport> {
     serde_json::from_slice(&fs::read(prototype_dir(ws).join(LIKENESS_FILE)).ok()?).ok()
@@ -441,6 +508,44 @@ mod tests {
         fs::write(ws.capture_dir().join("capture.json"), layouts(390)).unwrap();
         fs::write(prototype.join("capture.json"), layouts(640)).unwrap();
         assert!(fits_window_check(&ws).summary.contains("the original's page fits"), "a prototype that made it worse is told so");
+    }
+
+    /// A prototype is told what it still gets wrong, whether or not the original got it wrong too,
+    /// and is not told about what only the original had.
+    #[test]
+    fn a_prototype_is_told_about_unnamed_controls_and_missing_landmarks_and_not_about_what_it_fixed() {
+        let d = tempfile::tempdir().unwrap();
+        let ws = Workspace::create(d.path(), "L", "kind=redesign", craft_anything_engine::workspace::TargetRef::None).unwrap();
+        let page = |lang: &str, unnamed: u64, without_alt: u64, landmarks: Value| {
+            json!({"a11y": {"lang": lang, "unnamed_controls": unnamed, "unnamed_examples": ["a.icon"], "images_without_alt": without_alt, "landmarks": landmarks}}).to_string()
+        };
+        fs::create_dir_all(ws.capture_dir()).unwrap();
+        fs::write(ws.capture_dir().join("capture.json"), page("pt", 8, 3, json!({"main": 1, "search": 1}))).unwrap();
+        assert_eq!(basics_check(&ws).status, "not_evaluated");
+
+        let prototype = prototype_dir(&ws).join(START_PAGE);
+        fs::create_dir_all(&prototype).unwrap();
+        fs::write(prototype.join("capture.json"), page("pt", 0, 0, json!({"main": 1, "search": 1, "navigation": 2}))).unwrap();
+        let clean = basics_check(&ws);
+        assert_eq!(clean.status, "pass", "what only the original had is not held against the prototype: {clean:?}");
+
+        fs::write(prototype.join("capture.json"), page("pt", 2, 0, json!({"main": 1}))).unwrap();
+        let fewer = basics_check(&ws);
+        assert_eq!(fewer.status, "warn", "{fewer:?}");
+        assert!(
+            fewer.summary.contains("2 control(s) without a name") && fewer.summary.contains("a.icon"),
+            "fewer than the original is still told: {}",
+            fewer.summary
+        );
+        assert!(fewer.summary.contains("no search landmark"), "{}", fewer.summary);
+
+        fs::write(prototype.join("capture.json"), page("", 9, 0, json!({"main": 1, "search": 1}))).unwrap();
+        let worse = basics_check(&ws);
+        assert!(
+            worse.summary.contains("9 controls without a name") && worse.summary.contains("language"),
+            "more than the original, and a lost language: {}",
+            worse.summary
+        );
     }
 
     #[test]

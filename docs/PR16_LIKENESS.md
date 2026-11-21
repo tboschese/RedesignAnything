@@ -10,6 +10,7 @@
   - A screenshot no taller than the window shows a whole short page. It is compared over the height it draws, so the empty space under it is neither refused nor counted as alike.
 - `mode_scope` reports the scores and what wasn't measured in its summary. It does not judge them.
 - `page_fits_window` (advisory) reads the same prototype captures: it warns when a captured prototype page is wider than its window, so it scrolls sideways, and says whether the original's page was too. It is not evaluated before the prototype is captured.
+- `prototype_basics` (advisory) reads them too: controls without a name, pictures without alt text, a page language that isn't set, and a landmark of the original the prototype lacks. It reuses `website::health_notes` for what is worse than the original and adds what the prototype still has at all. It is not an accessibility audit and claims no certification.
 - `redesign_variants_show` gains `likeness_order`: on a page measured in two variants, the variant that changes less must not be less like the original. Out of order is a warning. Two scores that round to the same whole point are a tie.
 
 ## Why the scores are not judged against a limit
