@@ -2292,6 +2292,7 @@ document.getElementById('v').onclick = () => { document.getElementById('e').text
             r#"<!doctype html><html><body>
 <form id="f"><label for="q">Search the library</label> <input id="q"> <button>Search</button></form>
 <label>Kind <select id="k"><option>All</option><option>Texts</option></select></label>
+<label>Day <input id="d" type="date"></label>
 <p id="out"></p>
 <x-panel></x-panel>
 <div style="position:relative;width:200px;height:40px"><button id="c">Covered action</button>
@@ -2300,6 +2301,7 @@ document.getElementById('v').onclick = () => { document.getElementById('e').text
 const out = document.getElementById('out');
 document.getElementById('f').onsubmit = ev => { ev.preventDefault(); out.textContent = 'Results for ' + document.getElementById('q').value; };
 document.getElementById('k').onchange = ev => { out.textContent = 'Kind chosen: ' + ev.target.value; };
+document.getElementById('d').onchange = ev => { out.textContent = 'Day chosen: ' + ev.target.value; };
 document.getElementById('c').onclick = () => { out.textContent = 'Covered action ran'; };
 customElements.define('x-panel', class extends HTMLElement { connectedCallback() {
   const root = this.attachShadow({mode: 'open'});
@@ -2313,6 +2315,11 @@ if (location.hash === '#/library') out.textContent = 'Library page';
         let run = |args: Value| e.call("web_site_journey_run", args, cli()).unwrap().to_json()["result"].clone();
 
         let typed = run(json!({"steps": [{"type": "cats", "into": "Search the library"}, {"press": "Enter"}, {"expect": "results for cats"}]}));
+        // A date field takes no typed characters: its value is set as its picker would.
+        let dated = run(json!({"steps": [{"type": "2026-11-20", "into": "Day"}, {"expect": "Day chosen: 2026-11-20"}]}));
+        assert_eq!(dated["passed"], true, "{dated}");
+        let bad_date = run(json!({"steps": [{"type": "20/11/2026", "into": "Day"}]}));
+        assert_eq!(bad_date["passed"], false, "a value the date field refuses fails its step: {bad_date}");
         assert_eq!(typed["passed"], true, "{typed}");
         let clicked = run(json!({"steps": [{"type": "maps", "into": "search the library"}, {"click": "Search"}, {"expect": "Results for maps"}]}));
         assert_eq!(clicked["passed"], true, "{clicked}");

@@ -17,7 +17,8 @@ pub enum Step {
     /// Click the control with this visible or accessible name (a button, link, tab, option…).
     Click { click: String },
     /// Type this text into the field with this label, placeholder or name, replacing what it held.
-    /// For a drop-down, choose the option with this text.
+    /// For a drop-down, choose the option with this text; a date, time, colour or range field is
+    /// set to it (a date written 2026-11-20).
     Type {
         #[serde(rename = "type")]
         text: String,
@@ -100,7 +101,7 @@ pub(super) fn tool() -> ToolSpec {
     spec(
         "web_site_journey_run",
         "Run a visitor's journey",
-        "On the open website, do a visitor's steps in order and say which one failed: {\"click\": name} clicks the control with that visible or accessible name, {\"type\": text, \"into\": field} types into the field with that label, placeholder or name (or chooses that option of a drop-down), {\"press\": key} presses Enter, Escape, Tab, Space or an arrow key, {\"open\": path} loads that address on the same site from scratch, and {\"expect\": text} waits up to wait_ms for that text to show, {\"check\": name, \"is\": state} for that control or field to be enabled, disabled, present, absent or unusable, {\"value_of\": field, \"equals\": text} for that field to hold the text (compared in the page; its content is never read back), and {\"alert\": text} for an alert or live region to announce it (empty: anything). Controls inside open shadow roots are found; ones in frames are not. A click is a real pointer click at the control's centre, so a covered control fails the step. The page is loaded again first unless restart is false. With output_directory, a picture of the page at the end is saved as end.png. Clicking and typing run the site's own code, so it needs your approval.",
+        "On the open website, do a visitor's steps in order and say which one failed: {\"click\": name} clicks the control with that visible or accessible name, {\"type\": text, \"into\": field} types into the field with that label, placeholder or name (or chooses that option of a drop-down, or sets a date, time, colour or range field to it, a date written 2026-11-20), {\"press\": key} presses Enter, Escape, Tab, Space or an arrow key, {\"open\": path} loads that address on the same site from scratch, and {\"expect\": text} waits up to wait_ms for that text to show, {\"check\": name, \"is\": state} for that control or field to be enabled, disabled, present, absent or unusable, {\"value_of\": field, \"equals\": text} for that field to hold the text (compared in the page; its content is never read back), and {\"alert\": text} for an alert or live region to announce it (empty: anything). Controls inside open shadow roots are found; ones in frames are not. A click is a real pointer click at the control's centre, so a covered control fails the step. The page is loaded again first unless restart is false. With output_directory, a picture of the page at the end is saved as end.png. Clicking and typing run the site's own code, so it needs your approval.",
         "Click and type through the site the way a visitor would, and check what shows.",
         Toolset::Browser,
         Effects::EVIDENCE.union(Effects::WRITES_FILESYSTEM).union(Effects::EXECUTES_FOREIGN_CODE).union(Effects::ACCESSES_NETWORK),
@@ -167,6 +168,16 @@ const FIND_FIELD_JS: &str = r#"(() => {
     el.dispatchEvent(new Event('input', {bubbles: true}));
     el.dispatchEvent(new Event('change', {bubbles: true}));
     return {found: true, kind: 'select', chosen: true};
+  }
+  // A date, time, colour or range field takes no typed characters: set its value the way its
+  // picker would, and say whether the field kept it.
+  if (el.tagName === 'INPUT' && ['date', 'time', 'datetime-local', 'month', 'week', 'color', 'range'].includes(el.type)) {
+    const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+    el.focus();
+    set.call(el, __TEXT__);
+    el.dispatchEvent(new Event('input', {bubbles: true}));
+    el.dispatchEvent(new Event('change', {bubbles: true}));
+    return {found: true, kind: 'set', field: el.type, kept: el.value === __TEXT__};
   }
   el.focus();
   if (typeof el.select === 'function') el.select(); else getSelection().selectAllChildren(el);
@@ -326,6 +337,14 @@ fn run_step(client: &mut CdpClient, step: &Step, start: &str, p: &JourneyParams,
                 }
                 settle(client, 300)?;
                 return Ok(Ok(format!("chose {text:?} in the drop-down {into:?}")));
+            }
+            if found["kind"] == "set" {
+                let field = found["field"].as_str().unwrap_or("date");
+                if found["kept"] != true {
+                    return Ok(Err(format!("the {field} field {into:?} does not take {text:?} (a date is written 2026-11-20)")));
+                }
+                settle(client, 300)?;
+                return Ok(Ok(format!("set the {field} field {into:?} to {text:?}")));
             }
             client.call("Input.insertText", json!({"text": text}), None, dl)?;
             settle(client, 300)?;
