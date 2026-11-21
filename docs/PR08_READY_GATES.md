@@ -4,7 +4,7 @@
 
 - `redesign_checks_run` — fail-closed native Rust checks written to `redesign/check_results.json`
 - `redesign_report_write` — runs the same checks and writes `redesign/report/report.md` and `report.html` for any project: what waits for the person, what is not passing, each scenario with how it was judged, likeness to the original, then every check
-- `RedesignReadyCheck` (`redesign-ready`) — registered on `RedesignKind` next to `BuildCheck` (no `WebVisualCheck` / no `similarity`)
+- `RedesignReadyCheck` (`redesign-ready`) — registered on `RedesignKind` after `BuildCheck` and `JourneysCheck` (`redesign-journeys`, which runs the scenarios' journeys in the built site each round; see `docs/PR17_JOURNEYS.md`). No `WebVisualCheck` / no `similarity`
 
 ## Gates
 

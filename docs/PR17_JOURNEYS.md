@@ -16,6 +16,10 @@
   - A failed journey fails a scenario whose word is in the sources; a passed journey passes one whose word is not.
   - A report written for an older build is not used, and the summary says to run the journeys again.
 
+## In the builder's own loop
+
+When Craft Anything's builder makes the prototype (`rebuild_start`), the redesign kind's checks are build, then `redesign-journeys`, then `redesign-ready`. The journeys check serves the built site, runs the journeys kept in `redesign/quality/journeys.json`, writes the report the Ready check reads, and fails with the step that failed and the scenarios that have no journey yet. That result goes back to the builder like any failed check, so it fixes the UI or writes the missing journey in the next round. The brief lists the scenarios that owe a journey and the journey format. A project with no scenario skips the check.
+
 ## Why journeys belong to the project, not to the oracle
 
 The oracle says what must be true. How a prototype is driven to show it depends on that prototype: two variants of one study name their controls differently. So the steps are kept beside the prototype, and the oracle is not edited.

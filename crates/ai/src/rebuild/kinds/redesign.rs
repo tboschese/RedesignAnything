@@ -99,6 +99,11 @@ impl TargetKind for RedesignKind {
                 states.join(", ")
             ));
         }
+        let owed = crate::rebuild::redesign_journeys::owed(cx.ws);
+        if !owed.is_empty() {
+            let list = owed.iter().map(|(id, then)| format!("- {id}: {then}")).collect::<Vec<_>>().join("\n");
+            out.push(format!("{JOURNEYS_BRIEF}\nThe scenarios that need one:\n{list}"));
+        }
         if !cx.ws.manifest.own_project() {
             out.push(website::HOW_TO_RUN.into());
         }
@@ -106,8 +111,94 @@ impl TargetKind for RedesignKind {
     }
 
     fn checks(&self, _ws: &Workspace) -> Vec<Box<dyn Check>> {
-        // No WebVisualCheck / pixel-similarity gate. Build + native Ready (fail-closed).
-        vec![Box::new(BuildCheck), Box::new(RedesignReadyCheck)]
+        // No WebVisualCheck / pixel-similarity gate. Build, the scenarios' journeys run in the
+        // built site, then native Ready (fail-closed), which reads what the journeys found.
+        vec![Box::new(BuildCheck), Box::new(JourneysCheck), Box::new(RedesignReadyCheck)]
+    }
+}
+
+/// How the builder shows each scenario working, for [`JourneysCheck`].
+pub const JOURNEYS_BRIEF: &str = concat!(
+    "Show each scenario working in the built prototype: write redesign/quality/journeys.json as ",
+    "{\"journeys\": [{\"scenario_id\": \"<id>\", \"steps\": [...]}]}, one journey per scenario below. ",
+    "Steps run in order in a real browser from the start page: {\"click\": \"<visible or accessible name>\"}, ",
+    "{\"type\": \"<text>\", \"into\": \"<field label or placeholder>\"}, {\"press\": \"Enter\"}, ",
+    "{\"open\": \"/#/<route>\"} and {\"expect\": \"<text that must show>\"}; end each journey with an expect. ",
+    "Each check round runs them and tells you the step that failed. A scenario passes only when its journey does, ",
+    "not when its words appear in the code, so write the UI that makes the steps work rather than steps that avoid it."
+);
+
+/// Runs the kept journeys in the built site, one per owed scenario, and writes
+/// redesign/quality/journeys-report.json for [`RedesignReadyCheck`] to read. A scenario without a
+/// journey, or whose journey fails, is something the builder can fix, so it is refined.
+pub struct JourneysCheck;
+
+impl JourneysCheck {
+    pub const ID: &'static str = "redesign-journeys";
+}
+
+impl Check for JourneysCheck {
+    fn id(&self) -> &'static str {
+        Self::ID
+    }
+
+    /// Nothing to run without a scenario that owes a journey.
+    fn applies(&self, cx: &CheckCx) -> bool {
+        !crate::rebuild::redesign_journeys::owed(cx.ws).is_empty()
+    }
+
+    fn run(&self, cx: &mut CheckCx) -> Result<CheckResult, ToolError> {
+        use crate::rebuild::redesign_journeys as journeys;
+        let (ws, round) = (cx.ws, cx.round);
+        let owed = journeys::owed(ws);
+        let kept = match journeys::load(ws).and_then(|kept| journeys::check(ws, &kept).map(|()| kept)) {
+            Ok(kept) => kept,
+            Err(e) => {
+                return Ok(CheckResult::new(
+                    self.id(),
+                    round,
+                    false,
+                    format!("redesign/{} can't be used: {}. {JOURNEYS_BRIEF}", journeys::JOURNEYS_FILE, e.message),
+                ));
+            }
+        };
+        let missing: Vec<&str> = owed.iter().map(|(id, _)| id.as_str()).filter(|id| !kept.iter().any(|j| j.scenario_id == *id)).collect();
+        let Some(site) = crate::rebuild::site_dir(&ws.app_dir()) else {
+            return Ok(CheckResult::new(self.id(), round, false, "No built site to run the journeys in: build the app first (npm run build in app/)."));
+        };
+        let base = cx.serve_preview(&site)?;
+        let built = journeys::built_fingerprint(ws).ok_or_else(|| ToolError::internal("the built prototype could not be read"))?;
+        let _ = cx.call("web_site_close", json!({}));
+        cx.call("web_site_open", json!({"url": base, "settle_ms": 800, "signed_in": false}))?;
+        let mut results = Vec::new();
+        for j in &kept {
+            let ran = journeys::fresh_picture_dir(ws, &j.scenario_id)
+                .and_then(|out| cx.call("web_site_journey_run", json!({"steps": j.steps, "output_directory": out.display().to_string()})));
+            results.push(journeys::result_of(&j.scenario_id, ran.map(|o| o.to_json()["result"].clone())));
+        }
+        let _ = cx.call("web_site_close", json!({}));
+        let report_path = journeys::write_report(ws, &journeys::Report { built, width: 1440, journeys: results.clone() })?;
+
+        let mut claims: Vec<Claim> = results.iter().map(|r| Claim::new(format!("the journey for {} passes", r.scenario_id), r.passed, r.note())).collect();
+        claims.extend(missing.iter().map(|id| Claim::new(format!("the journey for {id} passes"), false, "no journey was written for it")));
+        let failed: Vec<String> = results.iter().filter(|r| !r.passed).map(|r| format!("{}: {}", r.scenario_id, r.note())).collect();
+        let passed = failed.is_empty() && missing.is_empty();
+        let note = if passed {
+            format!("All {} journey(s) passed in the built prototype.", results.len())
+        } else {
+            let mut parts = Vec::new();
+            if !failed.is_empty() {
+                parts.push(format!("Journeys that failed — {}.", failed.join("; ")));
+            }
+            if !missing.is_empty() {
+                parts.push(format!("Scenarios without a journey: {}. {JOURNEYS_BRIEF}", missing.join(", ")));
+            }
+            parts.join(" ")
+        };
+        let mut out = CheckResult::new(self.id(), round, passed, note);
+        out.claims = claims;
+        out.artifacts = report_path.strip_prefix(&ws.root).ok().map(Path::to_path_buf).into_iter().collect();
+        Ok(out)
     }
 }
 
@@ -199,7 +290,7 @@ mod tests {
         let d = tempfile::tempdir().unwrap();
         let ws = Workspace::create(d.path(), "R", "kind=redesign", TargetRef::Website { url: "https://example.test".into() }).unwrap();
         let ids: Vec<_> = RedesignKind.checks(&ws).iter().map(|c| c.id()).collect();
-        assert_eq!(ids, [CheckResult::BUILD, RedesignReadyCheck::ID]);
+        assert_eq!(ids, [CheckResult::BUILD, JourneysCheck::ID, RedesignReadyCheck::ID]);
         assert!(!ids.contains(&CheckResult::WEB_VISUAL));
     }
 
