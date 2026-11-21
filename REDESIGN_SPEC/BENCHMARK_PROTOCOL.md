@@ -41,6 +41,16 @@ Small samples can guide engineering decisions but do not authorize statistical g
 
 Independent oracles and synthetic data must be frozen before running A/B/C; see `ORACLE_POLICY.md`. Baseline B must receive strong UX instructions, without artificial weakening. If C does not usefully outperform B, prefer the simpler solution.
 
+## Addendum 2026-11-21 — judged by the tool
+
+Thiago Boschese decided (2026-11-21) that the benchmark needs no human raters and no human oracle
+confirmation: the product must run it and settle it. The rubric is therefore computed from
+mechanical measures in the product's browser (fixed oracle checks reached by journeys, captures,
+design-system check), and no LLM judges any result; an agent may only drive a build to the fixed
+checks. Arms A and B run in plain Craft as the person's own project, so no instruction to match
+the original biases them. Pre-registration: [`benchmark/BENCHMARK_RUN_PLAN_2026-11-21.md`](benchmark/BENCHMARK_RUN_PLAN_2026-11-21.md).
+Where this addendum conflicts with "blind rubric" or "human evaluation" above, it takes precedence.
+
 ## First public release launch gate
 
 The benchmark is mandatory before the first public release; compare plain Craft, Craft with strong instructions and Redesign Anything on distinct fixtures, including a multi-step journey and a real design system. Pre-register metrics and thresholds. If it does not show a useful gain over the baseline with strong instructions, improve the implementation before launch. See `V1_FIRST_RELEASE.md`.

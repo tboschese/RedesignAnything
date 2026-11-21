@@ -27,6 +27,7 @@ Redesign existing web applications with significant structure and experience cha
 
 - Pre-registered benchmark on at least three applications/fixtures of distinct natures: dense enterprise form, multi-step journey, and an app with a real design system; include error and permission states. Final sample size, repetitions, and thresholds must be fixed **before** execution — not invented retrospectively.
 - A/B/C comparison: original Craft; Craft + good UX instructions; Redesign Anything. Same model, permissions, task, and comparable budget. Blind human evaluation by tasks and rubric; measure effectiveness, errors, DS consistency, functional coverage, accessibility, human effort, and tokens/time. Do not use only an LLM as judge.
+- *Decision 2026-11-21 (Thiago Boschese): no human evaluation; the product computes the rubric from mechanical measures and no LLM judges results. See `BENCHMARK_PROTOCOL.md`, addendum 2026-11-21.*
 - V1 must show **relevant gain against B**, without critical function or security regression. If there is no gain, fix before public release; do not rebrand a demo as V1.
 - Primary demo: authorized corporate web app with a full journey, corporate DS, executable before/after, decision evidence, and check report. A second demo without DS proves generality.
 

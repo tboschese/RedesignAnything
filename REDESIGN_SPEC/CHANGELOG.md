@@ -1,5 +1,9 @@
 # Changelog — Redesign Anything specification
 
+## Documentation 1.5.0 — 2026-11-21
+
+- Benchmark judged by the tool (Thiago Boschese's decision): no human raters and no human oracle confirmation; the rubric is computed from mechanical measures and no LLM judges results. Arms A and B run in plain Craft as the person's own project. `BENCHMARK_PROTOCOL.md` addendum, `V1_FIRST_RELEASE.md` impact criterion note, pre-registration `benchmark/BENCHMARK_RUN_PLAN_2026-11-21.md` with fixed checks in `benchmark/expectations/2026-11-21.json`.
+
 ## Documentation 1.4.12 — 2026-11-21
 
 - `prototype_basics` (advisory) also names controls the keyboard does not reach and controls whose focus cannot be seen, from a Tab walk in `web_site_capture` (`a11y.keyboard`). See `docs/PR16_LIKENESS.md`. No contract or schema change; nothing claims WCAG conformance.

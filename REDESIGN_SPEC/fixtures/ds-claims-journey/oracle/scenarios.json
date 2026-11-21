@@ -1,9 +1,8 @@
 {
   "fixture_id": "ds-claims-journey",
-  "oracle_author": "Coding agent (Claude Code), by replay in Craft Anything's browser; human confirmation by Thiago Boschese pending",
+  "oracle_author": "Coding agent (Claude Code), by replay in Craft Anything's browser",
   "captured_at": "2026-11-21T15:00:00Z",
   "oracle_type": "observed_verified",
-  "human_confirmed": false,
   "environment_fingerprint": "React 18.3.1 + Vite 5.4.11 build of app/, @fixture/acme-ds 1.2.0 linked from ../design-system; served by vite preview on 127.0.0.1:8767; no backend",
   "coverage_scope": "The six rules in MANIFEST.md, one replay each, desktop width; roles employee and viewer",
   "unknowns": [
