@@ -265,6 +265,8 @@ pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
     checks.push(super::redesign_likeness::fits_window_check(ws));
     // Advisory: the basics a captured prototype page gets wrong (names, alt text, language, landmarks).
     checks.push(super::redesign_likeness::basics_check(ws));
+    // Advisory: does a captured prototype page repeat the original's sentences?
+    checks.push(super::redesign_likeness::copied_wording_check(ws));
 
     // Functional proxy + quality runners (oracle static eval, optional Playwright/axe reports).
     let app_tsx = fs::read_to_string(ws.app_dir().join("src/App.tsx")).unwrap_or_default();
@@ -352,7 +354,7 @@ pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
             "Prototype Ready needs every scenario judged by a journey run in the built prototype (redesign_journeys_run); a word found in the sources is not enough.".into(),
             "Engineering Ready requires no backend_change_required mappings; approving a gap is not a contract.".into(),
             "identity_essence failing blocks every gate; identity_drift failing blocks Prototype Ready; identity_evolution is advisory.".into(),
-            "mode_scope, page_fits_window and prototype_basics are advisory and never change Ready.".into(),
+            "mode_scope, page_fits_window, prototype_basics and copied_wording are advisory and never change Ready.".into(),
             format!("traceability={trace_status}"),
         ],
     };
