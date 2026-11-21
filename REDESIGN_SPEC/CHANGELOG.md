@@ -1,5 +1,10 @@
 # Changelog — Redesign Anything specification
 
+## Documentation 1.4.2 — 2026-11-20
+
+- `SPEC.md` scope: `refresh` now means organizing each screen with the same blocks, journeys and look (it read "visual, minimal functional change"). The plan's mode is validated and compared with the plan by the advisory `mode_scope` check.
+- `CONTRACTS.md`: comment on `RedesignMode`. No schema change: the mode enum was already in the schemas.
+
 ## Documentation 1.4.1 — 2026-11-20
 
 - Renamed product nickname **V1 Impactante** → **First public release**; binding doc is now `V1_FIRST_RELEASE.md` (removed `V1_IMPACTANTE.md`).

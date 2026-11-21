@@ -497,6 +497,8 @@ Continue edits in the host agent; do not call `rebuild_start` under `host_agent`
         "capabilities_count": caps.len(),
         "decisions": decisions.iter().map(|d| d.id.clone()).collect::<Vec<_>>(),
         "plan": plan.as_ref().map(|_| "redesign/transformation_plan.json"),
+        "mode": plan.as_ref().map(|p| p.mode.clone()),
+        "router": "hash",
         "routes": routes.iter().map(|r| json!({
             "path": r.path,
             "slug": r.slug,
@@ -726,6 +728,8 @@ mod tests {
 
         let out = scaffold_app(&ws, None).unwrap();
         assert_eq!(out["routes_generated"], 2);
+        let refs: Value = serde_json::from_slice(&fs::read(redesign_store::redesign_dir(&ws).join("scaffold_refs.json")).unwrap()).unwrap();
+        assert_eq!(refs["mode"], plan.mode, "the builder reads the plan's mode from the refs");
         assert!(ws.app_dir().join("src/routes/journey_approve.tsx").is_file());
         assert!(ws.app_dir().join("src/routes/journey_confirm.tsx").is_file());
         assert!(!ws.app_dir().join("src/routes/legacy.tsx").exists());

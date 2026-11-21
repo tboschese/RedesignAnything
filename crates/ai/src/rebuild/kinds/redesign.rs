@@ -55,6 +55,11 @@ impl TargetKind for RedesignKind {
         false
     }
 
+    /// A redesign never rebuilds the original pixel for pixel; how close it stays depends on the mode.
+    fn capture_guidance(&self, cx: &BriefCx) -> Option<String> {
+        Some(crate::rebuild::redesign_mode::RedesignMode::of(cx.ws).capture_guidance().into())
+    }
+
     fn brief_sections(&self, cx: &BriefCx) -> Vec<String> {
         let mut out = vec![REDESIGN_BRIEF.into()];
         // Compact redesign refs — pass by path, do not dump full stores into the prompt.
@@ -72,6 +77,11 @@ impl TargetKind for RedesignKind {
             )),
             Ok(_) => {}
             Err(e) => out.push(format!("redesign/identity.json could not be read ({}); ask before changing the original's look.", e.message)),
+        }
+        if let Ok(plan) = crate::rebuild::redesign_plan::load_plan(cx.ws)
+            && let Ok(mode) = crate::rebuild::redesign_mode::RedesignMode::parse(&plan.mode)
+        {
+            out.push(format!("{} mode_scope checks the plan against this.", mode.builder_guidance()));
         }
         // Reuse website capture notes when Study photographed the target.
         let routes = website::routes(cx.ws);

@@ -115,6 +115,10 @@ pub trait TargetKind: Send + Sync {
     }
     /// "What to build" in the brief.
     fn goal(&self) -> &'static str;
+    /// What the builder does with a website capture, in place of matching it exactly. `None`: match it.
+    fn capture_guidance(&self, _cx: &BriefCx) -> Option<String> {
+        None
+    }
     /// Extra brief sections after the shared steps and rules.
     fn brief_sections(&self, _cx: &BriefCx) -> Vec<String> {
         Vec::new()

@@ -248,6 +248,8 @@ pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
     // Advisory identity checks (drift from kept traits, frozen character). Deliberately not part of CheckInputs.
     checks.push(super::redesign_identity::drift_check(ws));
     checks.push(super::redesign_identity::evolution_check(ws));
+    // Advisory: does the plan stay within its mode (tidy-up, redesign, rethink)?
+    checks.push(super::redesign_mode::scope_check(ws));
 
     // Functional proxy + quality runners (oracle static eval, optional Playwright/axe reports).
     let app_tsx = fs::read_to_string(ws.app_dir().join("src/App.tsx")).unwrap_or_default();
@@ -331,6 +333,7 @@ pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
             "Accessibility not_evaluated ≠ WCAG pass.".into(),
             "Engineering Ready requires no backend_change_required mappings; approving a gap is not a contract.".into(),
             "identity_drift and identity_evolution are advisory and never change Ready.".into(),
+            "mode_scope is advisory and never changes Ready.".into(),
             format!("traceability={trace_status}"),
         ],
     };
