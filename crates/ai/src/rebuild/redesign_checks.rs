@@ -257,6 +257,8 @@ pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
     checks.push(super::redesign_identity::evolution_check(ws));
     // Advisory: does the plan stay within its mode (tidy-up, redesign, rethink)?
     checks.push(super::redesign_mode::scope_check(ws));
+    // Advisory: does a captured prototype page run off the side of its window?
+    checks.push(super::redesign_likeness::fits_window_check(ws));
 
     // Functional proxy + quality runners (oracle static eval, optional Playwright/axe reports).
     let app_tsx = fs::read_to_string(ws.app_dir().join("src/App.tsx")).unwrap_or_default();
@@ -342,7 +344,7 @@ pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
             "Accessibility not_evaluated ≠ WCAG pass.".into(),
             "Engineering Ready requires no backend_change_required mappings; approving a gap is not a contract.".into(),
             "identity_essence failing blocks every gate; identity_drift failing blocks Prototype Ready; identity_evolution is advisory.".into(),
-            "mode_scope is advisory and never changes Ready.".into(),
+            "mode_scope and page_fits_window are advisory and never change Ready.".into(),
             format!("traceability={trace_status}"),
         ],
     };

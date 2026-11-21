@@ -9,6 +9,7 @@
   - A page that can't be compared is named with its reason: no prototype capture, an empty outline, no screenshot at a shared width, or a screenshot taller than the window with more than 35% of its height in blank bands.
   - A screenshot no taller than the window shows a whole short page. It is compared over the height it draws, so the empty space under it is neither refused nor counted as alike.
 - `mode_scope` reports the scores and what wasn't measured in its summary. It does not judge them.
+- `page_fits_window` (advisory) reads the same prototype captures: it warns when a captured prototype page is wider than its window, so it scrolls sideways, and says whether the original's page was too. It is not evaluated before the prototype is captured.
 - `redesign_variants_show` gains `likeness_order`: on a page measured in two variants, the variant that changes less must not be less like the original. Out of order is a warning.
 
 ## Why the scores are not judged against a limit
