@@ -228,6 +228,43 @@ pub fn out_of_order(scores: &[(RedesignMode, Vec<(String, f64)>)]) -> Vec<String
     out
 }
 
+/// For a variant: where its likeness is out of order with its sibling variants, said as what to do
+/// about it. A variant that changes less than a sibling but is less like the original should keep
+/// closer to it; one that changes more but is more alike should change more. Empty when the project
+/// is not a variant, or when no sibling page was measured to compare with.
+pub fn order_against_siblings(ws: &Workspace) -> Vec<String> {
+    let Ok(Some(own)) = variant_of(ws) else { return Vec::new() };
+    let Some(mine) = super::redesign_likeness::load(ws) else { return Vec::new() };
+    let Ok(root) = parent(ws).and_then(|p| safe_child(p, &own.source_project)) else { return Vec::new() };
+    let Ok(source) = Workspace::open(&root) else { return Vec::new() };
+    let pages = |l: &super::redesign_likeness::LikenessReport| l.measured().map(|(p, s)| (p.to_string(), s)).collect::<Vec<_>>();
+    // This project's own scores stand for its mode, whether or not the source lists it (a copy of
+    // a variant made to try another builder isn't listed).
+    let mut scores = vec![(own.mode, pages(&mine))];
+    for (listed, found) in paths(&source).unwrap_or_default() {
+        if listed.mode != own.mode
+            && let Some(l) = found.as_ref().and_then(super::redesign_likeness::load)
+        {
+            scores.push((listed.mode, pages(&l)));
+        }
+    }
+    let mode = format!("`{}`", own.mode.as_str());
+    out_of_order(&scores)
+        .into_iter()
+        .filter(|line| line.contains(&mode))
+        .map(|line| {
+            let (page, rest) = line.split_once(": ").unwrap_or(("a page", line.as_str()));
+            if rest.starts_with(&mode) {
+                let other = rest.split(" than ").nth(1).unwrap_or("a variant that changes more");
+                format!("{page}: this {} variant is less like the original than {other}, which changes more; keep closer to the original", own.mode.label())
+            } else {
+                let other = rest.split(" is less like").next().unwrap_or("a variant that changes less");
+                format!("{page}: this {} variant is more like the original than {other}, which changes less; change more", own.mode.label())
+            }
+        })
+        .collect()
+}
+
 /// The variants of a project (asked on the source or on any variant), with what its last checks said.
 pub fn show(ws: &Workspace) -> Result<Value, ToolError> {
     let source: Workspace = match variant_of(ws)? {
@@ -400,6 +437,47 @@ mod tests {
         assert!(out_of_order(&tied).is_empty(), "{:?}", out_of_order(&tied));
         let a_point_apart = [(RedesignMode::Refresh, page(36.0)), (RedesignMode::Redesign, page(37.2))];
         assert_eq!(out_of_order(&a_point_apart).len(), 1);
+    }
+
+    /// A variant is told which way it is out of order with its siblings, in its own mode's terms.
+    #[test]
+    fn a_variant_is_told_to_change_more_or_keep_closer_when_out_of_order_with_its_siblings() {
+        let d = tempfile::tempdir().unwrap();
+        let ws = studied(d.path());
+        let made = create(&ws, &[RedesignMode::Redesign, RedesignMode::Reimagine]).unwrap();
+        let open = |i: usize| Workspace::open(Path::new(made["variants"][i]["project"].as_str().unwrap())).unwrap();
+        let (redesign, reimagine) = (open(0), open(1));
+        let measured = |v: &Workspace, score: f64| {
+            let page = super::super::redesign_likeness::PageLikeness {
+                page: "start".into(),
+                structure: Some(score),
+                text: None,
+                picture: Some(score),
+                width: Some(1440),
+                overall: Some(score),
+                not_measured: vec![],
+            };
+            let report = super::super::redesign_likeness::LikenessReport { schema_version: "1.0.0".into(), pages: vec![page] };
+            let dir = redesign_dir(v).join(super::super::redesign_likeness::PROTOTYPE_CAPTURE_DIR);
+            fs::create_dir_all(&dir).unwrap();
+            fs::write(dir.join(super::super::redesign_likeness::LIKENESS_FILE), serde_json::to_vec(&report).unwrap()).unwrap();
+        };
+        measured(&redesign, 40.0);
+        assert!(order_against_siblings(&reimagine).is_empty(), "no sibling measured with it yet");
+        measured(&reimagine, 49.0);
+        let told = order_against_siblings(&reimagine);
+        assert!(told.len() == 1 && told[0].starts_with("start:") && told[0].ends_with("change more"), "{told:?}");
+        let told = order_against_siblings(&redesign);
+        assert!(told.len() == 1 && told[0].ends_with("keep closer to the original"), "{told:?}");
+        assert!(order_against_siblings(&ws).is_empty(), "the source is not a variant");
+        measured(&reimagine, 20.0);
+        assert!(order_against_siblings(&reimagine).is_empty() && order_against_siblings(&redesign).is_empty(), "in order");
+
+        // A copy of a variant, made to try another builder, is judged on its own scores.
+        let copy = reimagine.duplicate("reimagine copy").unwrap();
+        assert!(variant_of(&copy).unwrap().is_some(), "a copy keeps the variant record");
+        measured(&copy, 49.0);
+        assert!(order_against_siblings(&copy)[0].ends_with("change more"), "its own 49, not the listed variant's 20");
     }
 
     #[cfg(unix)]
