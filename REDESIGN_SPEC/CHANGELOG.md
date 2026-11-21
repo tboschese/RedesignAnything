@@ -1,5 +1,9 @@
 # Changelog — Redesign Anything specification
 
+## Documentation 1.4.9 — 2026-11-21
+
+- `CONTRACTS.md` §7: Prototype Ready needs every critical scenario judged by a journey run in the built prototype. A scenario that passes only on a word found in the sources no longer counts; `functional_scenarios` reports it as a warning.
+
 ## Documentation 1.4.8 — 2026-11-20
 
 - Critical scenarios can be judged by a journey run in the built prototype (`redesign_journeys_run`) instead of a word hint. See `docs/PR17_JOURNEYS.md`. No contract or schema change: the gate in CONTRACTS.md §7 still counts passed scenarios.

@@ -44,6 +44,6 @@ Organize screens keeps the original's one page, so the two scenarios about an it
 ## Limits
 
 - The builder writes the steps. A passed journey shows that these steps passed, not that they are the right steps for the scenario; the report keeps them for a person to read.
-- Prototype Ready does not require journeys: a scenario without one is still judged by a word hint, and the check says how many were.
+- A scenario without a journey is still judged by a word hint, and the check says how many were. Since 1.4.9 a prototype is not ready while one is.
 - An `expect` looks for its text anywhere on the page. Controls inside frames are not found.
 - When several controls share a name, the first one that shows is used, and the step's note says so.
