@@ -1407,3 +1407,8 @@ it passed two scenarios about an item page for a prototype that has no item page
 judged by a journey run in the built prototype when one exists (`redesign_journeys_run`), and the
 check says for each scenario whether it was a journey or a word hint. A prototype is not ready while
 a scenario rests on a word hint.
+
+**A box on the page is not proof that a visitor sees it.** The content of a closed `<details>` keeps
+its box in current browsers and has no text to read, so a link in a closed menu was outlined as
+shown and counted as a control without a name. The capture, the states tool and the journey tool
+now also ask the browser (`Element.checkVisibility()`) before they call an element shown.
