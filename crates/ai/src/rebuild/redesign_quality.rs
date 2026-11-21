@@ -151,8 +151,11 @@ pub fn evaluate_oracle(ws: &Workspace, oracle: &Value) -> Result<(QualityCheck, 
         QualityCheck {
             id: "functional_scenarios".into(),
             status: status.into(),
-            summary: format!("scenarios pass={passed} fail={failed} total={}", evals.len()),
-            details: json!({ "evals": evals }),
+            summary: format!(
+                "scenarios pass={passed} fail={failed} total={} (a word hint found in the app sources, mock data included; no journey was run)",
+                evals.len()
+            ),
+            details: json!({ "evals": evals, "method": "word_hint_in_sources", "ran_journeys": false }),
         },
         evals.clone(),
     ))
