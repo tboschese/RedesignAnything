@@ -21,6 +21,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use super::kinds::website;
+use super::redesign_checks::CheckResult;
 use super::redesign_store::{self, redesign_dir, reject_symlink, safe_child, write_record};
 
 pub const PROTOTYPE_CAPTURE_DIR: &str = "prototype_capture";
@@ -270,6 +271,53 @@ pub fn measure(ws: &Workspace) -> Result<Value, ToolError> {
     }))
 }
 
+/// The widths a captured page is wider than its window at, as (window, page) in px.
+fn wider_than_window(dir: &Path) -> Vec<(u64, u64)> {
+    let Some(capture) = read_capture(dir) else { return Vec::new() };
+    let layouts = capture["layouts"].as_array().cloned().unwrap_or_default();
+    layouts.iter().filter_map(|l| Some((l["width"].as_u64()?, l["page_w"].as_u64()?))).filter(|(window, page)| *page > window + 1).collect()
+}
+
+pub const FITS_CHECK_ID: &str = "page_fits_window";
+
+/// Advisory: whether a captured prototype page runs off the side of its window (it scrolls
+/// sideways), and whether the original's page did. As old as the prototype captures.
+pub fn fits_window_check(ws: &Workspace) -> CheckResult {
+    let said = |(window, page): &(u64, u64)| format!("{page} px wide in a {window} px window");
+    let (mut captured, mut wider, mut original_wider) = (0u32, Vec::new(), Vec::new());
+    for (page, original) in original_pages(ws) {
+        let prototype = prototype_dir(ws).join(&page);
+        if !prototype.join("capture.json").is_file() {
+            continue;
+        }
+        captured += 1;
+        let before = wider_than_window(&original);
+        original_wider.extend(before.iter().map(|w| format!("{page}: {}", said(w))));
+        for now in wider_than_window(&prototype) {
+            let original_too = if before.iter().any(|(window, _)| *window == now.0) { "the original's page is too" } else { "the original's page fits" };
+            wider.push(format!("{page}: {} ({original_too})", said(&now)));
+        }
+    }
+    let (status, summary) = if captured == 0 {
+        ("not_evaluated", "the prototype was not captured: run redesign_prototype_capture".to_string())
+    } else if !wider.is_empty() {
+        ("warn", format!("the prototype scrolls sideways: {}", wider.join("; ")))
+    } else if original_wider.is_empty() {
+        ("pass", format!("no captured prototype page is wider than its window ({captured} page(s))"))
+    } else {
+        (
+            "pass",
+            format!("no captured prototype page is wider than its window ({captured} page(s)); the original scrolled sideways: {}", original_wider.join("; ")),
+        )
+    };
+    CheckResult {
+        id: FITS_CHECK_ID.into(),
+        status: status.into(),
+        summary,
+        details: json!({"advisory": true, "pages": captured, "wider": wider, "original_wider": original_wider, "note": "Advisory: read from the prototype's captures, which are as old as the last redesign_prototype_capture."}),
+    }
+}
+
 /// The saved report, if any. A report that can't be read counts as none.
 pub fn load(ws: &Workspace) -> Option<LikenessReport> {
     serde_json::from_slice(&fs::read(prototype_dir(ws).join(LIKENESS_FILE)).ok()?).ok()
@@ -365,6 +413,34 @@ mod tests {
         assert!(nothing.picture.is_none() && nothing.not_measured.iter().any(|r| r.contains("nothing drawn")), "{nothing:?}");
         let undrawn = picture("tall");
         assert!(undrawn.not_measured.iter().any(|r| r.contains("flat")), "the same picture of a page taller than the window is still refused: {undrawn:?}");
+    }
+
+    /// A prototype that runs off the side of a narrow window is told so, with whether the original
+    /// did; one that fits where the original did not says what was gained.
+    #[test]
+    fn a_prototype_wider_than_its_window_is_warned_about_and_one_that_fits_is_not() {
+        let d = tempfile::tempdir().unwrap();
+        let ws = Workspace::create(d.path(), "L", "kind=redesign", craft_anything_engine::workspace::TargetRef::None).unwrap();
+        let layouts = |narrow: u64| json!({"layouts": [{"width": 1440, "page_w": 1440}, {"width": 390, "page_w": narrow}]}).to_string();
+        fs::create_dir_all(ws.capture_dir()).unwrap();
+        fs::write(ws.capture_dir().join("capture.json"), layouts(1120)).unwrap();
+        assert_eq!(fits_window_check(&ws).status, "not_evaluated", "nothing to read before the prototype is captured");
+
+        let prototype = prototype_dir(&ws).join(START_PAGE);
+        fs::create_dir_all(&prototype).unwrap();
+        fs::write(prototype.join("capture.json"), layouts(640)).unwrap();
+        let wide = fits_window_check(&ws);
+        assert_eq!(wide.status, "warn", "{wide:?}");
+        assert!(wide.summary.contains("640 px wide in a 390 px window") && wide.summary.contains("the original's page is too"), "{}", wide.summary);
+
+        fs::write(prototype.join("capture.json"), layouts(390)).unwrap();
+        let fits = fits_window_check(&ws);
+        assert_eq!(fits.status, "pass", "{fits:?}");
+        assert!(fits.summary.contains("1120 px wide in a 390 px window"), "it says the original did not fit: {}", fits.summary);
+
+        fs::write(ws.capture_dir().join("capture.json"), layouts(390)).unwrap();
+        fs::write(prototype.join("capture.json"), layouts(640)).unwrap();
+        assert!(fits_window_check(&ws).summary.contains("the original's page fits"), "a prototype that made it worse is told so");
     }
 
     #[test]
