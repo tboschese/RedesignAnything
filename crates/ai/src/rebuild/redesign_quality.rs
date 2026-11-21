@@ -161,10 +161,14 @@ pub fn evaluate_oracle(ws: &Workspace, oracle: &Value) -> Result<(QualityCheck, 
         evals.push(ScenarioEval { scenario_id: id, capability_id: cap, status: status.into(), notes, method: "word_hint".into() });
     }
 
+    // A scenario that passed on a word in the sources was not seen working: that is a warning, and
+    // Prototype Ready waits for its journey.
     let status = if failed > 0 {
         "fail"
     } else if passed == 0 {
         "not_evaluated"
+    } else if by_hint > 0 {
+        "warn"
     } else {
         "pass"
     };
@@ -183,6 +187,9 @@ pub fn evaluate_oracle(ws: &Workspace, oracle: &Value) -> Result<(QualityCheck, 
     let mut summary = format!("scenarios pass={passed} fail={failed} total={} ({how})", evals.len());
     if let Some(note) = &journeys_note {
         summary.push_str(&format!("; {note}"));
+    }
+    if by_hint > 0 && failed == 0 && passed > 0 {
+        summary.push_str("; Prototype Ready needs a journey for each scenario: redesign_journeys_run");
     }
     Ok((
         QualityCheck {
@@ -430,8 +437,10 @@ mod tests {
                 "then": ["Approve button is visible"]
             }]
         });
-        let (qc, _) = evaluate_oracle(&ws, &oracle).unwrap();
-        assert_eq!(qc.status, "pass", "{qc:?}");
+        // The word is there, so the scenario is not failed; nothing was seen working, so the check
+        // only warns.
+        let (qc, evals) = evaluate_oracle(&ws, &oracle).unwrap();
+        assert_eq!((qc.status.as_str(), evals[0].status.as_str()), ("warn", "pass"), "{qc:?}");
     }
 
     /// A word in the sources can agree with a scenario that doesn't work and miss one that does;
@@ -499,8 +508,10 @@ mod tests {
                 "then": ["Donate control remains available"]
             }]
         });
-        let (qc, _) = evaluate_oracle(&ws, &oracle).unwrap();
-        assert_eq!(qc.status, "pass", "{qc:?}");
+        // The word is there, so the scenario is not failed; nothing was seen working, so the check
+        // only warns.
+        let (qc, evals) = evaluate_oracle(&ws, &oracle).unwrap();
+        assert_eq!((qc.status.as_str(), evals[0].status.as_str()), ("warn", "pass"), "{qc:?}");
     }
 
     #[test]

@@ -48,6 +48,9 @@ pub struct CheckInputs {
     pub essence_lost: bool,
     /// The app drifted from an intentional kept trait (`identity_drift` failed): blocks Prototype Ready.
     pub essence_drift: bool,
+    /// Scenarios judged only by a word found in the sources, with no journey run in the built
+    /// prototype: a prototype is not ready on those.
+    pub scenarios_on_a_word_hint: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -110,6 +113,7 @@ pub fn prototype_ready(inp: &CheckInputs, unmapped_critical_unapproved: u32) -> 
         && matches!(inp.ds_status, CheckExec::Pass | CheckExec::NotEvaluated | CheckExec::Warn)
         && inp.functional.critical_scenarios_total > 0
         && inp.functional.critical_scenarios_passed == inp.functional.critical_scenarios_total
+        && inp.scenarios_on_a_word_hint == 0
         && inp.functional.button_works
         && unmapped_critical_unapproved == 0
         && !inp.a11y_critical_fail
@@ -283,6 +287,7 @@ pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
     let mut a11y_critical_fail = false;
     let mut scenario_passed = 0u32;
     let mut scenario_total = 0u32;
+    let mut scenarios_on_a_word_hint = 0u32;
     match super::redesign_quality::run_quality(ws, None) {
         Ok(qcs) => {
             for qc in qcs {
@@ -291,6 +296,7 @@ pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
                 {
                     scenario_total = evals.len() as u32;
                     scenario_passed = evals.iter().filter(|e| e.get("status").and_then(|s| s.as_str()) == Some("pass")).count() as u32;
+                    scenarios_on_a_word_hint = evals.iter().filter(|e| e.get("method").and_then(|m| m.as_str()) == Some("word_hint")).count() as u32;
                 }
                 if qc.id == "accessibility" && qc.status == "fail" {
                     a11y_critical_fail = true;
@@ -328,6 +334,7 @@ pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
         critic_says_ready: false,
         essence_lost,
         essence_drift,
+        scenarios_on_a_word_hint,
     };
 
     let report = ReadyReport {
@@ -340,6 +347,7 @@ pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
             "unavailable usage/tokens are not treated as zero.".into(),
             "Design Critic recommendations never alone set Ready.".into(),
             "Accessibility not_evaluated ≠ WCAG pass.".into(),
+            "Prototype Ready needs every scenario judged by a journey run in the built prototype (redesign_journeys_run); a word found in the sources is not enough.".into(),
             "Engineering Ready requires no backend_change_required mappings; approving a gap is not a contract.".into(),
             "identity_essence failing blocks every gate; identity_drift failing blocks Prototype Ready; identity_evolution is advisory.".into(),
             "mode_scope is advisory and never changes Ready.".into(),
@@ -576,6 +584,22 @@ mod tests {
         assert!(concept_ready(&inp(CheckExec::NotEvaluated)), "a concept needs no build");
         assert!(!prototype_ready(&inp(CheckExec::NotEvaluated), 0));
         assert!(prototype_ready(&inp(CheckExec::Pass), 0));
+    }
+
+    #[test]
+    fn a_prototype_is_not_ready_while_a_scenario_rests_on_a_word_in_the_sources() {
+        let inp = |scenarios_on_a_word_hint| CheckInputs {
+            preview_available: true,
+            security_ok: true,
+            build_status: CheckExec::Pass,
+            ds_status: CheckExec::Pass,
+            functional: FunctionalSummary { critical_scenarios_total: 3, critical_scenarios_passed: 3, button_works: true },
+            scenarios_on_a_word_hint,
+            ..Default::default()
+        };
+        assert!(concept_ready(&inp(1)), "a concept needs no journey");
+        assert!(!prototype_ready(&inp(1), 0), "all three passed, one of them only on a word");
+        assert!(prototype_ready(&inp(0), 0));
     }
 
     #[test]
