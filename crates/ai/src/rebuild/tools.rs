@@ -290,6 +290,17 @@ pub fn specs() -> Vec<ToolSpec> {
             run: redesign_prototype_capture,
         },
         ToolSpec {
+            id: "redesign_benchmark_evaluate",
+            title: "Judge a benchmark trial",
+            summary: "Judge one arm's build of a benchmark fixture the way BENCHMARK_RUN_PLAN_2026-11-21.md registers it, with no human rater and no LLM deciding a result. Serves the project's built site and, for each critical scenario, runs the given journey only if it reaches the scenario's fixed checks in order (benchmark/expectations/2026-11-21.json: the oracle's texts, controls disabled or absent, values kept); a missing or incomplete journey fails its scenario. Captures the start page and every opened address at 1440 and 390 px (contrast, keyboard walk, names, page width), checks the sources against @fixture/acme-ds for ds-claims-journey, and computes the rubric D1–D5. Writes evaluation.json, the pictures and the captures to output_directory. Build the site first: this tool runs no build. It closes any site this session has open. Runs the build's scripts, so it needs your approval.",
+            beginner: "Scores one version of a test app by clicking through its tasks and measuring its pages.",
+            toolset: Toolset::Projects,
+            effects: Effects::WRITES_FILESYSTEM.union(Effects::EXECUTES_FOREIGN_CODE).union(Effects::ACCESSES_NETWORK).union(Effects::LAUNCHES_PROCESS),
+            requires: Requires::Engine("chromium"),
+            input_schema: schema_of::<BenchmarkEvaluateParams>,
+            run: redesign_benchmark_evaluate,
+        },
+        ToolSpec {
             id: "redesign_journeys_run",
             title: "Run the prototype's journeys",
             summary: "Serve the project's built prototype, and in the private browser do each journey's steps the way a visitor would (web_site_journey_run: {\"click\": name}, {\"type\": text, \"into\": field}, {\"press\": key}, {\"open\": path}, {\"expect\": text}, {\"check\": name, \"is\": state}, {\"value_of\": field, \"equals\": text}, {\"alert\": text}), each from a freshly loaded start page. A journey shows one scenario of redesign/oracle/scenarios.json in this prototype and ends with a check. `journeys` replaces the ones the project keeps (redesign/quality/journeys.json); without it the kept ones run again. Writes redesign/quality/journeys-report.json and a picture of where each journey ended; redesign_checks_run then judges those scenarios by their journey instead of a word hint, for as long as the prototype is not built again. Build the prototype first: this tool runs no build. It closes any site this session has open. Runs the prototype's scripts, so it needs your approval.",
@@ -688,6 +699,27 @@ struct JourneysRunParams {
     /// Window width in CSS pixels (default 1440).
     #[serde(default)]
     pub width: Option<u32>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct BenchmarkEvaluateParams {
+    /// The arm's project: its built site is served and judged.
+    pub project: PathBuf,
+    /// The fixture the arm redesigned: dense-form, multi-step-journey or ds-claims-journey.
+    pub fixture_id: String,
+    /// The arm: A, B, C or D.
+    pub arm: String,
+    /// The repetition, from 1.
+    pub trial: u32,
+    /// One journey per critical scenario of the fixture, written for this build. Each must
+    /// contain, in order, the scenario's fixed checks (benchmark/expectations/2026-11-21.json):
+    /// {"expect": the oracle's text}, {"alert": ""}, {"open": path}, {"check": name, "is": state},
+    /// {"value_of": field, "equals": text}. Controls and fields carry this build's own names.
+    pub journeys: Vec<super::redesign_journeys::Journey>,
+    /// Absolute path of a folder that does not exist yet: the evaluation, the journeys' pictures
+    /// and the captures are written there.
+    pub output_directory: PathBuf,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -1650,6 +1682,125 @@ fn redesign_prototype_capture(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOu
     out["not_captured"] = json!(not_captured);
     out["widths"] = json!(widths);
     Ok(ToolOutput::Value(out))
+}
+
+fn redesign_benchmark_evaluate(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    use super::redesign_benchmark_eval as eval;
+    let p: BenchmarkEvaluateParams = parse_params(params)?;
+    if !["A", "B", "C", "D"].contains(&p.arm.as_str()) || p.trial == 0 {
+        return Err(ToolError::invalid("arm is A, B, C or D and trial starts at 1"));
+    }
+    let path = eval::expectations_path();
+    let expectations: Value = std::fs::read(&path)
+        .ok()
+        .and_then(|b| serde_json::from_slice(&b).ok())
+        .ok_or_else(|| ToolError::invalid(format!("{} can't be read", eval::EXPECTATIONS)))?;
+    let (checks, error_scenarios) = eval::fixture_checks(&expectations, &p.fixture_id).ok_or_else(|| {
+        ToolError::invalid(format!("no fixed checks for fixture {:?}", p.fixture_id))
+            .with_remediation("Use dense-form, multi-step-journey or ds-claims-journey.")
+    })?;
+    if p.output_directory.exists() {
+        return Err(ToolError::invalid(format!("{} already exists: give a new folder", p.output_directory.display())));
+    }
+    let ws = open(&p.project)?;
+    let engine = engine(ctx).ok_or_else(|| {
+        ToolError::new(ErrorCode::FeatureMissing, "Judging a benchmark trial isn't available in this engine.")
+            .with_remediation("Use the app or `craft-anything-cli`.")
+    })?;
+    let server = super::preview(&ws).map_err(|e| e.with_remediation("Build the arm's site first, then call this again."))?;
+    let base = server.url().trim_end_matches('/').to_string();
+    let out = p.output_directory.clone();
+    std::fs::create_dir_all(out.join("journeys")).map_err(|e| ToolError::io(out.display(), e))?;
+    std::fs::create_dir_all(out.join("captures")).map_err(|e| ToolError::io(out.display(), e))?;
+    // The browser tools run as this call's own steps, as in redesign_journeys_run.
+    let step = |ctx: &mut Ctx<'_>, id: &str, args: Value| -> Result<ToolOutput, ToolError> {
+        let spec = engine.registry().get(id).ok_or_else(|| ToolError::internal(format!("{id} is not registered")))?;
+        (spec.run)(ctx, args)
+    };
+
+    let mut scenarios = Vec::new();
+    let mut passed = Vec::new();
+    let _ = step(ctx, "web_site_close", json!({}));
+    let opened = step(ctx, "web_site_open", json!({"url": format!("{base}/")}));
+    for (i, (id, fixed)) in checks.iter().enumerate() {
+        ctx.report(Some(i as f32 / checks.len().max(1) as f32), format!("Judging {id}…"));
+        let journey = p.journeys.iter().find(|j| &j.scenario_id == id);
+        let (ok, note, names) = match (journey, &opened) {
+            (None, _) => (false, "no journey was given for this scenario".to_string(), Vec::new()),
+            (_, Err(e)) => (false, format!("the build didn't open: {}", e.message), Vec::new()),
+            (Some(j), Ok(_)) => match eval::reaches(fixed, &j.steps) {
+                Err(why) => (false, why, Vec::new()),
+                Ok(names) => {
+                    let ran =
+                        step(ctx, "web_site_journey_run", json!({"steps": j.steps, "output_directory": out.join("journeys").join(id).display().to_string()}));
+                    match ran.map(|o| o.to_json()["result"].clone()) {
+                        Ok(r) if r["passed"] == true => (true, "every fixed check passed".to_string(), names),
+                        Ok(r) => {
+                            let at = r["failed_at"].as_u64().unwrap_or(0);
+                            let why = r["steps"].as_array().and_then(|s| s.last()).and_then(|s| s["note"].as_str()).unwrap_or("a step failed").to_string();
+                            (false, format!("step {at} failed: {why}"), names)
+                        }
+                        Err(e) => (false, format!("the journey couldn't run: {}", e.message), names),
+                    }
+                }
+            },
+        };
+        passed.push((id.clone(), ok));
+        scenarios.push(json!({
+            "scenario_id": id, "passed": ok, "note": note,
+            "names_used": names.iter().map(|(role, name)| json!({"role": role, "name": name})).collect::<Vec<_>>(),
+            "steps": journey.map(|j| j.steps.clone()),
+        }));
+    }
+    let _ = step(ctx, "web_site_close", json!({}));
+
+    // The start page and every address a journey opened, each in its own browser.
+    let mut addresses = vec!["/".to_string()];
+    for j in &p.journeys {
+        for s in &j.steps {
+            if let Some(o) = s["open"].as_str().map(|o| o.trim().to_string())
+                && !addresses.contains(&o)
+            {
+                addresses.push(o);
+            }
+        }
+    }
+    let mut pages = Vec::new();
+    let mut not_captured = Vec::new();
+    for (n, address) in addresses.iter().enumerate() {
+        let dir = out.join("captures").join(format!("page-{}", n + 1));
+        let url = if address.starts_with('/') { format!("{base}{address}") } else { format!("{base}/{address}") };
+        let done = step(ctx, "web_site_open", json!({"url": url}))
+            .and_then(|_| step(ctx, "web_site_capture", json!({"output_directory": dir.display().to_string(), "widths": [1440, 390], "include_html": false})));
+        let _ = step(ctx, "web_site_close", json!({}));
+        match done.and_then(|_| std::fs::read(dir.join("capture.json")).map_err(|e| ToolError::io(dir.display(), e))) {
+            Ok(bytes) => pages.push(eval::page_measures(&serde_json::from_slice(&bytes).unwrap_or(Value::Null))),
+            Err(e) => not_captured.push(json!({"address": address, "why": e.message})),
+        }
+    }
+    drop(server);
+
+    let ds = if p.fixture_id == "ds-claims-journey" {
+        let fixture_ds = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../REDESIGN_SPEC/fixtures/design-system");
+        // The registry is kept with the evaluation, not in the arm's project.
+        let registry = out.join("design-system");
+        std::fs::create_dir_all(&registry).map_err(|e| ToolError::io(registry.display(), e))?;
+        let reg_ws = craft_anything_engine::workspace::Workspace::create(&registry, "ds", "ds", craft_anything_engine::workspace::TargetRef::None)?;
+        let reg = super::redesign_ds::ingest_package(&reg_ws, &fixture_ds, "strict", false)?;
+        let report = super::redesign_ds::check_sources(&reg, &eval::app_sources(&ws.app_dir()), Some("1.2.0"));
+        Some(serde_json::to_value(&report).map_err(|e| ToolError::internal(e.to_string()))?)
+    } else {
+        None
+    };
+    let rubric = eval::rubric(&passed, &error_scenarios, &pages, ds.as_ref().and_then(|d| d["status"].as_str()));
+    let missing = eval::missing_measures(&pages);
+    let mut record = eval::record(&p.fixture_id, &p.arm, p.trial, scenarios, &rubric, &missing, ds.as_ref());
+    record["pages"] = json!(pages);
+    record["not_captured"] = json!(not_captured);
+    record["project"] = json!(ws.root);
+    let bytes = serde_json::to_vec_pretty(&record).map_err(|e| ToolError::internal(e.to_string()))?;
+    craft_anything_engine::project::write_atomic(&out.join("evaluation.json"), &bytes)?;
+    Ok(ToolOutput::Value(record))
 }
 
 fn redesign_journeys_run(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
