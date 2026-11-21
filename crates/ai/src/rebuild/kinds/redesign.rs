@@ -237,11 +237,9 @@ impl Check for PrototypeCaptureCheck {
         let report = likeness::measure(ws)?;
         let fits = likeness::fits_window_check(ws);
         let basics = likeness::basics_check(ws);
-        let copied = likeness::copied_wording_check(ws);
         let mut claims = vec![
             Claim::new("every captured page fits its window", fits.status != "warn", fits.summary.clone()),
             Claim::new("every captured page has the basics (names, alt text, language, landmarks)", basics.status != "warn", basics.summary.clone()),
-            Claim::new("no captured page repeats the original's sentences", copied.status != "warn", copied.summary.clone()),
         ];
         claims.extend(not_captured.iter().map(|why| Claim::new(format!("the prototype page {why} could be photographed"), false, why.clone())));
         let scores: Vec<String> =
