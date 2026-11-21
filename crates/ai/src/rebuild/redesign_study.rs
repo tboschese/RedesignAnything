@@ -118,13 +118,45 @@ pub fn import_oracle(ws: &Workspace, oracle: &Value) -> Result<Value, ToolError>
         }
         imported_caps += 1;
     }
+    let kept = keep_scenarios(ws, oracle)?;
     Ok(json!({
         "imported_evidence": imported_ev,
         "imported_capabilities": imported_caps,
         "preserved_capabilities": preserved_caps,
         "unknowns": unknowns,
+        "scenarios_kept": kept,
         "coverage": coverage_of(ws)?
     }))
+}
+
+/// Keep the imported scenarios in redesign/oracle/scenarios.json, where the checks, the journeys
+/// and the retirements read them: an imported scenario replaces the one with its id, the others
+/// stay. Returns how many scenarios the file holds.
+fn keep_scenarios(ws: &Workspace, oracle: &Value) -> Result<usize, ToolError> {
+    let Some(incoming) = oracle.get("scenarios").and_then(Value::as_array) else { return Ok(0) };
+    let file = redesign_store::redesign_dir(ws).join("oracle/scenarios.json");
+    let mut kept: Value = fs::read(&file).ok().and_then(|b| serde_json::from_slice(&b).ok()).filter(Value::is_object).unwrap_or_else(|| json!({}));
+    for (key, value) in oracle.as_object().into_iter().flatten() {
+        if key != "scenarios" && kept.get(key).is_none() {
+            kept[key] = value.clone();
+        }
+    }
+    let mut scenarios: Vec<Value> = kept.get("scenarios").and_then(Value::as_array).cloned().unwrap_or_default();
+    for sc in incoming {
+        let id = sc.get("id").and_then(Value::as_str);
+        match scenarios.iter_mut().find(|s| id.is_some() && s.get("id").and_then(Value::as_str) == id) {
+            Some(old) => *old = sc.clone(),
+            None => scenarios.push(sc.clone()),
+        }
+    }
+    let n = scenarios.len();
+    kept["scenarios"] = Value::Array(scenarios);
+    if let Some(dir) = file.parent() {
+        fs::create_dir_all(dir).map_err(|e| ToolError::io(dir.display(), e))?;
+    }
+    let bytes = serde_json::to_vec_pretty(&kept).map_err(|e| ToolError::internal(e.to_string()))?;
+    craft_anything_engine::project::write_atomic(&file, &bytes)?;
+    Ok(n)
 }
 
 fn knowledge_rank(status: &str) -> u8 {
@@ -327,6 +359,27 @@ mod tests {
         assert!(caps.iter().any(|c| c.knowledge_status == "unknown"));
         let unknown_cap = caps.iter().find(|c| c.id == "cap_dense-form_unknowns").unwrap();
         assert_eq!(unknown_cap.criticality, "normal");
+    }
+
+    /// An imported oracle is kept where the builder's journeys round, the checks and the
+    /// retirements read it, so the scenarios they owe are the imported ones; importing again
+    /// replaces a scenario by its id and keeps the others.
+    #[test]
+    fn an_imported_oracle_is_kept_where_the_checks_read_it() {
+        let d = tempfile::tempdir().unwrap();
+        let ws = Workspace::create(d.path(), "Fix", "kind=redesign", TargetRef::None).unwrap();
+        let scenario = |id: &str, then: &str| json!({"id": id, "capability_id": format!("cap_{id}"), "then": [then], "assertion_source": "observed"});
+        import_oracle(&ws, &json!({"fixture_id": "f", "scenarios": [scenario("gate", "Submit stays disabled"), scenario("roles", "Approve hidden")]})).unwrap();
+        let owed = |ws: &Workspace| super::super::redesign_journeys::owed(ws).into_iter().map(|(id, _)| id).collect::<Vec<_>>();
+        assert_eq!(owed(&ws), ["gate", "roles"], "the journeys round owes the imported scenarios");
+
+        let out = import_oracle(&ws, &json!({"scenarios": [scenario("gate", "Submit stays disabled until valid"), scenario("empty", "No attachments yet.")]}))
+            .unwrap();
+        assert_eq!(out["scenarios_kept"], 3);
+        let kept: Value = serde_json::from_slice(&fs::read(redesign_store::redesign_dir(&ws).join("oracle/scenarios.json")).unwrap()).unwrap();
+        assert_eq!(kept["fixture_id"], "f", "the first import's fields stay");
+        assert_eq!(kept["scenarios"][0]["then"][0], "Submit stays disabled until valid", "replaced by id");
+        assert_eq!(owed(&ws), ["gate", "roles", "empty"]);
     }
 
     #[test]

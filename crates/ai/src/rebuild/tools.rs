@@ -215,7 +215,7 @@ pub fn specs() -> Vec<ToolSpec> {
         ToolSpec {
             id: "redesign_study_map",
             title: "Map Study into redesign store",
-            summary: "Map Craft capture routes into capabilities, and/or import an independent fixture oracle JSON. Does not start a new crawl.",
+            summary: "Map Craft capture routes into capabilities, and/or import an independent fixture oracle JSON, whose scenarios are kept in redesign/oracle/scenarios.json (by id: an imported scenario replaces the one with its id) for the checks, the journeys and the builder. Does not start a new crawl.",
             beginner: "Turns Study captures or fixture oracles into redesign capabilities.",
             toolset: Toolset::Projects,
             effects: Effects::WRITES_FILESYSTEM,
