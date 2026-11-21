@@ -3530,8 +3530,30 @@ fn deeper_pages_come_from_the_captured_pages_links() {
     let about_page = json!({"links": [{"href": "https://shop.example.com/products/chairs"}, {"href": "https://shop.example.com/team"}]});
     let r = pick_deeper_routes(&[products_page.clone(), about_page], start, &have, 5);
     let paths: Vec<&str> = r.iter().map(|r| r.path.as_str()).collect();
-    assert_eq!(paths, vec!["/products/chairs", "/products/tables", "/team"], "new pages only, once each, same site, no files");
+    assert_eq!(paths, vec!["/products/chairs", "/team", "/products/tables"], "new pages only, once each, same site, no files; one of each kind first");
     assert_eq!(pick_deeper_routes(&[products_page], start, &have, 1).len(), 1, "never more than there's room for");
+}
+
+/// With room for a few pages, a study photographs pages of different kinds, the kinds the start
+/// page links to most first, rather than the first few links when they are all alike.
+#[test]
+fn a_study_picks_one_page_of_each_kind_before_more_of_one() {
+    use kinds::website::pick_routes;
+    let link = |p: &str| json!({"href": format!("https://site.example{p}")});
+    let collections = json!({"links": [
+        link("/details/texts"), link("/details/movies"), link("/details/audio"), link("/details/software"),
+        link("/about/"), link("/details/image"), link("/donate/?from=menu"), link("/signup"),
+    ]});
+    let paths = |r: Vec<kinds::website::Route>| r.into_iter().map(|r| r.path).collect::<Vec<_>>();
+    assert_eq!(paths(pick_routes(&collections, "https://site.example/", 4)), ["/details/texts", "/about/", "/donate/", "/signup"]);
+    assert_eq!(paths(pick_routes(&collections, "https://site.example/", 6)).len(), 6, "the room left goes to more of a kind");
+
+    // Under one folder, a `Prefix:` marks another kind; what the page links to most comes first.
+    let wiki = json!({"links": [
+        link("/wiki/Help:Editing/First_steps"), link("/wiki/Portal:Featured"), link("/wiki/Help:Contents"), link("/wiki/Portal:Events"),
+        link("/wiki/Moon"), link("/wiki/Sun"), link("/wiki/Mars"), link("/wiki/Special:Random"),
+    ]});
+    assert_eq!(paths(pick_routes(&wiki, "https://site.example/wiki/Main_Page", 3)), ["/wiki/Moon", "/wiki/Help:Editing/First_steps", "/wiki/Portal:Featured"]);
 }
 
 #[test]
