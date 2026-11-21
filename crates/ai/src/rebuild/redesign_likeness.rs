@@ -67,23 +67,37 @@ impl LikenessReport {
     }
 }
 
-/// The share of the picture's height made of bands with one flat colour.
-pub fn blank_share(img: &Image) -> f64 {
+/// For each band of the picture, top to bottom: whether it is one flat colour.
+fn flat_bands(img: &Image) -> Vec<bool> {
     let (w, h) = (img.width as usize, img.height as usize);
     if w == 0 || h == 0 {
-        return 1.0;
+        return Vec::new();
     }
     let band = BAND_PX as usize;
-    let (mut bands, mut blank) = (0usize, 0usize);
-    for top in (0..h).step_by(band) {
-        let rows = &img.rgba[top * w * 4..(top + band).min(h) * w * 4];
-        let first = &rows[..4];
-        // Every 8th pixel is enough to tell a drawn band from a flat one.
-        let flat = rows.as_chunks::<4>().0.iter().step_by(8).all(|px| px.iter().zip(first).all(|(a, b)| a.abs_diff(*b) <= 3));
-        bands += 1;
-        blank += usize::from(flat);
+    (0..h)
+        .step_by(band)
+        .map(|top| {
+            let rows = &img.rgba[top * w * 4..(top + band).min(h) * w * 4];
+            let first = &rows[..4];
+            // Every 8th pixel is enough to tell a drawn band from a flat one.
+            rows.as_chunks::<4>().0.iter().step_by(8).all(|px| px.iter().zip(first).all(|(a, b)| a.abs_diff(*b) <= 3))
+        })
+        .collect()
+}
+
+/// The share of the picture's height made of bands with one flat colour.
+pub fn blank_share(img: &Image) -> f64 {
+    let bands = flat_bands(img);
+    if bands.is_empty() {
+        return 1.0;
     }
-    blank as f64 / bands as f64
+    bands.iter().filter(|flat| **flat).count() as f64 / bands.len() as f64
+}
+
+/// How far down the picture something is drawn: the bottom of its last band that is not flat.
+fn drawn_height(img: &Image) -> u32 {
+    let last = flat_bands(img).iter().rposition(|flat| !flat);
+    last.map_or(0, |i| ((i as u32 + 1) * BAND_PX).min(img.height))
 }
 
 fn read_capture(dir: &Path) -> Option<Value> {
@@ -101,9 +115,23 @@ fn widths(dir: &Path) -> Vec<u32> {
     out
 }
 
+/// The window's height when a page was captured.
+fn window_height(dir: &Path) -> u32 {
+    read_capture(dir).and_then(|c| c["viewport"]["h"].as_u64()).map_or(900, |h| h as u32)
+}
+
+/// A page's picture at `width`, ready to compare. A picture no taller than the window was all in
+/// view when it was taken, so the empty space under a short page is cut off instead of counted. A
+/// taller one with large flat bands was not drawn to the end, and is refused.
 fn picture(dir: &Path, width: u32, whose: &str) -> Result<Image, String> {
     let bytes = fs::read(dir.join(format!("screenshot-{width}.png"))).map_err(|e| format!("{whose} screenshot can't be read: {e}"))?;
     let img = web_common::decode_png(&bytes).map_err(|e| format!("{whose} screenshot can't be decoded: {}", e.message))?;
+    if img.height <= window_height(dir) {
+        return match drawn_height(&img) {
+            0 => Err(format!("{whose} screenshot shows nothing drawn")),
+            drawn => Ok(web_common::crop(&img, img.width, drawn)),
+        };
+    }
     let blank = blank_share(&img);
     if blank > MAX_BLANK_SHARE {
         return Err(format!(
@@ -303,6 +331,40 @@ mod tests {
         assert!(cut.not_measured.iter().any(|r| r.contains("flat")), "{cut:?}");
         assert!(cut.structure.is_some(), "the outline is still compared: {cut:?}");
         assert!(compare_page("p", &at("drawn"), &at("drawn")).picture.is_some(), "a drawn page with white space is compared");
+    }
+
+    /// A page shorter than the window is all in the picture: the empty space under it is neither a
+    /// reason to refuse it nor something two pages have in common.
+    #[test]
+    fn a_page_shorter_than_the_window_is_compared_over_what_it_draws() {
+        let d = tempfile::tempdir().unwrap();
+        let at = |name: &str| d.path().join(name);
+        let short = |name: &str, parts: &[(&str, u32)]| {
+            capture(&at(name), parts, None);
+            let mut c = read_capture(&at(name)).unwrap();
+            c["viewport"] = json!({"w": 640, "h": 960});
+            fs::write(at(name).join("capture.json"), c.to_string()).unwrap();
+        };
+        short("results", &[("header", 0), ("main", 220)]);
+        short("same", &[("header", 0), ("main", 220)]);
+        short("other", &[("form", 0), ("aside", 220)]);
+        short("empty", &[]);
+        capture(&at("tall"), &[("header", 0), ("main", 220)], None);
+
+        let picture = |name: &str| compare_page("p", &at("results"), &at(name));
+        let (same, other) = (picture("same").picture.expect("a short page is compared"), picture("other").picture.unwrap());
+        assert!(same > other, "same {same} vs other {other}");
+        // Compared over the whole window, the white under both pages would make them look alike.
+        let whole = |name: &str| web_common::decode_png(&fs::read(at(name).join("screenshot-640.png")).unwrap()).unwrap();
+        let over_the_window = (web_common::block_similarity(&whole("results"), &whole("other"), 16, 24)
+            + web_common::perceptual_similarity(&whole("results"), &whole("other")))
+            * 50.0;
+        assert!(other < over_the_window, "over what is drawn {other} vs over the window {over_the_window}");
+
+        let nothing = picture("empty");
+        assert!(nothing.picture.is_none() && nothing.not_measured.iter().any(|r| r.contains("nothing drawn")), "{nothing:?}");
+        let undrawn = picture("tall");
+        assert!(undrawn.not_measured.iter().any(|r| r.contains("flat")), "the same picture of a page taller than the window is still refused: {undrawn:?}");
     }
 
     #[test]
