@@ -99,6 +99,7 @@ impl TargetKind for RedesignKind {
                 states.join(", ")
             ));
         }
+        out.extend(plan_changes(cx.ws));
         let unmapped = crate::rebuild::redesign_likeness::pages_without_address(cx.ws);
         if !unmapped.is_empty() {
             let routes = website::routes(cx.ws);
@@ -143,6 +144,35 @@ pub const JOURNEYS_BRIEF: &str = concat!(
     "Each check round runs them and tells you the step that failed. A scenario passes only when its journey does, ",
     "not when its words appear in the code, so write the UI that makes the steps work rather than steps that avoid it."
 );
+
+/// What the plan changes, said plainly to the builder: each approved decision that changes the
+/// original (its problem, the chosen option and what it changes), and each scenario an approved
+/// decision retired, with what replaces it. The files alone hold generic option text, so without
+/// this a builder rebuilds what the original did.
+fn plan_changes(ws: &Workspace) -> Vec<String> {
+    let mut out = Vec::new();
+    let decisions = crate::rebuild::redesign_plan::list_decisions(ws).unwrap_or_default();
+    let changes: Vec<String> = decisions
+        .iter()
+        .filter(|d| d.chosen_option_id != "keep_as_is" && d.status == "approved")
+        .map(|d| {
+            let option = d.options.iter().find(|o| o.id == d.chosen_option_id).map_or(d.chosen_option_id.as_str(), |o| o.description.as_str());
+            format!("- {} ({}): {} Chosen: {} Rationale: {}", d.id, d.capability_ids.join(", "), d.problem.trim(), option.trim(), d.rationale.trim())
+        })
+        .collect();
+    if !changes.is_empty() {
+        out.push(format!("Approved changes to the original; build these, not what the original did:\n{}", changes.join("\n")));
+    }
+    let (retired, _) = crate::rebuild::redesign_retired::in_force(ws);
+    if !retired.is_empty() {
+        let lines: Vec<String> = retired.values().map(|r| format!("- {}: {}", r.scenario_id, r.note())).collect();
+        out.push(format!(
+            "Scenarios retired by an approved decision: the prototype must not do what they ask for; build what replaces them, and write no journey for them:\n{}",
+            lines.join("\n")
+        ));
+    }
+    out
+}
 
 /// How the builder tells the check round which prototype page stands for each original page.
 pub const CAPTURE_BRIEF: &str = concat!(

@@ -894,6 +894,10 @@ struct DecisionChooseParams {
     pub project: PathBuf,
     pub decision_id: String,
     pub option_id: String,
+    /// What this choice changes in the prototype, in a sentence ("one search box takes both a web
+    /// address and words"). The builder's brief quotes it; an option's own text is generic advice.
+    #[serde(default)]
+    pub change: Option<String>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -1777,7 +1781,7 @@ fn redesign_decision_propose(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOu
 fn redesign_decision_choose(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
     let p: DecisionChooseParams = parse_params(params)?;
     let ws = open(&p.project)?;
-    let dec = super::redesign_plan::choose_option(&ws, &p.decision_id, &p.option_id)?;
+    let dec = super::redesign_plan::choose_option_saying(&ws, &p.decision_id, &p.option_id, p.change.as_deref())?;
     Ok(ToolOutput::Value(serde_json::to_value(dec).map_err(|e| ToolError::internal(e.to_string()))?))
 }
 

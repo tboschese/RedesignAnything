@@ -3037,6 +3037,62 @@ fn a_redesign_brief_asks_for_one_journey_per_scenario() {
     assert!(b.contains("redesign/quality/journeys.json") && b.contains("- search: Search returns results"), "{b}");
 }
 
+/// The brief says what an approved decision changes, in the words it was chosen with, and which
+/// scenario it retired, so the builder builds the change rather than the original.
+#[test]
+fn a_redesign_brief_says_what_the_approved_decisions_change_and_what_they_retired() {
+    use crate::rebuild::{redesign_plan, redesign_retired, redesign_store};
+    let d = tempfile::tempdir().unwrap();
+    let mut ws = Workspace::create(d.path(), "R", "kind=redesign", TargetRef::None).unwrap();
+    ws.manifest.kind = Some("redesign".into());
+    ws.save().unwrap();
+    let oracle = ws.root.join("redesign/oracle");
+    std::fs::create_dir_all(&oracle).unwrap();
+    let scenarios = json!({"scenarios": [{"id": "two_fields", "capability_id": "cap_search", "then": ["Two separate search fields"]}]});
+    std::fs::write(oracle.join("scenarios.json"), scenarios.to_string()).unwrap();
+    let decision = redesign_plan::propose_decision(
+        "Search on the home page",
+        &["cap_search".to_string()],
+        &crate::rebuild::redesign_knowledge::critic("Search on the home page", &[]),
+        "ui_only",
+        &[],
+        &[],
+    );
+    redesign_plan::save_decision(&ws, &decision).unwrap();
+    let option = decision.options.iter().find(|o| o.id != "keep_as_is").unwrap().id.clone();
+    redesign_plan::choose_option_saying(&ws, &decision.id, &option, Some("One search box takes both a web address and words")).unwrap();
+    let before = brief(&ws, "redesign", false, false, None, false, None);
+    assert!(!before.contains("One search box"), "a choice not approved yet is not built");
+    let approval = redesign_store::EvidenceRecord {
+        id: "ev_yes".into(),
+        source: "user".into(),
+        source_operation: "answer".into(),
+        subject: "s".into(),
+        kind: "approval".into(),
+        status: "declared".into(),
+        scope: Value::Null,
+        locator: None,
+        digest: None,
+        observed_at: String::new(),
+        limitations: vec![],
+        sensitivity: "internal".into(),
+        summary: "yes".into(),
+    };
+    redesign_store::put_evidence(&ws, approval).unwrap();
+    redesign_plan::approve_decision(&ws, &decision.id, "ev_yes").unwrap();
+    let retired = redesign_retired::Retired {
+        scenario_id: "two_fields".into(),
+        decision_id: decision.id.clone(),
+        approval_evidence_id: "ev_yes".into(),
+        reason: "one box takes both".into(),
+    };
+    redesign_retired::retire(&ws, retired).unwrap();
+    let b = brief(&ws, "redesign", false, false, None, false, None);
+    assert!(b.contains("Approved changes to the original") && b.contains("One search box takes both a web address and words"), "{b}");
+    assert!(b.contains("must not do what they ask for") && b.contains("- two_fields: replaced by the approved decision"), "{b}");
+    assert!(!b.contains("- two_fields: Two separate search fields"), "a retired scenario owes no journey: {b}");
+}
+
 /// Without a scenario that owes a journey, the journeys check does not run at all.
 #[test]
 fn a_redesign_without_scenarios_runs_no_journeys_check() {
