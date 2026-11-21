@@ -56,7 +56,7 @@ pub fn specs() -> Vec<ToolSpec> {
         spec(
             "web_page_states_capture",
             "Capture menus, dialogs and tabs",
-            "On the open website, open up to max_states of its visible menus, pop-ups, tabs and collapsed sections (aria-expanded, aria-haspopup, unselected tabs, <summary>; never form controls or submit buttons) one at a time: click it, take a screenshot, record what changed (expanded, a dialog appeared, the tab or the address changed), then put the page back. Writes state-<n>.png and states.json into a new folder. Clicking runs the site's own code, so it needs your approval.",
+            "On the open website, open up to max_states of its visible menus, pop-ups, tabs and collapsed sections (aria-expanded, aria-haspopup, unselected tabs, <summary>; never form controls or submit buttons) one at a time: click it, take a screenshot, record what changed (expanded, a dialog appeared, the tab or the address changed), then put the page back. Then, when the page has a search field, type a word into it without submitting (search_text, or by default the word its headings and links use most) and picture what showed, such as suggestions; the field is emptied after. Writes state-<n>.png and states.json into a new folder. Clicking runs the site's own code, so it needs your approval.",
             "Open the site's menus, pop-ups and tabs and photograph each, so a rebuild can match them too.",
             Toolset::Browser,
             Effects::EVIDENCE.union(Effects::WRITES_FILESYSTEM).union(Effects::EXECUTES_FOREIGN_CODE).union(Effects::ACCESSES_NETWORK),
@@ -485,6 +485,10 @@ pub struct StatesParams {
     /// Page width in CSS pixels (320..=3840, default 1440).
     #[serde(default = "d_state_width")]
     pub width: u32,
+    /// What to type into the page's search field (at most 40 characters; never submitted). Default:
+    /// the word of five letters or more its headings and links use most. Empty: type nothing.
+    #[serde(default)]
+    pub search_text: Option<String>,
     #[serde(default = "d_timeout")]
     pub timeout_secs: u64,
 }
@@ -513,6 +517,61 @@ const FIND_STATES_JS: &str = r#"(() => {
     out.push({index: out.length, kind, label: cap(el.innerText || el.getAttribute('aria-label') || el.getAttribute('title'), 80)});
   }
   return out;
+})()"#;
+
+/// Find the page's search field, in open shadow roots too (a search input, a combobox or a field
+/// in a search landmark, then one whose name, id or form says search), mark it, focus it with its
+/// content selected, and say its label and the word of five letters or more the page's headings
+/// and links use most. `{found: false}` when there is none.
+const FOCUS_SEARCH_JS: &str = r#"(() => {
+  __DEEP__
+  const cap = (s, n) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, n);
+  const els = all(document, []);
+  for (const old of els) if (old.hasAttribute('data-craft-search')) old.removeAttribute('data-craft-search');
+  const inSearch = el => { for (let n = el; n; n = up(n)) if (n.getAttribute && n.getAttribute('role') === 'search') return true; return false; };
+  const score = el => {
+    if (el.tagName !== 'INPUT' || !['search', 'text', ''].includes((el.getAttribute('type') || '').toLowerCase())) return 0;
+    if (!shown(el) || el.disabled || el.readOnly) return 0;
+    if (el.type === 'search') return 3;
+    if (el.getAttribute('role') === 'combobox' || inSearch(el)) return 2;
+    return /search|query|^q$/i.test([el.name, el.id, el.form ? el.form.getAttribute('action') : ''].join(' ')) ? 1 : 0;
+  };
+  let field = null, best = 0;
+  for (const el of els) { const n = score(el); if (n > best) { best = n; field = el; } }
+  if (!field) return {found: false};
+  field.setAttribute('data-craft-search', '1');
+  const root = field.getRootNode();
+  const forLabel = field.id && root.querySelector ? root.querySelector('label[for="' + CSS.escape(field.id) + '"]') : null;
+  const label = cap(field.getAttribute('aria-label') || labelled(field) || (forLabel && forLabel.innerText) || field.placeholder || field.getAttribute('title') || field.name, 80);
+  const counts = {};
+  for (const el of els) if (el.matches('h1, h2, h3, a') && shown(el)) for (const w of (el.innerText || '').toLowerCase().match(/\p{L}{5,}/gu) || []) counts[w] = (counts[w] || 0) + 1;
+  const word = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+  field.scrollIntoView({block: 'center', behavior: 'instant'});
+  field.focus();
+  if (typeof field.select === 'function') field.select();
+  return {found: true, label, word: word ? word[0] : ''};
+})()"#;
+
+/// What shows around the marked search field now: whether it says its list is open, how many
+/// options show, how many elements show at all, and the address.
+const SEARCH_STATE_JS: &str = r#"(() => {
+  __DEEP__
+  const els = all(document, []);
+  const field = els.find(el => el.hasAttribute('data-craft-search'));
+  const seen = els.filter(shown);
+  return {present: !!field, expanded: field ? field.getAttribute('aria-expanded') : null, options: seen.filter(el => el.matches('[role="option"]')).length, showing: seen.length, url: location.href};
+})()"#;
+
+/// Empty the marked search field the way typing would, and take the focus from it.
+const CLEAR_SEARCH_JS: &str = r#"(() => {
+  __DEEP__
+  const field = all(document, []).find(el => el.hasAttribute('data-craft-search'));
+  if (!field) return false;
+  const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+  set.call(field, '');
+  field.dispatchEvent(new Event('input', {bubbles: true}));
+  field.blur();
+  return true;
 })()"#;
 
 /// What the page looks like around control `__I__` now.
@@ -552,6 +611,21 @@ fn settle(client: &mut CdpClient, ms: u64) -> Result<(), ToolError> {
     Ok(())
 }
 
+/// What typing into the search field changed, in plain words, from the state before and after.
+fn search_change(before: &Value, after: &Value) -> Vec<&'static str> {
+    let n = |v: &Value, k: &str| v[k].as_u64().unwrap_or(0);
+    let mut out = Vec::new();
+    if n(after, "options") > n(before, "options") || (after["expanded"] == "true" && before["expanded"] != "true") {
+        out.push("suggestions appeared");
+    } else if n(after, "showing") >= n(before, "showing") + 3 {
+        out.push("more showed");
+    }
+    if after["url"] != before["url"] {
+        out.push("address changed");
+    }
+    out
+}
+
 /// What a click changed, in plain words, from the state before and after.
 fn state_change(before: &Value, after: &Value) -> Vec<&'static str> {
     let mut out = Vec::new();
@@ -573,6 +647,55 @@ fn state_change(before: &Value, after: &Value) -> Vec<&'static str> {
     out
 }
 
+/// Type into the page's search field (never submitted), picture what showed as
+/// `state-<n + 1>.png`, then empty the field and put the page back. None when the page has no
+/// search field, there is nothing to type, or the typing couldn't be done.
+fn search_state(
+    ctx: &mut Ctx<'_>,
+    client: &mut CdpClient,
+    out: &Path,
+    start: &str,
+    p: &StatesParams,
+    n: usize,
+    dl: &Deadline,
+) -> Result<Option<Value>, ToolError> {
+    let deep = |js: &str| js.replace("__DEEP__", journey::DEEP_JS);
+    let field = eval(client, &deep(FOCUS_SEARCH_JS), dl)?;
+    if field["found"] != true {
+        return Ok(None);
+    }
+    let text = p.search_text.clone().unwrap_or_else(|| field["word"].as_str().unwrap_or_default().to_string());
+    if text.trim().is_empty() {
+        return Ok(None);
+    }
+    ctx.report(None, format!("Typing {text:?} into the search field…"));
+    let before = eval(client, &deep(SEARCH_STATE_JS), dl)?;
+    if client.call("Input.insertText", json!({"text": text}), None, dl).is_err() {
+        return Ok(None);
+    }
+    settle(client, 1200)?;
+    let after = eval(client, &deep(SEARCH_STATE_JS), dl).unwrap_or(Value::Null);
+    let changed = search_change(&before, &after);
+    let mut row = json!({"index": n, "kind": "search", "label": field["label"], "typed": text, "changed": changed});
+    if !changed.contains(&"address changed") {
+        let shot = client.call("Page.captureScreenshot", json!({"format": "png"}), None, dl)?;
+        if let Some(data) = shot.get("data").and_then(Value::as_str) {
+            let bytes = web_common::b64_decode(data)?;
+            let name = format!("state-{}.png", n + 1);
+            write_new_file(out, std::slice::from_ref(&name), &bytes).map_err(ToolError::invalid)?;
+            row["file"] = json!(name);
+            row["sha256"] = json!(sha256_hex(&bytes));
+        }
+    }
+    let _ = eval(client, &deep(CLEAR_SEARCH_JS), dl);
+    press_escape(client, dl);
+    if after["url"].as_str().is_some_and(|u| u != start) {
+        let _ = navigate(client, start, p.width, 900, 800, dl)?;
+    }
+    settle(client, 300)?;
+    Ok(Some(row))
+}
+
 fn web_page_states_capture(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
     let p: StatesParams = parse_params(params)?;
     if !(1..=8).contains(&p.max_states) {
@@ -580,6 +703,9 @@ fn web_page_states_capture(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutpu
     }
     if !(320..=3840).contains(&p.width) {
         return Err(ToolError::invalid("width must be 320..=3840"));
+    }
+    if p.search_text.as_ref().is_some_and(|t| t.chars().count() > 40) {
+        return Err(ToolError::invalid("search_text is at most 40 characters"));
     }
     let dl = deadline(ctx, p.timeout_secs.max(30))?;
     let site = open_site(ctx, &dl)?;
@@ -632,6 +758,11 @@ fn web_page_states_capture(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutpu
             settle(&mut client, 300)?;
             states.push(row);
         }
+        if !dl.expired()
+            && let Some(row) = search_state(ctx, &mut client, &out, &start, &p, states.len(), &dl)?
+        {
+            states.push(row);
+        }
         Ok((start, states, found.len()))
     })();
     cleanup(&mut client, &dl);
@@ -640,10 +771,16 @@ fn web_page_states_capture(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutpu
     write_new_file(&out, &["states.json".into()], &json_bytes).map_err(ToolError::invalid)?;
     let shown = shown_url(&start);
     let pictured = states.iter().filter(|s| s.get("file").is_some()).count();
+    let searched = states.iter().find(|s| s["kind"] == "search").and_then(|s| s["typed"].as_str()).map(|t| format!(" Typed {t:?} into its search field."));
     let summary = if found == 0 {
-        format!("{shown} has no menus, pop-ups, tabs or collapsed sections to open.")
+        format!("{shown} has no menus, pop-ups, tabs or collapsed sections to open.{}", searched.unwrap_or_default())
     } else {
-        format!("Opened {} of {found} control(s) on {shown}; {pictured} pictured in {}.", states.len(), out.display())
+        format!(
+            "Opened {} of {found} control(s) on {shown}; {pictured} pictured in {}.{}",
+            states.iter().filter(|s| s["kind"] != "search").count(),
+            out.display(),
+            searched.unwrap_or_default()
+        )
     };
     let browser = site.handle();
     let ev = EvidenceBuilder::new(
@@ -651,7 +788,7 @@ fn web_page_states_capture(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutpu
         Subject { kind: "website".into(), sha256: None, name: Some(shown.clone()) },
         browser_env(ctx.session.clean_room(), &browser),
     )
-    .params(json!({"max_states": p.max_states, "width": p.width}))
+    .params(json!({"max_states": p.max_states, "width": p.width, "search_text": p.search_text}))
     .result(json!({"url": start, "found": found, "states": states, "folder": out.display().to_string()}))
     .summary(summary)
     .confidence(Confidence::Observed)
@@ -1590,6 +1727,7 @@ mod tests {
         assert!(state_change(&before, &before).is_empty());
         // The page scripts carry their placeholders.
         assert!(FIND_STATES_JS.contains("__MAX__") && STATE_JS.contains("__I__") && CLICK_STATE_JS.contains("__I__"));
+        assert!([FOCUS_SEARCH_JS, SEARCH_STATE_JS, CLEAR_SEARCH_JS].iter().all(|js| js.contains("__DEEP__")));
         assert!(REMEMBER_TAB_JS.contains("__I__") && RESELECT_TAB_JS.contains("__I__"));
     }
 
@@ -1957,6 +2095,42 @@ body{margin:0} .d{display:none} @media (min-width:800px){.d{display:block} .p{di
             e.call("web_page_states_capture", json!({"output_directory": out.display().to_string(), "width": width, "max_states": 1}), cli()).unwrap();
             assert_eq!(top_colour(&out), (label.to_string(), colour.to_vec()), "at {width} px");
         }
+        let _ = e.call("web_site_close", json!({}), cli());
+    }
+
+    /// The search field is typed into, never submitted: by default with the word the page's
+    /// headings and links use most, in an open shadow root too, and what showed is pictured. An
+    /// empty search_text types nothing. Live (`--ignored`).
+    #[test]
+    #[ignore]
+    fn the_search_field_is_typed_into_and_its_suggestions_pictured() {
+        let e = serve_and_open(
+            r#"<!doctype html><html lang="en"><body><h1>Planets</h1><a href="/p/mars">Planets near us</a><a href="/p/venus">Other planets</a>
+<site-search></site-search><ul id="out"></ul>
+<script>customElements.define('site-search', class extends HTMLElement { connectedCallback() {
+  const root = this.attachShadow({mode: 'open'});
+  root.innerHTML = '<form action="/find"><input type="search" aria-label="Search the atlas"><ul role="listbox" id="list"></ul></form>';
+  const input = root.querySelector('input'), list = root.querySelector('#list');
+  input.addEventListener('input', () => { list.innerHTML = input.value ? '<li role="option">' + input.value + ' one</li><li role="option">' + input.value + ' two</li>' : ''; });
+}});</script></body></html>"#,
+        );
+        let cli = || crate::CallOptions::new(crate::Caller::Cli).with_consent(crate::Consent::Granted);
+        let dir = tempfile::tempdir().unwrap();
+        let rows = |out: &Path| -> Vec<Value> {
+            let v: Value = serde_json::from_str(&std::fs::read_to_string(out.join("states.json")).unwrap()).unwrap();
+            v["states"].as_array().unwrap().clone()
+        };
+        let out = dir.path().join("states");
+        e.call("web_page_states_capture", json!({"output_directory": out.display().to_string(), "max_states": 1}), cli()).unwrap();
+        let search = rows(&out).into_iter().find(|r| r["kind"] == "search").expect("a search row");
+        assert_eq!(search["typed"], "planets", "{search}");
+        assert_eq!(search["label"], "Search the atlas");
+        assert!(search["changed"].as_array().unwrap().iter().any(|c| c == "suggestions appeared"), "{search}");
+        assert!(out.join(search["file"].as_str().unwrap()).is_file());
+
+        let none = dir.path().join("none");
+        e.call("web_page_states_capture", json!({"output_directory": none.display().to_string(), "max_states": 1, "search_text": ""}), cli()).unwrap();
+        assert!(rows(&none).iter().all(|r| r["kind"] != "search"), "an empty search_text types nothing");
         let _ = e.call("web_site_close", json!({}), cli());
     }
 

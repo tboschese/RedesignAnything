@@ -3676,12 +3676,23 @@ fn menus_are_studied_on_a_phone_too() {
     for (dir, width, label) in [(STATES_DIR.to_string(), 1440, "Products"), (phone_states_dir(390), 390, "Menu")] {
         let states = ws.capture_dir().join(dir);
         std::fs::create_dir_all(&states).unwrap();
-        let list = json!({"width": width, "states": [{"kind": "menu", "label": label, "file": "state-1.png"}]});
+        let mut list = json!({"width": width, "states": [{"kind": "menu", "label": label, "file": "state-1.png"}]});
+        if width == 1440 {
+            list["states"].as_array_mut().unwrap().push(json!({"kind": "search", "label": "Search", "typed": "chairs", "file": "state-2.png"}));
+        }
         std::fs::write(states.join("states.json"), serde_json::to_vec(&list).unwrap()).unwrap();
     }
     std::fs::create_dir_all(ws.capture_dir().join("states-old")).unwrap();
     assert_eq!(state_dirs(&ws.capture_dir()), ["states", "states-390"]);
-    assert_eq!(pictured_states(&ws), ["states/state-1.png (Products, menu, 1440 px)", "states-390/state-1.png (Menu, menu, 390 px)"]);
+    assert_eq!(
+        pictured_states(&ws),
+        [
+            "states/state-1.png (Products, menu, 1440 px)",
+            "states/state-2.png (Search, search, \"chairs\" typed, 1440 px)",
+            "states-390/state-1.png (Menu, menu, 390 px)"
+        ],
+        "a typed search says what was typed"
+    );
 }
 
 /// A builder whose turn lasts until its own check (asked like `rebuild_check` from another process)
