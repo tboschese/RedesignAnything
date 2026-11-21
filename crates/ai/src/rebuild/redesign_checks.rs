@@ -267,7 +267,15 @@ pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
     checks.push(super::redesign_likeness::basics_check(ws));
 
     // Functional proxy + quality runners (oracle static eval, optional Playwright/axe reports).
-    let app_tsx = fs::read_to_string(ws.app_dir().join("src/App.tsx")).unwrap_or_default();
+    // Any source file the app's UI is written in: a well-split app keeps its buttons in components.
+    let mut ui_files = Vec::new();
+    files_under(&ws.app_dir().join("src"), 0, &mut ui_files);
+    let app_tsx: String = ui_files
+        .iter()
+        .filter(|p| p.extension().and_then(|e| e.to_str()).is_some_and(|e| matches!(e, "tsx" | "jsx" | "ts" | "js" | "vue" | "svelte")))
+        .filter_map(|p| fs::read_to_string(p).ok())
+        .collect::<Vec<_>>()
+        .join("\n");
     let button_works = primary_action_present(&app_tsx);
     let preview = pkg.is_file() && ws.app_dir().join("src/main.tsx").is_file();
 
@@ -636,6 +644,21 @@ mod tests {
         assert!(ready(&[eval("pass", "journey_run"), eval("retired", "retired")]), "what is left all passed");
         assert!(!ready(&[eval("fail", "journey_run"), eval("retired", "retired")]));
         assert!(!ready(&[eval("retired", "retired")]), "nothing left to show the prototype works");
+    }
+
+    /// A button written in a component, with none in App.tsx, still counts.
+    #[test]
+    fn a_button_in_a_component_counts_for_the_smoke_check() {
+        let d = tempfile::tempdir().unwrap();
+        let mut ws = Workspace::create(d.path(), "S", "kind=redesign", TargetRef::None).unwrap();
+        ws.manifest.kind = Some("redesign".into());
+        ws.save().unwrap();
+        fs::create_dir_all(ws.app_dir().join("src/components")).unwrap();
+        fs::write(ws.app_dir().join("src/App.tsx"), "import { Bar } from './components/Bar'; export const App = () => <Bar />;").unwrap();
+        let smoke = |ws: &Workspace| run_native_checks(ws).unwrap().checks.into_iter().find(|c| c.id == "functional_smoke").unwrap().summary;
+        assert!(smoke(&ws).contains("button_works=false"));
+        fs::write(ws.app_dir().join("src/components/Bar.tsx"), "export const Bar = () => <button>Go</button>;").unwrap();
+        assert!(smoke(&ws).contains("button_works=true"));
     }
 
     #[test]

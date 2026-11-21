@@ -3034,7 +3034,7 @@ fn a_redesign_brief_asks_for_one_journey_per_scenario() {
     let scenarios = json!({"scenarios": [{"id": "search", "capability_id": "c1", "then": ["Search returns results"]}]});
     std::fs::write(oracle.join("scenarios.json"), scenarios.to_string()).unwrap();
     let b = brief(&ws, "redesign", false, false, None, false, None);
-    assert!(b.contains("redesign/quality/journeys.json") && b.contains("- search: Search returns results"), "{b}");
+    assert!(b.contains("app/redesign-journeys.json") && b.contains("- search: Search returns results"), "{b}");
 }
 
 /// The brief says what an approved decision changes, in the words it was chosen with, and which

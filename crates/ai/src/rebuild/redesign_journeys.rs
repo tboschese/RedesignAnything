@@ -138,13 +138,22 @@ pub fn save(ws: &Workspace, journeys: &[Journey]) -> Result<(), ToolError> {
 }
 
 /// The journeys the project keeps; none when it keeps no file.
+/// The journeys a builder writes, inside the app it may change: the builder changes nothing
+/// outside app/, so its journeys can't go under redesign/.
+pub const APP_JOURNEYS_FILE: &str = "redesign-journeys.json";
+
+/// Whichever of two files was written last, among those that exist.
+pub(super) fn newest(candidates: [PathBuf; 2]) -> Option<PathBuf> {
+    candidates.into_iter().filter(|p| p.is_file()).max_by_key(|p| fs::metadata(p).and_then(|m| m.modified()).ok())
+}
+
+/// The journeys the project keeps: the newer of those `redesign_journeys_run` was given
+/// (redesign/quality/journeys.json) and those the builder wrote (app/redesign-journeys.json).
 pub fn load(ws: &Workspace) -> Result<Vec<Journey>, ToolError> {
-    let path = file(ws, JOURNEYS_FILE);
-    if !path.is_file() {
-        return Ok(Vec::new());
-    }
+    let Some(path) = newest([file(ws, JOURNEYS_FILE), ws.app_dir().join(APP_JOURNEYS_FILE)]) else { return Ok(Vec::new()) };
     let bytes = fs::read(&path).map_err(|e| ToolError::io(path.display(), e))?;
-    let kept: JourneyFile = serde_json::from_slice(&bytes).map_err(|e| ToolError::invalid(format!("redesign/{JOURNEYS_FILE}: {e}")))?;
+    let shown = path.strip_prefix(&ws.root).unwrap_or(&path).display().to_string();
+    let kept: JourneyFile = serde_json::from_slice(&bytes).map_err(|e| ToolError::invalid(format!("{shown}: {e}")))?;
     Ok(kept.journeys)
 }
 
@@ -240,6 +249,26 @@ mod tests {
         assert!(check(&ws, &[journey("search", json!([{"expect": "Results"}, {"click": "Search"}]))]).is_err(), "nothing checked after the last click");
         assert!(check(&ws, &[journey("search", json!([]))]).is_err());
         assert!(check(&ws, &[good.clone(), good]).is_err(), "one journey per scenario");
+    }
+
+    /// A builder writes its journeys in the app it may change; the newer of its file and the
+    /// tool's is the one kept.
+    #[test]
+    fn the_newer_of_the_builders_journeys_and_the_tools_is_kept() {
+        let (_d, ws) = project_with_scenarios(&["search"]);
+        let given = journey("search", json!([{"click": "Search"}, {"expect": "Results"}]));
+        save(&ws, std::slice::from_ref(&given)).unwrap();
+        let written = journey("search", json!([{"press": "Enter"}, {"expect": "Results"}]));
+        fs::create_dir_all(ws.app_dir()).unwrap();
+        let app_file = ws.app_dir().join(APP_JOURNEYS_FILE);
+        fs::write(&app_file, json!({"journeys": [written.clone()]}).to_string()).unwrap();
+        let later = fs::metadata(file(&ws, JOURNEYS_FILE)).unwrap().modified().unwrap() + std::time::Duration::from_secs(5);
+        fs::File::options().write(true).open(&app_file).unwrap().set_modified(later).unwrap();
+        assert_eq!(load(&ws).unwrap(), vec![written]);
+        save(&ws, std::slice::from_ref(&given)).unwrap();
+        let newer = later + std::time::Duration::from_secs(5);
+        fs::File::options().write(true).open(file(&ws, JOURNEYS_FILE)).unwrap().set_modified(newer).unwrap();
+        assert_eq!(load(&ws).unwrap(), vec![given], "given to the tool after: the tool's");
     }
 
     #[test]
