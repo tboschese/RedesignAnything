@@ -292,7 +292,8 @@ The example text is original and illustrative; the implementation must verify th
 
 ```ts
 function conceptReady(report: RunReport): boolean {
-  return report.security.status === 'pass' && report.preview_available;
+  // identity_essence: no intentional identity trait is replaced without the operator's recorded approval.
+  return report.security.status === 'pass' && report.preview_available && report.identity_essence.status !== 'fail';
 }
 function prototypeReady(report: RunReport): boolean {
   return conceptReady(report)
@@ -301,6 +302,7 @@ function prototypeReady(report: RunReport): boolean {
     && report.functional.critical_scenarios_total > 0
     && report.functional.critical_scenarios_passed === report.functional.critical_scenarios_total
     && report.traceability.unmapped_critical_unapproved === 0
+    && report.identity_drift.status !== 'fail' // the app still shows the intentional traits it keeps
     && report.required_checks.every(c => c.status === 'pass');
 }
 ```

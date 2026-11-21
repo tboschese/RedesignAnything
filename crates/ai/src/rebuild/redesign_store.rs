@@ -250,6 +250,18 @@ pub fn put_capability(ws: &Workspace, cap: Capability) -> Result<StoreEnvelope, 
     bump(ws)
 }
 
+/// Load one evidence record by id, if present.
+pub fn get_evidence(ws: &Workspace, id: &str) -> Result<Option<EvidenceRecord>, ToolError> {
+    validate_id("ev_", id)?;
+    let path = safe_child(&evidence_dir(&redesign_dir(ws)), &format!("{id}.json"))?;
+    if !path.is_file() {
+        return Ok(None);
+    }
+    reject_symlink(&path)?;
+    let bytes = fs::read(&path).map_err(|e| ToolError::io(path.display(), e))?;
+    serde_json::from_slice(&bytes).map(Some).map_err(|e| ToolError::invalid(format!("{}: {e}", path.display())))
+}
+
 /// Load one capability by id, if present.
 pub fn get_capability(ws: &Workspace, id: &str) -> Result<Option<Capability>, ToolError> {
     validate_id("cap_", id)?;

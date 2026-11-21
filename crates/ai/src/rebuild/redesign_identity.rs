@@ -2,9 +2,15 @@
 //! whether the redesign keeps, evolves or replaces them. Stored at `redesign/identity.json`.
 //!
 //! Traits constrain style by context, not structure: a kept trait still evolves (`evolve_within`).
-//! An intentional trait left `undecided` counts as `keep` everywhere. Replacing an intentional
-//! trait needs a rationale. `identity_drift` and `identity_evolution` are advisory: they never
-//! feed the Ready gates.
+//! An intentional trait left `undecided` counts as `keep` everywhere.
+//!
+//! The intentional traits are the target's essence, and no redesign may lose it. Replacing one
+//! needs a rationale and the operator's approval, recorded as evidence (`approval_evidence_id`,
+//! a record with `source: "user"`); without it the trait still counts as kept. The record is an
+//! audit trail, not proof: the store can't tell who wrote it. `identity_essence` fails, and blocks
+//! Concept Ready, when a replacement lacks that approval or the profile can't be read.
+//! `identity_drift` fails, and blocks Prototype Ready, when the app drifts from an intentional
+//! kept trait; drift on other kept traits is a warning. `identity_evolution` is advisory.
 
 use craft_anything_engine::workspace::Workspace;
 use craft_anything_evidence::{ErrorCode, ToolError};
@@ -126,6 +132,10 @@ pub struct IdentityTrait {
     /// Required when an intentional trait is replaced.
     #[serde(default)]
     pub rationale: Option<String>,
+    /// `ev_…` id of the operator's approval in redesign/evidence/ (`source: "user"`). Required to
+    /// replace an intentional trait, or to stop calling a recorded trait intentional.
+    #[serde(default)]
+    pub approval_evidence_id: Option<String>,
     /// How a kept trait gets easier to use without losing its style.
     #[serde(default)]
     pub evolve_within: Option<String>,
@@ -137,12 +147,23 @@ pub struct IdentityTrait {
 }
 
 impl IdentityTrait {
-    /// The decision the redesign acts on: an intentional, undecided trait is kept.
+    /// The decision the redesign acts on: an intentional trait is kept when it is undecided, and
+    /// when it is marked for replacement without the operator's approval.
     pub fn effective_decision(&self) -> TraitDecision {
         match (self.intent, self.decision) {
             (TraitIntent::Intentional, TraitDecision::Undecided) => TraitDecision::Keep,
+            (TraitIntent::Intentional, TraitDecision::Replace) if self.approval_id().is_none() => TraitDecision::Keep,
             (_, d) => d,
         }
+    }
+
+    fn approval_id(&self) -> Option<&str> {
+        self.approval_evidence_id.as_deref().map(str::trim).filter(|a| !a.is_empty())
+    }
+
+    /// An intentional trait the profile wants replaced.
+    fn replaces_essence(&self) -> bool {
+        self.intent == TraitIntent::Intentional && self.decision == TraitDecision::Replace
     }
 
     fn rationale_text(&self) -> Option<&str> {
@@ -190,9 +211,12 @@ fn validate_trait(t: &IdentityTrait) -> Result<(), ToolError> {
     if t.observation.trim().is_empty() {
         return Err(ToolError::invalid(format!("trait {}: observation must not be empty", t.id)));
     }
-    if t.intent == TraitIntent::Intentional && t.decision == TraitDecision::Replace && t.rationale_text().is_none() {
+    if t.replaces_essence() && t.rationale_text().is_none() {
         return Err(ToolError::new(ErrorCode::BadInput, format!("trait {}: replacing an intentional trait needs a rationale", t.id))
             .with_details(json!({"code": "rationale_required", "trait_id": t.id})));
+    }
+    if let Some(a) = t.approval_id() {
+        redesign_store::validate_id(EVIDENCE_ID_PREFIX, a)?;
     }
     redesign_store::refuse_secretish(&format!("trait {} label", t.id), &t.label)?;
     redesign_store::refuse_secretish(&format!("trait {} observation", t.id), &t.observation)?;
@@ -238,6 +262,46 @@ pub fn load(ws: &Workspace) -> Result<Option<IdentityProfile>, ToolError> {
     Ok(Some(profile))
 }
 
+/// Whether `id` names the operator's approval: an evidence record with `source: "user"`.
+fn approved_by_operator(ws: &Workspace, id: Option<&str>) -> Result<bool, ToolError> {
+    let Some(id) = id else { return Ok(false) };
+    Ok(redesign_store::get_evidence(ws, id)?.is_some_and(|e| e.source == "user"))
+}
+
+fn approval_required(t: &IdentityTrait, what: &str) -> ToolError {
+    ToolError::new(
+        ErrorCode::BadInput,
+        format!(
+            "trait {}: {what} needs the operator's approval. Ask them, record their answer with redesign_evidence_put (source \"user\") and pass its id as approval_evidence_id.",
+            t.id
+        ),
+    )
+    .with_details(json!({"code": "approval_required", "trait_id": t.id}))
+}
+
+/// The essence can't be dropped by relabelling: what was recorded as intentional stays so, and
+/// is replaced, only with the operator's approval.
+fn guard_essence(ws: &Workspace, stored: &IdentityProfile, traits: &[IdentityTrait], replace_all: bool) -> Result<(), ToolError> {
+    for t in traits.iter().filter(|t| t.replaces_essence()) {
+        if !approved_by_operator(ws, t.approval_id())? {
+            return Err(approval_required(t, "replacing an intentional trait"));
+        }
+    }
+    for old in stored.traits.iter().filter(|t| t.intent == TraitIntent::Intentional) {
+        match traits.iter().find(|t| t.id == old.id) {
+            Some(new) if new.intent != TraitIntent::Intentional && !approved_by_operator(ws, new.approval_id())? => {
+                return Err(approval_required(new, "no longer calling a recorded intentional trait intentional"));
+            }
+            None if replace_all => {
+                return Err(ToolError::new(ErrorCode::BadInput, format!("replace_all would drop the intentional trait {}; include it in traits", old.id))
+                    .with_details(json!({"code": "approval_required", "trait_id": old.id})));
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
 /// Upsert traits by id (or replace the whole set), validating everything before writing.
 pub fn record(ws: &Workspace, traits: Vec<IdentityTrait>, replace_all: bool, notes: Option<Vec<String>>) -> Result<Value, ToolError> {
     if traits.is_empty() && !replace_all && notes.is_none() {
@@ -250,11 +314,13 @@ pub fn record(ws: &Workspace, traits: Vec<IdentityTrait>, replace_all: bool, not
             return Err(ToolError::invalid(format!("trait {} is listed twice", t.id)));
         }
     }
+    let stored = load(ws)?.unwrap_or_default();
+    guard_essence(ws, &stored, &traits, replace_all)?;
     for n in notes.iter().flatten() {
         redesign_store::refuse_secretish("identity note", n)?;
     }
 
-    let mut profile = if replace_all { IdentityProfile::default() } else { load(ws)?.unwrap_or_default() };
+    let mut profile = if replace_all { IdentityProfile::default() } else { stored };
     profile.schema_version = SCHEMA_VERSION.into();
     let (mut added, mut updated) = (0usize, 0usize);
     for t in traits {
@@ -373,7 +439,13 @@ pub fn identity_constraints(profile: &IdentityProfile) -> Vec<String> {
                 let how = [why, t.evolve_text()].into_iter().flatten().map(|s| format!("; {s}")).collect::<String>();
                 format!("Evolve: {} — {}{how}", t.label, t.observation)
             }
-            TraitDecision::Replace => format!("Replace: {} — {}", t.label, why.unwrap_or(&t.observation)),
+            TraitDecision::Replace => {
+                let head = match t.approval_id() {
+                    Some(a) if t.intent == TraitIntent::Intentional => format!("Replace (operator approved, {a})"),
+                    _ => "Replace".to_string(),
+                };
+                format!("{head}: {} — {}", t.label, why.unwrap_or(&t.observation))
+            }
             TraitDecision::Undecided => format!("Undecided: {} — {}", t.label, t.observation),
         }
     });
@@ -541,11 +613,12 @@ fn trait_drifts(t: &IdentityTrait, lower: &str) -> Vec<Value> {
 }
 
 /// Evaluate kept traits with checks against app text. Never passes when nothing was checked.
+/// Drift on an intentional trait fails; on any other kept trait it warns.
 pub fn evaluate_drift(profile: Option<&IdentityProfile>, app_text: &str) -> CheckResult {
     const ID: &str = "identity_drift";
     let limitations = json!([
         "Static scan of app sources; utility classes (e.g. Tailwind) and computed styles are not evaluated.",
-        "Advisory: identity drift never changes concept/prototype/engineering Ready."
+        "Drift on an intentional trait blocks Prototype Ready; drift on another kept trait is a warning."
     ]);
     let not_evaluated = |summary: &str| CheckResult {
         id: ID.into(),
@@ -565,9 +638,11 @@ pub fn evaluate_drift(profile: Option<&IdentityProfile>, app_text: &str) -> Chec
     }
     let lower = app_text.to_ascii_lowercase();
     let mut drifted = Vec::new();
+    let mut essence_drifted = false;
     for t in &checkable {
         for d in trait_drifts(t, &lower) {
-            drifted.push(json!({"trait_id": t.id, "label": t.label, "check": d["check"], "detail": d["detail"]}));
+            essence_drifted |= t.intent == TraitIntent::Intentional;
+            drifted.push(json!({"trait_id": t.id, "label": t.label, "intent": t.intent.as_str(), "check": d["check"], "detail": d["detail"]}));
         }
     }
     let checked: Vec<&str> = checkable.iter().map(|t| t.id.as_str()).collect();
@@ -576,13 +651,51 @@ pub fn evaluate_drift(profile: Option<&IdentityProfile>, app_text: &str) -> Chec
     } else {
         let mut ids: Vec<&str> = drifted.iter().filter_map(|d| d["trait_id"].as_str()).collect();
         ids.dedup();
-        ("warn", format!("identity drift in {}", ids.join(", ")))
+        (if essence_drifted { "fail" } else { "warn" }, format!("identity drift in {}", ids.join(", ")))
     };
     CheckResult {
         id: ID.into(),
         status: status.into(),
         summary,
-        details: json!({"advisory": true, "checked_traits": checked, "drifted": drifted, "limitations": limitations}),
+        details: json!({"advisory": !essence_drifted, "checked_traits": checked, "drifted": drifted, "limitations": limitations}),
+    }
+}
+
+/// `identity_essence`: is the target's essence still in the plan? Fails when an intentional trait
+/// is marked for replacement without the operator's approval, or the profile can't be read.
+pub fn essence_check(ws: &Workspace) -> CheckResult {
+    const ID: &str = "identity_essence";
+    let row = |status: &str, summary: String, details: Value| CheckResult { id: ID.into(), status: status.into(), summary, details };
+    let profile = match load(ws) {
+        Ok(p) => p,
+        Err(e) => return row("fail", format!("identity profile could not be read, so the essence is unknown: {}", e.message), json!({"unreadable": true})),
+    };
+    let intentional: Vec<&IdentityTrait> = profile.iter().flat_map(|p| &p.traits).filter(|t| t.intent == TraitIntent::Intentional).collect();
+    if intentional.is_empty() {
+        return row("not_evaluated", "no intentional identity trait recorded, so there is no essence to check".into(), json!({}));
+    }
+    let (mut approved, mut unapproved) = (Vec::new(), Vec::new());
+    for t in intentional.iter().filter(|t| t.replaces_essence()) {
+        match approved_by_operator(ws, t.approval_id()) {
+            Ok(true) => approved.push(t.id.as_str()),
+            Ok(false) => unapproved.push(t.id.as_str()),
+            Err(e) => return row("fail", format!("approval for {} could not be read: {}", t.id, e.message), json!({"unreadable": true})),
+        }
+    }
+    let details = json!({
+        "intentional_traits": intentional.len(),
+        "replaced_with_approval": approved,
+        "replaced_without_approval": unapproved,
+        "note": "An approval is an evidence record with source \"user\": an audit trail, not proof of who wrote it.",
+    });
+    if unapproved.is_empty() {
+        row(
+            "pass",
+            format!("{} intentional trait(s) kept or evolved; {} replaced with the operator's approval", intentional.len() - approved.len(), approved.len()),
+            details,
+        )
+    } else {
+        row("fail", format!("the target's essence would be lost: {} marked for replacement without the operator's approval", unapproved.join(", ")), details)
     }
 }
 
@@ -672,6 +785,7 @@ mod tests {
             intent,
             decision,
             rationale: None,
+            approval_evidence_id: None,
             evolve_within: None,
             evidence_ids: vec![],
             checks: TraitChecks { font_families_any: vec!["Georgia".into()], max_radius_px: Some(2), ..Default::default() },
@@ -685,23 +799,89 @@ mod tests {
         fs::write(src.join("index.css"), css).unwrap();
     }
 
-    #[test]
-    fn replacing_an_intentional_trait_needs_a_rationale() {
-        let (_d, ws) = ws();
-        let err = record(&ws, vec![archival_chrome(TraitIntent::Intentional, TraitDecision::Replace)], false, None).unwrap_err();
-        assert_eq!(err.code, ErrorCode::BadInput, "{err:?}");
-        assert!(load(&ws).unwrap().is_none(), "a refused record writes nothing");
+    fn evidence(ws: &Workspace, id: &str, source: &str) {
+        redesign_store::put_evidence(
+            ws,
+            redesign_store::EvidenceRecord {
+                id: id.into(),
+                source: source.into(),
+                source_operation: "answer".into(),
+                subject: "identity".into(),
+                kind: "approval".into(),
+                status: "declared".into(),
+                scope: Value::Null,
+                locator: None,
+                digest: None,
+                observed_at: "0Z".into(),
+                limitations: vec![],
+                sensitivity: "public".into(),
+                summary: "Approved a rebrand of the catalogue chrome.".into(),
+            },
+        )
+        .unwrap();
+    }
 
-        let mut with_reason = archival_chrome(TraitIntent::Intentional, TraitDecision::Replace);
-        with_reason.rationale = Some("Operator approved a rebrand for the new catalogue.".into());
-        record(&ws, vec![with_reason], false, None).unwrap();
-        let saved = load(&ws).unwrap().unwrap();
-        assert!(saved.traits.iter().any(|t| t.id == "trait_archival_chrome" && t.decision == TraitDecision::Replace));
-        assert!(identity_constraints(&saved).iter().any(|c| c.starts_with("Replace:") && c.contains("rebrand")));
+    fn rebrand(approval: Option<&str>) -> IdentityTrait {
+        let mut t = archival_chrome(TraitIntent::Intentional, TraitDecision::Replace);
+        t.rationale = Some("New catalogue brand.".into());
+        t.approval_evidence_id = approval.map(Into::into);
+        t
     }
 
     #[test]
-    fn identity_drift_warns_on_drift_passes_on_match_and_never_passes_unchecked() {
+    fn replacing_an_intentional_trait_needs_a_rationale_and_the_operators_recorded_approval() {
+        let (_d, ws) = ws();
+        let no_reason = record(&ws, vec![archival_chrome(TraitIntent::Intentional, TraitDecision::Replace)], false, None).unwrap_err();
+        assert_eq!(no_reason.code, ErrorCode::BadInput, "{no_reason:?}");
+
+        evidence(&ws, "ev_tool_note", "craft");
+        for refused in [None, Some("ev_missing"), Some("ev_tool_note")] {
+            let err = record(&ws, vec![rebrand(refused)], false, None).unwrap_err();
+            assert_eq!(err.details.as_ref().map(|d| &d["code"]), Some(&json!("approval_required")), "{refused:?}: {err:?}");
+        }
+        assert!(load(&ws).unwrap().is_none(), "a refused record writes nothing");
+
+        evidence(&ws, "ev_operator_ok", "user");
+        record(&ws, vec![rebrand(Some("ev_operator_ok"))], false, None).unwrap();
+        let saved = load(&ws).unwrap().unwrap();
+        assert!(identity_constraints(&saved).iter().any(|c| c.starts_with("Replace (operator approved")), "{saved:?}");
+        assert_eq!(essence_check(&ws).status, "pass");
+    }
+
+    #[test]
+    fn relabelling_or_dropping_an_intentional_trait_cannot_bypass_the_approval() {
+        let (_d, ws) = ws();
+        record(&ws, vec![archival_chrome(TraitIntent::Intentional, TraitDecision::Keep)], false, None).unwrap();
+
+        let mut relabelled = archival_chrome(TraitIntent::Incidental, TraitDecision::Replace);
+        relabelled.rationale = Some("It was never deliberate.".into());
+        let err = record(&ws, vec![relabelled.clone()], false, None).unwrap_err();
+        assert_eq!(err.details.as_ref().map(|d| &d["code"]), Some(&json!("approval_required")), "{err:?}");
+        let dropped = record(&ws, vec![], true, None).unwrap_err();
+        assert_eq!(dropped.details.as_ref().map(|d| &d["code"]), Some(&json!("approval_required")), "{dropped:?}");
+        assert!(load(&ws).unwrap().unwrap().traits.iter().any(|t| t.intent == TraitIntent::Intentional), "still the essence");
+
+        evidence(&ws, "ev_operator_ok", "user");
+        relabelled.approval_evidence_id = Some("ev_operator_ok".into());
+        record(&ws, vec![relabelled], false, None).unwrap();
+    }
+
+    #[test]
+    fn a_replacement_written_without_approval_still_counts_as_kept_and_fails_the_essence_check() {
+        let (_d, ws) = ws();
+        // Written past `record`, as an older version or a hand edit would.
+        let profile = IdentityProfile { traits: vec![rebrand(None)], ..Default::default() };
+        redesign_store::ensure(&ws).unwrap();
+        redesign_store::write_record(&redesign_dir(&ws).join(IDENTITY_FILE), &profile).unwrap();
+
+        assert_eq!(profile.traits[0].effective_decision(), TraitDecision::Keep);
+        assert!(identity_constraints(&profile).iter().any(|c| c.starts_with("Keep (intentional)")), "the builder is told to keep it");
+        let essence = essence_check(&ws);
+        assert_eq!(essence.status, "fail", "{essence:?}");
+    }
+
+    #[test]
+    fn drift_from_an_intentional_trait_fails_a_match_passes_and_nothing_checked_never_passes() {
         let (_d, ws) = ws();
         assert_eq!(drift_check(&ws).status, "not_evaluated", "no profile");
 
@@ -709,7 +889,7 @@ mod tests {
         record(&ws, vec![archival_chrome(TraitIntent::Intentional, TraitDecision::Undecided)], false, None).unwrap();
         write_app(&ws, ".card { border-radius: 12px; font-family: Inter, sans-serif; }\n");
         let drift = drift_check(&ws);
-        assert_eq!(drift.status, "warn", "{drift:?}");
+        assert_eq!(drift.status, "fail", "drift from the essence: {drift:?}");
         let drifted = drift.details["drifted"].as_array().unwrap();
         for check in ["max_radius_px", "font_families_any"] {
             assert!(drifted.iter().any(|d| d["trait_id"] == "trait_archival_chrome" && d["check"] == check), "{check}: {drift:?}");
@@ -717,12 +897,19 @@ mod tests {
 
         write_app(&ws, ".card { border-radius: 2px; font-family: Georgia, serif; }\n");
         assert_eq!(drift_check(&ws).status, "pass");
+    }
 
-        // A trait marked for replacement is not checked, so nothing is claimed.
+    #[test]
+    fn drift_on_a_kept_trait_that_is_not_intentional_only_warns_and_a_replaced_one_is_not_checked() {
+        let (_d, ws) = ws();
+        write_app(&ws, ".card { border-radius: 12px; font-family: Inter, sans-serif; }\n");
+        record(&ws, vec![archival_chrome(TraitIntent::Incidental, TraitDecision::Keep)], false, None).unwrap();
+        assert_eq!(drift_check(&ws).status, "warn");
+
         let mut replaced = archival_chrome(TraitIntent::Incidental, TraitDecision::Replace);
         replaced.rationale = Some("New brand".into());
         record(&ws, vec![replaced], true, None).unwrap();
-        assert_eq!(drift_check(&ws).status, "not_evaluated");
+        assert_eq!(drift_check(&ws).status, "not_evaluated", "nothing is claimed about a replaced trait");
     }
 
     #[test]
@@ -759,23 +946,44 @@ mod tests {
     }
 
     #[test]
-    fn identity_warnings_do_not_change_ready_gates() {
+    fn losing_the_essence_blocks_ready_and_a_frozen_character_does_not() {
         let (_d, mut ws) = ws();
         ws.manifest.kind = Some("redesign".into());
         ws.save().unwrap();
         let ds = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../REDESIGN_SPEC/fixtures/design-system").canonicalize().unwrap();
         super::super::redesign_ds::ingest_package(&ws, &ds, "advisory", false).unwrap();
         super::super::redesign_build::scaffold_app(&ws, None).unwrap();
-        fs::write(ws.app_dir().join("src/index.css"), ".card { border-radius: 24px; font-family: Inter; }\n").unwrap();
-        let before = super::super::redesign_checks::run_native_checks(&ws).unwrap();
+        let css = ws.app_dir().join("src/index.css");
+        fs::write(&css, ".card { border-radius: 2px; font-family: Georgia, serif; }\n").unwrap();
+        let run = || super::super::redesign_checks::run_native_checks(&ws).unwrap();
+        let before = run();
+        assert!(before.concept_ready, "the scaffold is a concept: {:?}", before.checks);
 
+        // Kept and matching, but with no way forward: a warning, and the gates stay where they were.
         record(&ws, vec![archival_chrome(TraitIntent::Intentional, TraitDecision::Keep)], false, None).unwrap();
-        let after = super::super::redesign_checks::run_native_checks(&ws).unwrap();
-        assert!(after.checks.iter().any(|c| c.id == "identity_drift" && c.status == "warn"), "{:?}", after.checks);
-        assert!(after.checks.iter().any(|c| c.id == "identity_evolution" && c.status == "warn"), "frozen profile: {:?}", after.checks);
-        assert_eq!(
-            (before.concept_ready, before.prototype_ready, before.engineering_ready),
-            (after.concept_ready, after.prototype_ready, after.engineering_ready)
-        );
+        let frozen = run();
+        assert!(frozen.checks.iter().any(|c| c.id == "identity_evolution" && c.status == "warn"), "{:?}", frozen.checks);
+        assert_eq!((before.concept_ready, before.prototype_ready), (frozen.concept_ready, frozen.prototype_ready));
+
+        // A replacement nobody approved loses the essence in the plan: no gate holds.
+        redesign_store::write_record(&redesign_dir(&ws).join(IDENTITY_FILE), &IdentityProfile { traits: vec![rebrand(None)], ..Default::default() }).unwrap();
+        let lost = run();
+        assert!(!lost.concept_ready && !lost.prototype_ready && !lost.engineering_ready, "{:?}", lost.checks);
+    }
+
+    #[test]
+    fn an_app_that_drifts_from_the_essence_is_a_concept_but_never_a_ready_prototype() {
+        let inputs = |essence_drift| super::super::redesign_checks::CheckInputs {
+            preview_available: true,
+            security_ok: true,
+            build_status: super::super::redesign_checks::CheckExec::Pass,
+            ds_status: super::super::redesign_checks::CheckExec::Pass,
+            functional: super::super::redesign_checks::FunctionalSummary { critical_scenarios_total: 1, critical_scenarios_passed: 1, button_works: true },
+            essence_drift,
+            ..Default::default()
+        };
+        use super::super::redesign_checks::{concept_ready, prototype_ready};
+        assert!(prototype_ready(&inputs(false), 0), "the same prototype without drift is ready");
+        assert!(concept_ready(&inputs(true)) && !prototype_ready(&inputs(true), 0));
     }
 }
