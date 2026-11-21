@@ -299,7 +299,7 @@ function prototypeReady(report: RunReport): boolean {
   return conceptReady(report)
     && report.build.status === 'pass'
     && (!report.design_system.strict || report.design_system.status === 'pass')
-    && report.functional.critical_scenarios_total > 0
+    && report.functional.critical_scenarios_total > 0 // scenarios retired by an approved decision, with the operator's approval, are not in the total
     && report.functional.critical_scenarios_passed === report.functional.critical_scenarios_total
     && report.functional.scenarios_on_a_word_hint === 0 // each one judged by a journey run in the built prototype
     && report.traceability.unmapped_critical_unapproved === 0

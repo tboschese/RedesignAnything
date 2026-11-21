@@ -301,6 +301,17 @@ pub fn specs() -> Vec<ToolSpec> {
             run: redesign_journeys_run,
         },
         ToolSpec {
+            id: "redesign_scenario_retire",
+            title: "Retire a scenario a decision replaces",
+            summary: "Retire an oracle scenario in this project because an approved decision replaces what it asks for (two search fields become one), so no journey can show it. The decision must decide the scenario's capability, change the original and be approved, and the operator must have approved the retirement itself: record their answer with redesign_evidence_put (source \"user\") and pass its id. A retired scenario is listed as retired with the decision and the reason, and is not counted as passed, failed or total; with no scenario left a prototype is still not ready. It stops counting if the decision changes, and is not carried to other variants. `restore: true` brings the scenario back.",
+            beginner: "Sets aside a test that an approved change makes impossible, with your OK.",
+            toolset: Toolset::Projects,
+            effects: Effects::WRITES_FILESYSTEM,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<ScenarioRetireParams>,
+            run: redesign_scenario_retire,
+        },
+        ToolSpec {
             id: "redesign_likeness_measure",
             title: "Measure how alike the prototype is",
             summary: "Compare each original page (the start page and every captured route) with the prototype page captured for it, and save redesign/prototype_capture/likeness.json: page structure, word overlap, and tile layout plus detail of the screenshots, each 0..=100. Capture the prototype first: open each page with web_site_open and save it with web_site_capture into redesign/prototype_capture/start/ or redesign/prototype_capture/<route slug>/ (this tool makes the parent folder and lists the pages it expects). A page that can't be compared is named with its reason, including a screenshot with large blank bands. The scores are reported, not judged against a limit; redesign_variants_show warns when a variant that changes less is less like the original than one that changes more. Opens no browser.",
@@ -645,6 +656,26 @@ struct PrototypeCaptureParams {
     /// Window widths; the original's when omitted.
     #[serde(default)]
     pub widths: Option<Vec<u32>>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct ScenarioRetireParams {
+    pub project: PathBuf,
+    /// The id of a scenario in redesign/oracle/scenarios.json.
+    pub scenario_id: String,
+    /// The approved decision that replaces what the scenario asks for. Not needed to restore.
+    #[serde(default)]
+    pub decision_id: Option<String>,
+    /// `ev_…` id of the operator's approval of this retirement (`source: "user"`). Not needed to restore.
+    #[serde(default)]
+    pub approval_evidence_id: Option<String>,
+    /// What the decision does instead, in a sentence. Not needed to restore.
+    #[serde(default)]
+    pub reason: Option<String>,
+    /// Bring the scenario back instead of retiring it (default false).
+    #[serde(default)]
+    pub restore: bool,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -1457,7 +1488,7 @@ const REDESIGN_STEPS: [&str; 7] = [
     "decide: propose a decision for each capability and choose an option, keep_as_is when a change isn't justified (redesign_decision_propose, redesign_decision_choose); a choice that changes the original waits for the person's approval (redesign_decision_approve)",
     "plan: one mode per project (redesign_modes_list, redesign_plan_build, redesign_traceability_check); for more than one version, redesign_variants_create makes a project per mode",
     "build: redesign_scaffold_app, write the UI in app/ with simulated data, then run the app's own build; the build check passes only on a built site as new as the sources",
-    "show it works: one journey per oracle scenario, run in the built prototype (redesign_journeys_run); a scenario without one rests on a word found in the sources",
+    "show it works: one journey per oracle scenario, run in the built prototype (redesign_journeys_run); a scenario without one rests on a word found in the sources; one that an approved decision replaces can be retired with the person's approval (redesign_scenario_retire)",
     "compare: capture the built prototype and measure how alike it is to the original (redesign_prototype_capture); likeness is reported, not judged",
     "check: redesign_checks_run gives the Concept, Prototype and Engineering Ready levels and says what each still waits for",
 ];
@@ -1660,7 +1691,11 @@ fn redesign_journeys_run(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput,
     let without: Vec<String> = {
         let have: Vec<&str> = kept.iter().map(|j| j.scenario_id.as_str()).collect();
         let (_, evals) = super::redesign_quality::evaluate_oracle_file(&ws, &super::redesign_store::redesign_dir(&ws).join("oracle/scenarios.json"))?;
-        evals.into_iter().filter(|e| e.status != "not_evaluated" && !have.contains(&e.scenario_id.as_str())).map(|e| e.scenario_id).collect()
+        evals
+            .into_iter()
+            .filter(|e| e.status != "not_evaluated" && e.status != "retired" && !have.contains(&e.scenario_id.as_str()))
+            .map(|e| e.scenario_id)
+            .collect()
     };
     Ok(ToolOutput::Value(json!({
         "passed": passed,
@@ -1669,6 +1704,34 @@ fn redesign_journeys_run(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput,
         "scenarios_without_a_journey": without,
         "report": path.strip_prefix(&ws.root).unwrap_or(&path).display().to_string(),
         "note": "redesign_checks_run judges these scenarios by their journey until the prototype is built again; scenarios without a journey are still judged by a word hint. A journey shows that its steps passed; whether they are the right steps for the scenario is for a person to read in the report.",
+    })))
+}
+
+fn redesign_scenario_retire(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    use super::redesign_retired as retired;
+    let p: ScenarioRetireParams = parse_params(params)?;
+    let ws = open(&p.project)?;
+    let restored = if p.restore {
+        Some(retired::restore(&ws, &p.scenario_id)?)
+    } else {
+        let need = |v: Option<String>, name: &str| v.ok_or_else(|| ToolError::invalid(format!("{name} is needed to retire a scenario")));
+        retired::retire(
+            &ws,
+            retired::Retired {
+                scenario_id: p.scenario_id.clone(),
+                decision_id: need(p.decision_id, "decision_id")?,
+                approval_evidence_id: need(p.approval_evidence_id, "approval_evidence_id")?,
+                reason: need(p.reason, "reason")?,
+            },
+        )?;
+        None
+    };
+    let (counted, lapsed) = retired::in_force(&ws);
+    Ok(ToolOutput::Value(json!({
+        "restored": restored,
+        "retired": counted.values().collect::<Vec<_>>(),
+        "no_longer_counting": lapsed,
+        "note": "A retired scenario is listed as retired by redesign_checks_run and is not counted. This project only: another variant of the same study still has the scenario.",
     })))
 }
 
@@ -2248,6 +2311,7 @@ mod tests {
             "redesign_variants_show",
             "redesign_prototype_capture",
             "redesign_journeys_run",
+            "redesign_scenario_retire",
             "redesign_likeness_measure",
             "redesign_knowledge_retrieve",
             "redesign_critic_recommend",

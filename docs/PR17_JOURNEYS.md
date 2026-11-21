@@ -32,6 +32,18 @@ Three prototypes of the same study, five scenarios each, before (word hints) and
 
 Organize screens keeps the original's one page, so the two scenarios about an item page were passing on a word in its sources. In New flows one scenario asks for two separate search fields, which that variant replaces with one by an approved decision: no journey can show it, so it has none.
 
+## Retiring a scenario a decision replaces
+
+An approved decision can replace exactly what a scenario asks for (two search fields become one). No honest journey can show that scenario in that variant. `redesign_scenario_retire {project, scenario_id, decision_id, approval_evidence_id, reason}` sets it aside:
+
+- the decision must decide the scenario's capability, change the original and be approved;
+- the operator must have approved the retirement itself, recorded as evidence with `source: "user"`;
+- it is kept in `redesign/retired_scenarios.json` of this project only, so another variant of the same study still has the scenario;
+- it stops counting when the decision is no longer the approved one that replaces it, and `restore: true` brings the scenario back;
+- a retired scenario is listed as `retired` with the decision and the reason. It is not counted as passed, failed or total, and a project with no scenario left is still not ready.
+
+This is a stopgap the operator asked for. The aim is prototypes complete enough that few scenarios need it.
+
 ## Guarantees tested
 
 - A journey types, clicks, presses Enter and reads what shows; it finds a control inside an open shadow root; a covered control and a text that never shows fail their own step; each run starts from a page loaded again (live browser test).
@@ -40,6 +52,7 @@ Organize screens keeps the original's one page, so the two scenarios about an it
 - A report is read only while the build it ran in is on disk.
 - A scenario whose journey ran is judged by it in both directions.
 - Running journeys is refused until the person approves it.
+- A scenario is retired only by the approved decision that replaces it and with the operator's yes; the retirement lapses when the decision changes; a retired scenario is not owed and is not a pass.
 
 ## Limits
 

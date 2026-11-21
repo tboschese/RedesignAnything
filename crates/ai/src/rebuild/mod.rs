@@ -64,6 +64,7 @@ pub mod redesign_plan;
 pub mod redesign_quality;
 pub mod redesign_rea;
 pub mod redesign_report;
+pub mod redesign_retired;
 pub mod redesign_store;
 pub mod redesign_study;
 pub mod redesign_variants;

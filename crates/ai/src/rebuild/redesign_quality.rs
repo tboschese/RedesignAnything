@@ -102,6 +102,9 @@ pub fn evaluate_oracle(ws: &Workspace, oracle: &Value) -> Result<(QualityCheck, 
 
     // A journey run in the built prototype says more than a word in the sources, either way.
     let (ran, journeys_note) = super::redesign_journeys::fresh_results(ws);
+    // A scenario an approved decision replaces, retired with the operator's yes, is listed and not counted.
+    let (retired, lapsed) = super::redesign_retired::in_force(ws);
+    let mut retired_count = 0u32;
     let (mut by_journey, mut by_hint) = (0u32, 0u32);
     let mut passed = 0u32;
     let mut failed = 0u32;
@@ -123,6 +126,11 @@ pub fn evaluate_oracle(ws: &Workspace, oracle: &Value) -> Result<(QualityCheck, 
             continue;
         }
 
+        if let Some(r) = retired.get(&id) {
+            retired_count += 1;
+            evals.push(ScenarioEval { scenario_id: id, capability_id: cap, status: "retired".into(), notes: vec![r.note()], method: "retired".into() });
+            continue;
+        }
         if let Some(journey) = ran.get(&id) {
             by_journey += 1;
             if journey.passed {
@@ -184,7 +192,14 @@ pub fn evaluate_oracle(ws: &Workspace, oracle: &Value) -> Result<(QualityCheck, 
         (_, 0) => "journey_run",
         _ => "mixed",
     };
-    let mut summary = format!("scenarios pass={passed} fail={failed} total={} ({how})", evals.len());
+    let counted = evals.len() as u32 - retired_count;
+    let mut summary = format!("scenarios pass={passed} fail={failed} total={counted} ({how})");
+    if retired_count > 0 {
+        summary.push_str(&format!("; {retired_count} retired by an approved decision, not counted"));
+    }
+    for note in &lapsed {
+        summary.push_str(&format!("; {note}"));
+    }
     if let Some(note) = &journeys_note {
         summary.push_str(&format!("; {note}"));
     }
@@ -203,6 +218,8 @@ pub fn evaluate_oracle(ws: &Workspace, oracle: &Value) -> Result<(QualityCheck, 
                 "journeys_run": by_journey,
                 "word_hints": by_hint,
                 "journeys_note": journeys_note,
+                "retired": retired_count,
+                "lapsed_retirements": lapsed,
             }),
         },
         evals.clone(),
@@ -486,6 +503,72 @@ mod tests {
         let (stale, after_rebuild) = statuses(&ws);
         assert_eq!(after_rebuild, by_hint);
         assert!(stale.summary.contains("redesign_journeys_run"), "{}", stale.summary);
+    }
+
+    /// A scenario retired by the approved decision that replaces it is listed as retired and is
+    /// not counted; the others are judged as before.
+    #[test]
+    fn a_retired_scenario_is_listed_and_not_counted() {
+        use crate::rebuild::{redesign_plan, redesign_retired, redesign_store};
+        let d = tempfile::tempdir().unwrap();
+        let ws = Workspace::create(d.path(), "Q", "q", TargetRef::None).unwrap();
+        std::fs::create_dir_all(ws.app_dir().join("src")).unwrap();
+        std::fs::write(ws.app_dir().join("src/App.tsx"), "export function App(){ return <p>Donate</p> }\n").unwrap();
+        let oracle = json!({"scenarios": [
+            {"id": "two_fields", "capability_id": "cap_search", "executable": true, "then": ["Wayback field is separate"]},
+            {"id": "donate", "capability_id": "cap_donate", "executable": true, "then": ["Donate control remains available"]},
+        ]});
+        let dir = redesign_store::redesign_dir(&ws).join("oracle");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("scenarios.json"), oracle.to_string()).unwrap();
+        let (before, _) = evaluate_oracle(&ws, &oracle).unwrap();
+        assert_eq!(before.status, "fail", "the first scenario's word is not in the sources: {before:?}");
+
+        let decision = redesign_plan::DesignDecision {
+            id: "dec_search".into(),
+            capability_ids: vec!["cap_search".into()],
+            problem: "one box".into(),
+            options: vec![],
+            chosen_option_id: "targeted_improvement".into(),
+            rationale: String::new(),
+            ux_rule_ids: vec![],
+            evidence_ids: vec![],
+            feasibility: "ui_only".into(),
+            dependencies: vec![],
+            status: "approved".into(),
+            approval_evidence_id: None,
+        };
+        redesign_plan::save_decision(&ws, &decision).unwrap();
+        let approval = redesign_store::EvidenceRecord {
+            id: "ev_operator_yes".into(),
+            source: "user".into(),
+            source_operation: "answer".into(),
+            subject: "retirement".into(),
+            kind: "approval".into(),
+            status: "declared".into(),
+            scope: Value::Null,
+            locator: None,
+            digest: None,
+            observed_at: String::new(),
+            limitations: vec![],
+            sensitivity: "internal".into(),
+            summary: "yes".into(),
+        };
+        redesign_store::put_evidence(&ws, approval).unwrap();
+        let retired = redesign_retired::Retired {
+            scenario_id: "two_fields".into(),
+            decision_id: decision.id.clone(),
+            approval_evidence_id: "ev_operator_yes".into(),
+            reason: "one box takes both".into(),
+        };
+        redesign_retired::retire(&ws, retired).unwrap();
+
+        let (after, evals) = evaluate_oracle(&ws, &oracle).unwrap();
+        let statuses: Vec<&str> = evals.iter().map(|e| e.status.as_str()).collect();
+        assert_eq!(statuses, ["retired", "pass"]);
+        assert_ne!(after.status, "fail", "{after:?}");
+        assert!(after.summary.contains("total=1") && after.summary.contains("1 retired"), "{}", after.summary);
+        assert!(evals[0].notes[0].contains(&decision.id) && evals[0].notes[0].contains("one box takes both"), "{:?}", evals[0].notes);
     }
 
     #[test]
