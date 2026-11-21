@@ -21,7 +21,8 @@ pub const REDESIGN_BRIEF: &str = concat!(
     "- Offer keep_as_is as a valid option when change isn't justified.\n",
     "- Mark unknowns explicitly; never promote inferred rules to validated without an independent oracle.\n",
     "- Default stack is React + TypeScript (Vite) unless the person named another supported stack.\n",
-    "- Write the app under app/; do not modify the original target. Use synthetic/mock data when the backend is unknown."
+    "- Write the app under app/; do not modify the original target. Use synthetic/mock data when the backend is unknown.\n",
+    "- A scenario counts as working when its journey runs in the built prototype (redesign_journeys_run), not when its words appear in the code. Build the app before the checks."
 );
 
 impl TargetKind for RedesignKind {

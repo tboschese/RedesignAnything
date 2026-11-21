@@ -1445,16 +1445,22 @@ fn redesign_project_init(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput,
         "stack": ws.manifest.stack,
         "status": ws.manifest.status,
         "request": ws.manifest.request,
-        "steps": [
-            "study (reuse Craft web capture when target is a URL)",
-            "diagnose / keep_as_is options",
-            "build React+TypeScript in app/",
-            "check (build; no pixel-similarity gate)",
-            "ready report"
-        ],
+        "steps": REDESIGN_STEPS,
         "builder_started": false
     })))
 }
+
+/// The path through a redesign, with the tools for each step, as `redesign_project_init` and
+/// `redesign_project_show` tell it. An agent that follows it knows what each Ready level waits for.
+const REDESIGN_STEPS: [&str; 7] = [
+    "study: capture the target when it is a web address (web_site_open, web_site_capture), then record what was seen and what must keep working (redesign_evidence_put, redesign_capability_put, redesign_identity_record, redesign_study_map with the oracle)",
+    "decide: propose a decision for each capability and choose an option, keep_as_is when a change isn't justified (redesign_decision_propose, redesign_decision_choose); a choice that changes the original waits for the person's approval (redesign_decision_approve)",
+    "plan: one mode per project (redesign_modes_list, redesign_plan_build, redesign_traceability_check); for more than one version, redesign_variants_create makes a project per mode",
+    "build: redesign_scaffold_app, write the UI in app/ with simulated data, then run the app's own build; the build check passes only on a built site as new as the sources",
+    "show it works: one journey per oracle scenario, run in the built prototype (redesign_journeys_run); a scenario without one rests on a word found in the sources",
+    "compare: capture the built prototype and measure how alike it is to the original (redesign_prototype_capture); likeness is reported, not judged",
+    "check: redesign_checks_run gives the Concept, Prototype and Engineering Ready levels and says what each still waits for",
+];
 
 fn redesign_project_show(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
     let _ = ctx;
@@ -1475,13 +1481,7 @@ fn redesign_project_show(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput,
         "request": ws.manifest.request,
         "checks": ws.manifest.checks,
         "kind_checks": check_ids,
-        "steps": [
-            "study",
-            "diagnose",
-            "build",
-            "check",
-            "ready"
-        ]
+        "steps": REDESIGN_STEPS
     })))
 }
 
@@ -2203,6 +2203,21 @@ mod tests {
         // The kept journeys run again without being passed, and replace the report.
         let again = e.call("redesign_journeys_run", json!({"project": project}), ok()).unwrap().to_json();
         assert_eq!(again["result"]["journeys"], ran["result"]["journeys"], "{again}");
+    }
+
+    /// The steps name tools; a tool renamed or removed must not leave them pointing nowhere.
+    #[test]
+    fn every_redesign_tool_a_step_names_is_registered() {
+        let registered: Vec<&str> = specs().iter().map(|s| s.id).collect();
+        let named: Vec<&str> = REDESIGN_STEPS
+            .iter()
+            .flat_map(|step| step.split(|c: char| !(c.is_ascii_lowercase() || c == '_')))
+            .filter(|word| word.starts_with("redesign_"))
+            .collect();
+        assert!(named.len() >= 10, "the steps name their tools: {named:?}");
+        for tool in named {
+            assert!(registered.contains(&tool), "{tool} is named in a step but is not a registered tool");
+        }
     }
 
     #[test]
