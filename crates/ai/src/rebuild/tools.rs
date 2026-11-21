@@ -292,7 +292,7 @@ pub fn specs() -> Vec<ToolSpec> {
         ToolSpec {
             id: "redesign_journeys_run",
             title: "Run the prototype's journeys",
-            summary: "Serve the project's built prototype, and in the private browser do each journey's steps the way a visitor would (web_site_journey_run: {\"click\": name}, {\"type\": text, \"into\": field}, {\"press\": key}, {\"open\": path}, {\"expect\": text}), each from a freshly loaded start page. A journey shows one scenario of redesign/oracle/scenarios.json in this prototype and ends with an expect. `journeys` replaces the ones the project keeps (redesign/quality/journeys.json); without it the kept ones run again. Writes redesign/quality/journeys-report.json and a picture of where each journey ended; redesign_checks_run then judges those scenarios by their journey instead of a word hint, for as long as the prototype is not built again. Build the prototype first: this tool runs no build. It closes any site this session has open. Runs the prototype's scripts, so it needs your approval.",
+            summary: "Serve the project's built prototype, and in the private browser do each journey's steps the way a visitor would (web_site_journey_run: {\"click\": name}, {\"type\": text, \"into\": field}, {\"press\": key}, {\"open\": path}, {\"expect\": text}, {\"check\": name, \"is\": state}, {\"value_of\": field, \"equals\": text}, {\"alert\": text}), each from a freshly loaded start page. A journey shows one scenario of redesign/oracle/scenarios.json in this prototype and ends with a check. `journeys` replaces the ones the project keeps (redesign/quality/journeys.json); without it the kept ones run again. Writes redesign/quality/journeys-report.json and a picture of where each journey ended; redesign_checks_run then judges those scenarios by their journey instead of a word hint, for as long as the prototype is not built again. Build the prototype first: this tool runs no build. It closes any site this session has open. Runs the prototype's scripts, so it needs your approval.",
             beginner: "Clicks and types through the new design to check that each task still works.",
             toolset: Toolset::Projects,
             effects: Effects::WRITES_FILESYSTEM.union(Effects::EXECUTES_FOREIGN_CODE).union(Effects::ACCESSES_NETWORK).union(Effects::LAUNCHES_PROCESS),
@@ -1666,7 +1666,7 @@ fn redesign_journeys_run(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput,
     let kept = journeys::load(&ws)?;
     if kept.is_empty() {
         return Err(ToolError::invalid("this project keeps no journeys yet").with_remediation(
-            "Pass `journeys`: for each scenario in redesign/oracle/scenarios.json, the steps that show it in this prototype, ending with an expect.",
+            "Pass `journeys`: for each scenario in redesign/oracle/scenarios.json, the steps that show it in this prototype, ending with a check (expect, check, value_of or alert).",
         ));
     }
     journeys::check(&ws, &kept)?;

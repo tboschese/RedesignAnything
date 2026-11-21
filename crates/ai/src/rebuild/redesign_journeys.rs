@@ -31,7 +31,8 @@ pub struct Journey {
     /// The id of a scenario in redesign/oracle/scenarios.json.
     pub scenario_id: String,
     /// The steps, as web_site_journey_run takes them: {"click": name}, {"type": text, "into":
-    /// field}, {"press": key}, {"open": path}, {"expect": text}. The last one is an "expect".
+    /// field}, {"press": key}, {"open": path}, {"expect": text}, {"check": name, "is": state},
+    /// {"value_of": field, "equals": text}, {"alert": text}. The last one checks something.
     pub steps: Vec<Value>,
 }
 
@@ -120,9 +121,9 @@ pub fn check(ws: &Workspace, journeys: &[Journey]) -> Result<(), ToolError> {
             return Err(ToolError::invalid(format!("two journeys for scenario {:?}: keep one", j.scenario_id)));
         }
         seen.push(&j.scenario_id);
-        if j.steps.last().is_none_or(|last| !last["expect"].is_string()) {
+        if j.steps.last().is_none_or(|last| !["expect", "check", "value_of", "alert"].iter().any(|k| last.get(*k).is_some())) {
             return Err(ToolError::invalid(format!(
-                "the journey for {:?} must end with an {{\"expect\": text}} step, so it checks what the steps before it led to",
+                "the journey for {:?} must end with a check ({{\"expect\": text}}, {{\"check\": name, \"is\": state}}, {{\"value_of\": field, \"equals\": text}} or {{\"alert\": text}}), so it checks what the steps before it led to",
                 j.scenario_id
             )));
         }
@@ -249,6 +250,9 @@ mod tests {
         assert!(check(&ws, &[journey("search", json!([{"expect": "Results"}, {"click": "Search"}]))]).is_err(), "nothing checked after the last click");
         assert!(check(&ws, &[journey("search", json!([]))]).is_err());
         assert!(check(&ws, &[good.clone(), good]).is_err(), "one journey per scenario");
+        for last in [json!({"check": "Donate", "is": "disabled"}), json!({"value_of": "Amount", "equals": "5"}), json!({"alert": "Enter an amount."})] {
+            assert!(check(&ws, &[journey("donate", json!([{"click": "Donate"}, last]))]).is_ok(), "a state, a value or an alert is a check too: {last}");
+        }
     }
 
     /// A builder writes its journeys in the app it may change; the newer of its file and the

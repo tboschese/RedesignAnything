@@ -2242,6 +2242,45 @@ body{margin:0} .d{display:none} @media (min-width:800px){.d{display:block} .p{di
         let _ = e.call("web_site_close", json!({}), cli());
     }
 
+    /// A journey checks states, not only texts: a control disabled until a field is filled, a
+    /// control that isn't there, the value a field holds (compared in the page) and an error the
+    /// page announces. A state that never comes fails its own step. Live (`--ignored`).
+    #[test]
+    #[ignore]
+    fn a_journey_checks_control_states_field_values_and_announced_errors() {
+        let e = serve_and_open(
+            r#"<!doctype html><html><body>
+<label>Name <input id="n"></label>
+<button id="s" disabled>Submit claim</button>
+<button id="v">Validate</button>
+<p id="e" role="alert"></p>
+<script>
+const n = document.getElementById('n'), s = document.getElementById('s');
+n.oninput = () => { s.disabled = !n.value.trim(); };
+document.getElementById('v').onclick = () => { document.getElementById('e').textContent = n.value.trim() ? '' : 'Enter your name.'; };
+</script></body></html>"#,
+        );
+        let cli = || crate::CallOptions::new(crate::Caller::Cli).with_consent(crate::Consent::Granted);
+        let run = |steps: Value| e.call("web_site_journey_run", json!({"steps": steps, "wait_ms": 600}), cli()).unwrap().to_json()["result"].clone();
+
+        let good = run(json!([
+            {"check": "Submit claim", "is": "disabled"}, {"check": "Approve", "is": "absent"}, {"check": "Approve", "is": "unusable"},
+            {"click": "Validate"}, {"alert": "Enter your name."}, {"alert": ""},
+            {"type": "Ada", "into": "Name"}, {"check": "Submit claim", "is": "enabled"}, {"value_of": "Name", "equals": "ada"}
+        ]));
+        assert_eq!(good["passed"], true, "{good}");
+        for (steps, why) in [
+            (json!([{"check": "Submit claim", "is": "enabled"}]), "disabled until the name is typed"),
+            (json!([{"check": "Approve", "is": "present"}]), "there is no Approve"),
+            (json!([{"type": "Ada", "into": "Name"}, {"value_of": "Name", "equals": "Bob"}]), "the field holds Ada"),
+            (json!([{"alert": "Enter your name."}]), "nothing was announced yet"),
+        ] {
+            let failed = run(steps);
+            assert_eq!(failed["passed"], false, "{why}: {failed}");
+        }
+        let _ = e.call("web_site_close", json!({}), cli());
+    }
+
     /// A journey is done the way a visitor would do it: fields are found by their label, controls
     /// by their name (inside an open shadow root too), Enter submits, and each run starts from a
     /// page loaded again. A covered control, or a text that never shows, fails its own step. Live
