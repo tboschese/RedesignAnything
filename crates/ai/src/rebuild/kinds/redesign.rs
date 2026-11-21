@@ -242,6 +242,11 @@ impl Check for PrototypeCaptureCheck {
             Claim::new("every captured page has the basics (names, alt text, language, landmarks)", basics.status != "warn", basics.summary.clone()),
         ];
         claims.extend(not_captured.iter().map(|why| Claim::new(format!("the prototype page {why} could be photographed"), false, why.clone())));
+        // A variant is told where it changes too little or too much for its mode next to its siblings.
+        if let Ok(Some(_)) = crate::rebuild::redesign_variants::variant_of(ws) {
+            let order = crate::rebuild::redesign_variants::order_against_siblings(ws);
+            claims.push(Claim::new("its likeness to the original is in order with its sibling variants", order.is_empty(), order.join("; ")));
+        }
         let scores: Vec<String> =
             report["pages"].as_array().into_iter().flatten().filter_map(|p| Some(format!("{} {:.0}", p["page"].as_str()?, p["overall"].as_f64()?))).collect();
         let mut note = format!("Photographed {} page(s) of the prototype at {:?} px.", targets.len() - not_captured.len(), widths);
