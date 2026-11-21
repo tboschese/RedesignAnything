@@ -709,7 +709,21 @@ const BLUEPRINT_JS: &str = r#"(() => {
   // canvas and read back.
   const cv = document.createElement('canvas'); cv.width = cv.height = 1; const g = cv.getContext('2d', {willReadFrequently: true}); const seenHex = {};
   const hex = c => { if (!c) return c; if (c in seenHex) return seenHex[c]; const h2 = x => x.toString(16).padStart(2, '0'); const m = /^rgba?\((\d+), (\d+), (\d+)(?:, ([\d.]+))?\)$/.exec(c); if (m) { const a = m[4] === undefined ? 1 : +m[4]; return seenHex[c] = '#' + h2(+m[1]) + h2(+m[2]) + h2(+m[3]) + (a < 1 ? h2(Math.round(a * 255)) : ''); } if (!g) return c; g.clearRect(0, 0, 1, 1); g.fillStyle = '#000'; g.fillStyle = c; g.fillRect(0, 0, 1, 1); const d = g.getImageData(0, 0, 1, 1).data; return seenHex[c] = '#' + h2(d[0]) + h2(d[1]) + h2(d[2]) + (d[3] < 255 ? h2(d[3]) : ''); };
-  const els = [document.documentElement, document.body, ...Array.from(document.querySelectorAll('body *')).slice(0, 12000)].filter(Boolean);
+  // Elements in page order, each open shadow root's content right after its host: components (Lit and
+  // the like) keep their content there. Closed roots can't be read; hosts that look like one are counted.
+  const openRoots = [];
+  const composed = (root, limit) => {
+    const out = [];
+    const go = r => { for (const el of r.querySelectorAll('*')) { if (out.length >= limit) return; out.push(el); if (el.shadowRoot) { if (root === document) openRoots.push(el.shadowRoot); go(el.shadowRoot); } } };
+    if (root) go(root);
+    return out;
+  };
+  const all = composed(document, 200000);
+  const deepAll = (sel, n) => { const out = []; for (const el of all) { if (out.length >= n) break; if (el.matches(sel)) out.push(el); } return out; };
+  const up = n => n.parentElement || (n.parentNode && n.parentNode.host) || null;
+  let closedHosts = 0;
+  for (const el of all) { if (closedHosts >= 1000) break; if (el.tagName.includes('-') && !el.shadowRoot && !el.childElementCount && !el.textContent.trim() && shown(el)) closedHosts++; }
+  const els = [document.documentElement, document.body, ...composed(document.body, 12000)].filter(Boolean);
   for (const el of els) {
     if (!shown(el)) continue;
     const s = getComputedStyle(el);
@@ -725,25 +739,30 @@ const BLUEPRINT_JS: &str = r#"(() => {
   }
   const vars = {}, bps = {}; let ruleCount = 0, unreadable = 0;
   const bp = (side, n, unit) => tally(bps, side + '-width ' + Math.round(parseFloat(n) * (unit === 'px' ? 1 : 16)) + 'px');
-  const walk = (rules, depth) => {
+  // A component's sheet: its :host variables don't replace the page's :root ones.
+  const walk = (rules, depth, component) => {
     if (!rules || depth > 6) return;
     for (const r of Array.from(rules)) {
       if (++ruleCount > 40000) return;
-      if (r.selectorText && r.selectorText.includes(':root') && r.style) for (const name of Array.from(r.style)) if (name.startsWith('--') && Object.keys(vars).length < 300) vars[name] = cap(r.style.getPropertyValue(name), 120);
+      if (r.selectorText && /:root|:host/.test(r.selectorText) && r.style) for (const name of Array.from(r.style)) if (name.startsWith('--') && Object.keys(vars).length < 300 && !(component && name in vars)) vars[name] = cap(r.style.getPropertyValue(name), 120);
       const media = r.media && r.media.mediaText ? r.media.mediaText : (r.conditionText || '');
       for (const m of media.matchAll(/(min|max)-width\s*:\s*([\d.]+)(px|r?em)/g)) bp(m[1], m[2], m[3]);
       for (const m of media.matchAll(/width\s*(>=?|<=?)\s*([\d.]+)(px|r?em)/g)) bp(m[1][0] === '>' ? 'min' : 'max', m[2], m[3]);
-      if (r.cssRules) walk(r.cssRules, depth + 1);
+      if (r.cssRules) walk(r.cssRules, depth + 1, component);
     }
   };
-  for (const sheet of Array.from(document.styleSheets)) { let rules; try { rules = sheet.cssRules; } catch (e) { unreadable++; continue; } walk(rules, 0); }
+  // Components share their constructed sheets, so each sheet is read once.
+  const seenSheets = new Set();
+  const readSheets = (sheets, component) => { for (const sheet of Array.from(sheets || [])) { if (seenSheets.has(sheet)) continue; seenSheets.add(sheet); let rules; try { rules = sheet.cssRules; } catch (e) { unreadable++; continue; } walk(rules, 0, component); } };
+  readSheets(document.styleSheets, false); readSheets(document.adoptedStyleSheets, false);
+  for (const r of openRoots) { if (ruleCount > 40000) break; readSheets(r.styleSheets, true); readSheets(r.adoptedStyleSheets, true); }
   const breakpoints = Object.entries(bps).map(([query, count]) => ({query, px: parseInt(query.split(' ')[1], 10), count})).sort((a, b) => a.px - b.px).slice(0, 24);
   const PICK = 'header,nav,main,footer,section,article,aside,form,h1,h2,h3,h4,p,ul,ol,button,a,img,picture,video,svg,input,select,textarea,[role]';
   const outline = [];
-  for (const el of document.querySelectorAll(PICK)) {
+  for (const el of all) {
     if (outline.length >= 900) break;
-    if (!shown(el)) continue;
-    let depth = 0; for (let p = el.parentElement; p; p = p.parentElement) depth++;
+    if (!el.matches(PICK) || !shown(el)) continue;
+    let depth = 0; for (let p = up(el); p; p = up(p)) depth++;
     const tag = el.tagName.toLowerCase();
     const item = {tag, depth, box: box(el)};
     const role = el.getAttribute('role'); if (role) item.role = role;
@@ -759,29 +778,30 @@ const BLUEPRINT_JS: &str = r#"(() => {
     outline.push(item);
   }
   const labelFor = el => { if (el.labels && el.labels[0]) return cap(el.labels[0].innerText, 80); return cap(el.getAttribute('aria-label'), 80); };
-  const forms = Array.from(document.forms).slice(0, 30).map(f => ({action: f.getAttribute('action') || '', method: (f.method || 'get').toLowerCase(),
+  const forms = deepAll('form', 30).map(f => ({action: f.getAttribute('action') || '', method: (f.method || 'get').toLowerCase(),
     fields: Array.from(f.elements).slice(0, 60).map(e => ({tag: e.tagName.toLowerCase(), type: e.type || '', name: cap(e.name, 60), label: labelFor(e), placeholder: cap(e.placeholder, 80), required: !!e.required}))}));
-  const links = Array.from(document.links).slice(0, 400).map(a => ({text: cap(a.innerText || a.getAttribute('aria-label'), 100), href: a.href}));
+  const links = deepAll('a[href],area[href]', 2000).filter(a => typeof a.href === 'string').slice(0, 400).map(a => ({text: cap(a.innerText || a.getAttribute('aria-label'), 100), href: a.href}));
   const meta = n => { const m = document.querySelector(`meta[name="${n}"],meta[property="${n}"]`); return m ? cap(m.content, 300) : ''; };
   const icons = Array.from(document.querySelectorAll('link[rel~="icon"],link[rel="apple-touch-icon"]')).map(l => l.href).slice(0, 10);
   // What the page loaded, without query strings (they can carry ids).
   const resources = (performance.getEntriesByType ? performance.getEntriesByType('resource') : []).map(e => ({url: String(e.name).split(/[?#]/)[0], type: e.initiatorType, bytes: e.transferSize || 0}));
+  const images = deepAll('img', 3000);
   // Accessibility at a glance: controls a screen reader can't name, pictures without alt text,
   // the landmarks and the page language.
   const CONTROLS = 'a[href],button,input:not([type="hidden"]),select,textarea,[role="button"],[role="link"],[role="tab"],[role="menuitem"]';
   const named = el => !!(cap(el.innerText, 80) || el.getAttribute('aria-label') || el.getAttribute('aria-labelledby') || el.getAttribute('title')
     || (el.labels && el.labels.length) || el.getAttribute('placeholder') || (['submit', 'button', 'reset'].includes(el.type) && el.value)
     || el.querySelector('img[alt]:not([alt=""]),svg title,[aria-label]'));
-  const unnamed = Array.from(document.querySelectorAll(CONTROLS)).slice(0, 3000).filter(el => shown(el) && !named(el));
+  const unnamed = deepAll(CONTROLS, 3000).filter(el => shown(el) && !named(el));
   const landmarks = {};
-  for (const el of document.querySelectorAll('header,nav,main,footer,aside,form[aria-label],[role="banner"],[role="navigation"],[role="main"],[role="contentinfo"],[role="complementary"],[role="search"]')) {
+  for (const el of deepAll('header,nav,main,footer,aside,form[aria-label],[role="banner"],[role="navigation"],[role="main"],[role="contentinfo"],[role="complementary"],[role="search"]', 2000)) {
     if (!shown(el)) continue;
     const role = el.getAttribute('role') || {header: 'banner', nav: 'navigation', main: 'main', footer: 'contentinfo', aside: 'complementary', form: 'form'}[el.tagName.toLowerCase()];
     tally(landmarks, role);
   }
   const a11y = {lang: document.documentElement.lang || '', landmarks, unnamed_controls: unnamed.length,
     unnamed_examples: unnamed.slice(0, 5).map(el => el.tagName.toLowerCase() + (el.className && typeof el.className === 'string' ? '.' + cap(el.className, 40).split(' ')[0] : '')),
-    images_without_alt: Array.from(document.images).filter(i => shown(i) && !i.hasAttribute('alt')).length};
+    images_without_alt: images.filter(i => shown(i) && !i.hasAttribute('alt')).length};
   const fontFaces = []; try { document.fonts.forEach(f => { if (fontFaces.length < 80) fontFaces.push({family: f.family, weight: f.weight, style: f.style, status: f.status}); }); } catch (e) {}
   return {
     url: location.href, title: document.title, lang: document.documentElement.lang || '',
@@ -789,9 +809,9 @@ const BLUEPRINT_JS: &str = r#"(() => {
     meta: {description: meta('description'), theme_color: meta('theme-color'), og_title: meta('og:title'), og_image: meta('og:image'), icons},
     design: {fonts: top(fonts, 12), font_sizes: top(sizes, 16), font_weights: top(weights, 8), text_colors: top(colors, 16), backgrounds: top(backgrounds, 16), radii: top(radii, 10), shadows: top(shadows, 8), spacing: top(spacing, 24), max_widths: top(maxWidths, 8), css_variables: vars, font_faces: fontFaces},
     breakpoints, unreadable_stylesheets: unreadable, a11y,
-    outline, forms, links,
+    outline, forms, links, shadow: {open_roots: openRoots.length, closed_hosts: closedHosts},
     assets: {
-      images: Array.from(document.images).slice(0, 300).map(i => ({src: i.currentSrc || i.src, w: i.naturalWidth, h: i.naturalHeight, alt: cap(i.alt, 120)})),
+      images: images.slice(0, 300).map(i => ({src: i.currentSrc || i.src, w: i.naturalWidth, h: i.naturalHeight, alt: cap(i.alt, 120)})),
       background_images: top(bgImages, 60).map(x => x.value),
       stylesheets: Array.from(document.styleSheets).map(s => s.href).filter(Boolean).slice(0, 80),
       scripts: Array.from(document.scripts).map(s => s.src).filter(Boolean).slice(0, 120),
@@ -799,7 +819,7 @@ const BLUEPRINT_JS: &str = r#"(() => {
       fonts: resources.filter(r => /\.(woff2?|ttf|otf|eot)$/i.test(r.url) || r.url.includes('fonts.googleapis.com')).map(r => r.url).slice(0, 40),
       requests: resources.slice(0, 300)
     },
-    headings: Array.from(document.querySelectorAll('h1,h2,h3')).slice(0, 120).map(h => ({level: Number(h.tagName[1]), text: cap(h.innerText, 160)})),
+    headings: deepAll('h1,h2,h3', 120).map(h => ({level: Number(h.tagName[1]), text: cap(h.innerText, 160)})),
     text: cap(document.body ? document.body.innerText : '', 30000)
   };
 })()"#;
@@ -962,6 +982,7 @@ fn web_site_capture(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, Tool
             "html_bytes": html_bytes,
             "counts": {"outline": n("outline"), "headings": n("headings"), "links": n("links"), "forms": n("forms"), "images": images},
             "design": blueprint.get("design"),
+            "shadow": blueprint.get("shadow"),
             "files": ["README.md", "capture.json"],
             "signed_in": signed_in,
             "signed_in_site": site.signed_in,
@@ -977,6 +998,7 @@ fn web_site_capture(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, Tool
             Limitation::new("cross_origin_css", "CSS custom properties and breakpoints from cross-origin stylesheets can't be read.")
         })
         .limitations(html_cut(html))
+        .limitations(closed_shadow_roots(&blueprint))
         .limitations(site.signed_in.as_deref().map(|s| profile_limitation(Some(s))))
         .limitations(sign_in_page.then(|| if signed_in { Limitation::new("sign_in_ended", SIGN_IN_ENDED) } else { Limitation::new("sign_in_page", SIGN_IN_HINT) }))
         .coverage(Coverage::complete(p.widths.len() as u64))
@@ -1011,6 +1033,18 @@ fn html_cut((kept, total): (usize, usize)) -> Option<Limitation> {
         Limitation::new(
             "html_cut",
             format!("page.html holds the first {kept} of the page's {total} bytes of HTML: it was cut at the {} MiB limit.", MAX_HTML_BYTES >> 20),
+        )
+    })
+}
+
+/// Components that seem to keep their content in closed shadow roots, which our script in the
+/// page can't read.
+fn closed_shadow_roots(blueprint: &Value) -> Option<Limitation> {
+    let n = blueprint.pointer("/shadow/closed_hosts").and_then(Value::as_u64).unwrap_or(0);
+    (n > 0).then(|| {
+        Limitation::new(
+            "closed_shadow_roots",
+            format!("{n} component(s) seem to keep their content in closed shadow roots, so their structure wasn't read; the screenshots still show them."),
         )
     })
 }
@@ -1153,6 +1187,12 @@ fn readme(b: &Value, shots: &[Value], (html_bytes, html_total): (usize, usize), 
     md.push_str(&format!("- Title: {}\n", s("/title")));
     if !s("/meta/description").is_empty() {
         md.push_str(&format!("- Description: {}\n", s("/meta/description")));
+    }
+    let shadow = |k: &str| b.pointer(&format!("/shadow/{k}")).and_then(Value::as_u64).unwrap_or(0);
+    let (open, closed) = (shadow("open_roots"), shadow("closed_hosts"));
+    if open + closed > 0 {
+        let unread = if closed > 0 { format!("; {closed} seem to be closed and weren't read") } else { String::new() };
+        md.push_str(&format!("- Web components: read inside {open} open shadow root(s){unread}\n"));
     }
     md.push_str(&format!(
         "- Page size at the first width: {}×{} CSS px\n\n",
@@ -1432,6 +1472,20 @@ mod tests {
         assert_eq!(l.code, "html_cut");
         assert!(l.message.contains("4 MiB"), "{}", l.message);
         assert!(html_cut((0, 0)).is_none());
+    }
+
+    #[test]
+    fn components_with_closed_shadow_roots_are_said() {
+        let b = json!({"shadow": {"open_roots": 4, "closed_hosts": 2}});
+        let l = closed_shadow_roots(&b).unwrap();
+        assert_eq!(l.code, "closed_shadow_roots");
+        assert!(l.message.contains('2') && l.message.contains("screenshots"), "{}", l.message);
+        let md = readme(&b, &[], (0, 0), false);
+        assert!(md.contains("4 open shadow root(s)") && md.contains("2 seem to be closed"), "{md}");
+        let open_only = json!({"shadow": {"open_roots": 4, "closed_hosts": 0}});
+        assert!(closed_shadow_roots(&open_only).is_none() && closed_shadow_roots(&json!({})).is_none());
+        assert!(!readme(&open_only, &[], (0, 0), false).contains("closed"));
+        assert!(!readme(&json!({}), &[], (0, 0), false).contains("Web components"));
     }
 
     #[test]
@@ -1783,5 +1837,30 @@ for (const t of tabs) t.onclick = () => tabs.forEach(o => o.setAttribute('aria-s
         assert!(values("backgrounds").contains(&"#f5f2ec".to_string()), "{:?}", values("backgrounds"));
         assert!(values("backgrounds").contains(&"#1e66f580".to_string()), "{:?}", values("backgrounds"));
         assert_eq!(values("text_colors"), ["#2d2b26"]);
+    }
+
+    /// Components (Lit and the like) keep their content in shadow roots: open ones are read, and a
+    /// closed one is counted. Live (`--ignored`).
+    #[test]
+    #[ignore]
+    fn open_shadow_roots_are_read_and_closed_ones_counted() {
+        let capture = capture_of(
+            r#"<!doctype html><html><head><style>x-locked{display:block}</style></head><body><h1>Light title</h1><x-card></x-card><x-locked></x-locked>
+<script>
+customElements.define('x-card', class extends HTMLElement { constructor() { super();
+  this.attachShadow({mode: 'open'}).innerHTML = '<h2>Shadow title</h2><a href="/inside">Inside link</a><button>Shadow button</button>'; } });
+customElements.define('x-locked', class extends HTMLElement { constructor() { super();
+  this.attachShadow({mode: 'closed'}).innerHTML = '<p style="margin:0;height:40px">Locked</p>'; } });
+</script></body></html>"#,
+        );
+        let outline = capture["outline"].as_array().unwrap();
+        let item = |text: &str| outline.iter().find(|i| i["text"] == text).unwrap_or_else(|| panic!("{text} not in {outline:?}"));
+        assert_eq!(item("Shadow button")["tag"], "button");
+        assert!(item("Shadow title")["depth"].as_u64() > item("Light title")["depth"].as_u64(), "depth counts through the host");
+        let hrefs: Vec<&str> = capture["links"].as_array().unwrap().iter().filter_map(|l| l["href"].as_str()).collect();
+        assert!(hrefs.iter().any(|h| h.ends_with("/inside")), "{hrefs:?}");
+        let headings: Vec<&str> = capture["headings"].as_array().unwrap().iter().filter_map(|h| h["text"].as_str()).collect();
+        assert!(headings.contains(&"Light title") && headings.contains(&"Shadow title"), "{headings:?}");
+        assert!(capture["shadow"]["open_roots"].as_u64() >= Some(1) && capture["shadow"]["closed_hosts"].as_u64() >= Some(1), "{}", capture["shadow"]);
     }
 }
