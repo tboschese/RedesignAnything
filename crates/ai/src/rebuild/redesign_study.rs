@@ -146,14 +146,20 @@ fn merge_unique(dst: &mut Vec<String>, extra: &[String]) {
     }
 }
 
-/// Write `incoming` unless a richer host/Study capability already exists for the same id.
+/// Write `incoming` unless a capability known at least as well already exists for the same id.
 /// Returns `true` when the existing richer record was preserved (merged refs/unknowns only).
 fn put_capability_preserving_richer(ws: &Workspace, incoming: Capability) -> Result<bool, ToolError> {
     if let Some(existing) = redesign_store::get_capability(ws, &incoming.id)? {
         let existing_rank = knowledge_rank(&existing.knowledge_status);
         let incoming_rank = knowledge_rank(&incoming.knowledge_status);
-        if existing_rank > incoming_rank || (existing_rank == incoming_rank && existing.task.len() > incoming.task.len()) {
+        // What was recorded stays unless the incoming record is known better. An oracle's capability
+        // is a stand-in made from a scenario (its id as the title, `/` as the route), so how long its
+        // text is says nothing about which record is richer.
+        if existing_rank >= incoming_rank {
             let mut merged = existing;
+            if merged.task.trim().is_empty() {
+                merged.task = incoming.task.clone();
+            }
             merge_unique(&mut merged.source_refs, &incoming.source_refs);
             merge_unique(&mut merged.unknowns, &incoming.unknowns);
             // Keep the stronger criticality when the host already marked one higher.
@@ -163,7 +169,7 @@ fn put_capability_preserving_richer(ws: &Workspace, incoming: Capability) -> Res
             redesign_store::put_capability(ws, merged)?;
             return Ok(true);
         }
-        // Incoming is richer or equal-and-not-shorter: take incoming, but keep prior refs/unknowns.
+        // Incoming is known better: take it, but keep prior refs/unknowns.
         let mut merged = incoming;
         merge_unique(&mut merged.source_refs, &existing.source_refs);
         merge_unique(&mut merged.unknowns, &existing.unknowns);
@@ -368,6 +374,45 @@ mod tests {
         assert!(cap.source_refs.iter().any(|r| r == "ev_ia_home_observed"));
         assert!(cap.source_refs.iter().any(|r| r == "ev_scenario_ia_home_dual_intent"));
         assert!(cap.unknowns.iter().any(|u| u.contains("Advanced Search")));
+    }
+
+    /// A capability recorded in few words and a scenario with a long "then", both observed: the
+    /// scenario is added to the capability, and what was recorded about it stays.
+    #[test]
+    fn an_oracle_scenario_is_added_to_a_recorded_capability_without_replacing_it() {
+        let d = tempfile::tempdir().unwrap();
+        let ws = Workspace::create(d.path(), "Fix", "kind=redesign", TargetRef::None).unwrap();
+        let recorded = Capability {
+            id: "cap_search".into(),
+            title: "Search the catalogue".into(),
+            task: "Find an item".into(),
+            actor_roles: vec!["visitor".into()],
+            original_routes: vec!["/catalogue/search".into()],
+            inputs: vec!["search words".into()],
+            actions: vec!["Search".into()],
+            outcomes: vec!["results list".into()],
+            criticality: "critical".into(),
+            knowledge_status: "observed".into(),
+            source_refs: vec!["ev_search_observed".into()],
+            unknowns: vec![],
+        };
+        redesign_store::put_capability(&ws, recorded.clone()).unwrap();
+        let oracle = json!({
+            "fixture_id": "catalogue",
+            "scenarios": [{
+                "id": "scenario_search",
+                "capability_id": "cap_search",
+                "given": ["On the start page"],
+                "when": ["Type words and search"],
+                "then": ["A list of results for the words shows, each with its title, a short text and the date it changed"],
+                "assertion_source": "observed"
+            }]
+        });
+        let out = import_oracle(&ws, &oracle).unwrap();
+        assert_eq!(out["preserved_capabilities"], 1);
+        let after = redesign_store::get_capability(&ws, "cap_search").unwrap().unwrap();
+        let expected = Capability { source_refs: vec!["ev_search_observed".into(), "ev_scenario_search".into()], ..recorded };
+        assert_eq!(after, expected);
     }
 
     #[test]
