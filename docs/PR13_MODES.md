@@ -7,7 +7,7 @@
 - `mode_scope` — a row in `redesign_checks_run`:
   - `refresh` warns when a capability moves to a route it did not have, a mapping needs backend changes, or an identity trait is replaced.
   - `redesign` reports route moves and divergent decisions.
-  - A route is compared as written, except the start page: the path of the project's target address is the prototype's `/`, and `%C3%A9` equals `é`. A page other than the start page that the prototype names differently (`/wiki/<name>` as `/article`) still counts as moved.
+  - A route is compared as written, except the start page: the path of the project's target address is the prototype's `/`, and `%C3%A9` equals `é`. Another page that the prototype names differently (`/wiki/<name>` as `/article`) is the same page once the prototype was captured for it (`redesign_prototype_capture` with `pages`); before that capture it counts as moved.
   - `reimagine` warns when the plan proposes nothing new.
 - The builder brief: a redesign project no longer gets the website kind's "Match it exactly" paragraph. `TargetKind::capture_guidance` lets a kind say what to do with the capture; the redesign kind answers by mode (`refresh`: keep the layout; `redesign`: the capture is evidence, not a layout to copy; `reimagine`: propose a new visual design too, keeping or evolving every intentional identity trait).
 - `redesign/scaffold_refs.json` records the plan's `mode` and the scaffold's `router`.

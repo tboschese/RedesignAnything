@@ -185,6 +185,40 @@ fn on_the_start_page(caps: &mut [Capability], target_url: &str) {
     }
 }
 
+/// The route a prototype capture was taken at. A hash router keeps it after the `#`.
+fn prototype_route(url: &str) -> Option<String> {
+    let route = match url.split_once('#') {
+        Some((_, after)) if after.starts_with('/') => after,
+        _ => path_of(url)?,
+    };
+    Some(route.split(['?', '#']).next().unwrap_or(route).to_string())
+}
+
+/// For each other page of the original that the prototype was captured for
+/// (redesign_prototype_capture): the original's path and the prototype route that stands for it.
+fn pages_standing_for(ws: &Workspace) -> Vec<(String, String)> {
+    let captures = super::redesign_store::redesign_dir(ws).join(super::redesign_likeness::PROTOTYPE_CAPTURE_DIR);
+    super::kinds::website::routes(ws)
+        .into_iter()
+        .filter_map(|r| {
+            let capture: Value = serde_json::from_slice(&std::fs::read(captures.join(&r.slug).join("capture.json")).ok()?).ok()?;
+            Some((r.path, prototype_route(capture["url"].as_str()?)?))
+        })
+        .collect()
+}
+
+/// A page the prototype names differently is the same page: a capability that stays on it has
+/// not moved. Each such page's prototype route becomes one more of the routes it had.
+fn under_the_prototypes_names(caps: &mut [Capability], pages: &[(String, String)]) {
+    for cap in caps {
+        for (original, prototype) in pages {
+            if cap.original_routes.iter().any(|r| same_route(r, original)) && !cap.original_routes.iter().any(|r| same_route(r, prototype)) {
+                cap.original_routes.push(prototype.clone());
+            }
+        }
+    }
+}
+
 /// A mapping that sends a capability to a route it didn't have in the original.
 fn moved_routes(caps: &[Capability], plan: &TransformationPlan) -> Vec<String> {
     plan.mappings
@@ -293,6 +327,7 @@ pub fn scope_check(ws: &Workspace) -> CheckResult {
     if let craft_anything_engine::workspace::TargetRef::Website { url } = &ws.manifest.target {
         on_the_start_page(&mut caps, url);
     }
+    under_the_prototypes_names(&mut caps, &pages_standing_for(ws));
     let decisions = match super::redesign_plan::list_decisions(ws) {
         Ok(d) => d,
         Err(e) => return not_evaluated("decisions", e),
@@ -389,6 +424,35 @@ mod tests {
         on_the_start_page(&mut caps, "https://example.org/wiki/P%C3%A1gina_principal?uselang=pt#top");
         assert!(moved_routes(&caps, &to_start("cap_search")).is_empty());
         assert_eq!(moved_routes(&caps, &to_start("cap_read")).len(), 1, "another page's capability brought to the start page did move");
+    }
+
+    /// The prototype calls the article page `/artigo`; its capture says which original page it
+    /// stands for. What stays on that page has not moved, and what goes elsewhere has.
+    #[test]
+    fn a_page_the_prototype_names_differently_is_the_same_page_once_its_capture_says_so() {
+        let d = tempfile::tempdir().unwrap();
+        let ws = Workspace::create(d.path(), "S", "kind=redesign", craft_anything_engine::workspace::TargetRef::None).unwrap();
+        let to = |route: &str| {
+            let mut p = plan("refresh", route, "ui_only");
+            p.mappings[0].capability_id = "cap_read".into();
+            p
+        };
+        let caps = || vec![cap("cap_read", "/wiki/")];
+        assert!(pages_standing_for(&ws).is_empty(), "nothing captured yet");
+        assert_eq!(moved_routes(&caps(), &to("/artigo")).len(), 1, "compared as text, a renamed page looks moved");
+
+        std::fs::create_dir_all(ws.capture_dir()).unwrap();
+        let routes = json!([{"path": "/wiki/", "slug": "artigo", "url": "https://example.org/wiki/Exemplo"}]);
+        std::fs::write(ws.capture_dir().join("routes.json"), routes.to_string()).unwrap();
+        let captured = super::super::redesign_store::redesign_dir(&ws).join("prototype_capture/artigo");
+        std::fs::create_dir_all(&captured).unwrap();
+        std::fs::write(captured.join("capture.json"), json!({"url": "http://127.0.0.1:5000/#/artigo?a=exemplo"}).to_string()).unwrap();
+
+        let mut named = caps();
+        under_the_prototypes_names(&mut named, &pages_standing_for(&ws));
+        assert!(moved_routes(&named, &to("/artigo")).is_empty());
+        assert_eq!(moved_routes(&named, &to("/busca")).len(), 1, "sent to another page, it did move");
+        assert_eq!(prototype_route("http://127.0.0.1:5000/artigo?a=1").as_deref(), Some("/artigo"), "a prototype without a hash router");
     }
 
     #[test]
