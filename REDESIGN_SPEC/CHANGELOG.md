@@ -1,5 +1,9 @@
 # Changelog — Redesign Anything specification
 
+## Documentation 1.4.10 — 2026-11-21
+
+- `CONTRACTS.md` §7: a scenario that an approved decision replaces can be retired in a project with the operator's approval (`redesign_scenario_retire`). It is listed as retired and is not in `critical_scenarios_total`; a project with no scenario left is still not Prototype Ready.
+
 ## Documentation 1.4.9 — 2026-11-21
 
 - `CONTRACTS.md` §7: Prototype Ready needs every critical scenario judged by a journey run in the built prototype. A scenario that passes only on a word found in the sources no longer counts; `functional_scenarios` reports it as a warning.

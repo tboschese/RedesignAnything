@@ -298,9 +298,7 @@ pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
                 if qc.id == "functional_scenarios"
                     && let Some(evals) = qc.details.get("evals").and_then(|e| e.as_array())
                 {
-                    scenario_total = evals.len() as u32;
-                    scenario_passed = evals.iter().filter(|e| e.get("status").and_then(|s| s.as_str()) == Some("pass")).count() as u32;
-                    scenarios_on_a_word_hint = evals.iter().filter(|e| e.get("method").and_then(|m| m.as_str()) == Some("word_hint")).count() as u32;
+                    (scenario_total, scenario_passed, scenarios_on_a_word_hint) = scenario_counts(evals);
                 }
                 if qc.id == "accessibility" && qc.status == "fail" {
                     a11y_critical_fail = true;
@@ -363,6 +361,13 @@ pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
     let path = redesign_store::redesign_dir(ws).join(CHECKS_FILE);
     craft_anything_engine::project::write_atomic(&path, serde_json::to_vec_pretty(&report).map_err(|e| ToolError::internal(e.to_string()))?.as_slice())?;
     Ok(report)
+}
+
+/// From the scenarios' evaluations: how many are owed, how many passed, and how many rest on a
+/// word hint. A retired scenario is neither passed nor owed, so it is not one of the total.
+fn scenario_counts(evals: &[Value]) -> (u32, u32, u32) {
+    let count = |key: &str, wanted: &str| evals.iter().filter(|e| e.get(key).and_then(Value::as_str) == Some(wanted)).count() as u32;
+    (evals.len() as u32 - count("status", "retired"), count("status", "pass"), count("method", "word_hint"))
 }
 
 /// Whether `app` holds a built site that is at least as new as its sources, from the files alone.
@@ -604,6 +609,33 @@ mod tests {
         assert!(concept_ready(&inp(1)), "a concept needs no journey");
         assert!(!prototype_ready(&inp(1), 0), "all three passed, one of them only on a word");
         assert!(prototype_ready(&inp(0), 0));
+    }
+
+    /// Retiring a scenario takes it out of what is owed; it never adds a pass, and a project with
+    /// every scenario retired has shown nothing.
+    #[test]
+    fn a_retired_scenario_is_not_owed_and_is_not_a_pass() {
+        let eval = |status: &str, method: &str| json!({"status": status, "method": method});
+        let (total, passed, on_hint) = scenario_counts(&[eval("pass", "journey_run"), eval("retired", "retired"), eval("fail", "journey_run")]);
+        assert_eq!((total, passed, on_hint), (2, 1, 0));
+        let ready = |evals: &[Value]| {
+            let (total, passed, on_hint) = scenario_counts(evals);
+            prototype_ready(
+                &CheckInputs {
+                    preview_available: true,
+                    security_ok: true,
+                    build_status: CheckExec::Pass,
+                    ds_status: CheckExec::Pass,
+                    functional: FunctionalSummary { critical_scenarios_total: total, critical_scenarios_passed: passed, button_works: true },
+                    scenarios_on_a_word_hint: on_hint,
+                    ..Default::default()
+                },
+                0,
+            )
+        };
+        assert!(ready(&[eval("pass", "journey_run"), eval("retired", "retired")]), "what is left all passed");
+        assert!(!ready(&[eval("fail", "journey_run"), eval("retired", "retired")]));
+        assert!(!ready(&[eval("retired", "retired")]), "nothing left to show the prototype works");
     }
 
     #[test]

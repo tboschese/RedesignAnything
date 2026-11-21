@@ -58,7 +58,7 @@ pub fn project_sections(ws: &Workspace, ready: &ReadyReport) -> Vec<Section> {
             let note = e["notes"][0].as_str().unwrap_or("");
             // A journey's own note says what ran; a word hint needs saying that nothing did.
             let how = match e["method"].as_str() {
-                Some("journey_run") => note.to_string(),
+                Some("journey_run") | Some("retired") => note.to_string(),
                 Some("word_hint") => format!("a word was found in the sources; no journey was run ({note})"),
                 _ => "not judged".to_string(),
             };

@@ -93,6 +93,7 @@ pub const TOOLS: &[&str] = &[
     "redesign_variants_show",
     "redesign_prototype_capture",
     "redesign_journeys_run",
+    "redesign_scenario_retire",
     "redesign_likeness_measure",
     "redesign_knowledge_retrieve",
     "redesign_critic_recommend",
