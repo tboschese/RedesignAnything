@@ -2976,6 +2976,50 @@ fn the_builders_check_round_runs_the_journeys_and_says_what_to_fix() {
     assert_eq!(results.get("donate").map(|r| r.passed), Some(false));
 }
 
+/// In the builder's check round the prototype is photographed and what the pictures show comes
+/// back as claims: a page wider than its window, a picture without alt text. An original page
+/// without a prototype address is an unknown until one is kept. Live (`--ignored`): needs a browser.
+#[test]
+#[ignore]
+fn the_builders_check_round_photographs_the_prototype_and_says_what_to_fix() {
+    use crate::rebuild::kinds::redesign::PrototypeCaptureCheck;
+    use craft_anything_engine::tools::web_common::{Image, encode_png};
+    let d = tempfile::tempdir().unwrap();
+    let mut ws = Workspace::create(d.path(), "Catalogue", "kind=redesign", TargetRef::None).unwrap();
+    ws.manifest.kind = Some("redesign".into());
+    ws.save().unwrap();
+    let dist = ws.app_dir().join("dist");
+    std::fs::create_dir_all(&dist).unwrap();
+    std::fs::write(dist.join("index.html"), "<!doctype html><html lang=en><body><main><h1>Catalogue</h1><img src=x.png width=40 height=40><div style=\"width:1200px;height:40px;background:#ccc\"></div></main></body></html>").unwrap();
+    // The original: captured at 800 px, with one other page.
+    let capture = ws.capture_dir();
+    std::fs::create_dir_all(&capture).unwrap();
+    let original = json!({"outline": [{"tag": "main", "depth": 1, "box": {"x": 0, "y": 0, "w": 800, "h": 400}}], "viewport": {"w": 800, "h": 900},
+        "layouts": [{"width": 800, "page_w": 800}], "a11y": {"lang": "en", "landmarks": {"main": 1}, "unnamed_controls": 0, "images_without_alt": 0}});
+    std::fs::write(capture.join("capture.json"), original.to_string()).unwrap();
+    let rgba = (0..800 * 900).flat_map(|i| if (i % 800) / 20 % 2 == 0 { [40, 40, 40, 255] } else { [220, 220, 220, 255] }).collect();
+    std::fs::write(capture.join("screenshot-800.png"), encode_png(&Image { width: 800, height: 900, rgba }).unwrap()).unwrap();
+    std::fs::write(capture.join("routes.json"), json!([{"path": "/wiki/", "slug": "artigo", "url": "https://example.test/wiki/X"}]).to_string()).unwrap();
+
+    let worker = Worker { engine: Arc::new(Engine::new(craft_anything_engine::testing::live_session())), ..check_worker(&ws, false) };
+    let checks = worker.run_checks(&ws, &RedesignKind, 1).unwrap();
+    let shot = checks.iter().find(|c| c.check == PrototypeCaptureCheck::ID).expect("the capture check ran");
+    let claim = |starts: &str| shot.claims.iter().find(|c| c.title.starts_with(starts)).unwrap_or_else(|| panic!("{starts}: {shot:?}")).clone();
+    let fits = claim("every captured page fits");
+    assert!(!fits.passed && fits.detail.contains("in a 800 px window"), "{fits:?}");
+    let basics = claim("every captured page has the basics");
+    assert!(!basics.passed && basics.detail.contains("without alt text"), "{basics:?}");
+    assert!(shot.unknowns.iter().any(|u| u.starts_with("artigo")), "{:?}", shot.unknowns);
+    assert!(ws.root.join("redesign/prototype_capture/likeness.json").is_file());
+    assert!(RedesignKind.checks(&ws).iter().find(|c| c.id() == PrototypeCaptureCheck::ID).unwrap().can_refine(shot), "the builder can fix it");
+
+    crate::rebuild::redesign_likeness::keep_pages(&ws, &[("artigo".into(), "/#/artigo".into())]).unwrap();
+    let again = worker.run_checks(&ws, &RedesignKind, 2).unwrap();
+    let shot = again.iter().find(|c| c.check == PrototypeCaptureCheck::ID).unwrap();
+    assert!(shot.unknowns.is_empty(), "with an address, the page is photographed too: {shot:?}");
+    assert!(ws.root.join("redesign/prototype_capture/artigo/capture.json").is_file());
+}
+
 /// The builder's brief lists the scenarios that owe a journey, with what each must show, and how
 /// to write one; a retired scenario or a project without scenarios adds nothing.
 #[test]

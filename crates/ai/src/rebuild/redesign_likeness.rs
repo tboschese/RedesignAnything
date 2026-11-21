@@ -226,6 +226,50 @@ pub fn capture_targets(ws: &Workspace, extra: &[(String, String)]) -> Result<Vec
     Ok(targets)
 }
 
+/// Which prototype address stands for which original page, kept under redesign/prototype_capture/:
+/// written by `redesign_prototype_capture` when it is given `pages`, or by the builder, and read by
+/// every later capture, the builder's check rounds included.
+pub const PAGES_FILE: &str = "pages.json";
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct PagesFile {
+    pages: Vec<PageAddress>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+struct PageAddress {
+    page: String,
+    path: String,
+}
+
+/// The kept `(page, prototype path)` pairs; none when nothing was kept or the file can't be read.
+pub fn kept_pages(ws: &Workspace) -> Vec<(String, String)> {
+    let file = prototype_dir(ws).join(PAGES_FILE);
+    let kept: PagesFile = fs::read(file).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default();
+    kept.pages.into_iter().map(|p| (p.page, p.path)).collect()
+}
+
+/// Keep `(page, prototype path)` pairs once [`capture_targets`] accepts them.
+pub fn keep_pages(ws: &Workspace, pages: &[(String, String)]) -> Result<(), ToolError> {
+    capture_targets(ws, pages)?;
+    redesign_store::ensure(ws)?;
+    let root = prototype_dir(ws);
+    reject_symlink(&root)?;
+    fs::create_dir_all(&root).map_err(|e| ToolError::io(root.display(), e))?;
+    let kept = PagesFile { pages: pages.iter().map(|(page, path)| PageAddress { page: page.clone(), path: path.clone() }).collect() };
+    write_record(&root.join(PAGES_FILE), &kept)
+}
+
+/// The original pages other than the start page that have no prototype address yet.
+pub fn pages_without_address(ws: &Workspace) -> Vec<String> {
+    let kept = kept_pages(ws);
+    website::routes(ws)
+        .into_iter()
+        .filter(|r| r.slug != START_PAGE && !r.path.trim_end_matches('/').is_empty() && !kept.iter().any(|(page, _)| *page == r.slug))
+        .map(|r| r.slug)
+        .collect()
+}
+
 /// An empty folder for one page's prototype capture: `web_site_capture` wants one that isn't there.
 pub fn fresh_page_dir(ws: &Workspace, page: &str) -> Result<PathBuf, ToolError> {
     redesign_store::ensure(ws)?;
@@ -546,6 +590,25 @@ mod tests {
             "more than the original, and a lost language: {}",
             worse.summary
         );
+    }
+
+    /// The address that stands for an original page is kept once and used by every later capture;
+    /// an address for a page the original doesn't have is refused and nothing is kept.
+    #[test]
+    fn a_prototype_address_for_an_original_page_is_kept_for_later_captures() {
+        let d = tempfile::tempdir().unwrap();
+        let ws = Workspace::create(d.path(), "L", "kind=redesign", craft_anything_engine::workspace::TargetRef::None).unwrap();
+        fs::create_dir_all(ws.capture_dir()).unwrap();
+        let routes = json!([{"path": "/wiki/", "slug": "artigo", "url": "https://example.test/wiki/X"}, {"path": "/busca", "slug": "busca", "url": "https://example.test/busca"}]);
+        fs::write(ws.capture_dir().join("routes.json"), routes.to_string()).unwrap();
+        assert_eq!(pages_without_address(&ws), ["artigo", "busca"]);
+        assert!(keep_pages(&ws, &[("nowhere".into(), "/#/x".into())]).is_err());
+        assert!(kept_pages(&ws).is_empty(), "nothing kept from a refused call");
+        keep_pages(&ws, &[("artigo".into(), "/#/artigo?a=1".into())]).unwrap();
+        assert_eq!(kept_pages(&ws), [("artigo".to_string(), "/#/artigo?a=1".to_string())]);
+        assert_eq!(pages_without_address(&ws), ["busca"]);
+        let targets = capture_targets(&ws, &kept_pages(&ws)).unwrap();
+        assert!(targets.contains(&("artigo".to_string(), "/#/artigo?a=1".to_string())), "{targets:?}");
     }
 
     #[test]

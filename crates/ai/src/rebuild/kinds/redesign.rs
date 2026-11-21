@@ -99,6 +99,16 @@ impl TargetKind for RedesignKind {
                 states.join(", ")
             ));
         }
+        let unmapped = crate::rebuild::redesign_likeness::pages_without_address(cx.ws);
+        if !unmapped.is_empty() {
+            let routes = website::routes(cx.ws);
+            let list = unmapped
+                .iter()
+                .map(|slug| format!("- {slug}: {}", routes.iter().find(|r| &r.slug == slug).map_or("", |r| r.path.as_str())))
+                .collect::<Vec<_>>()
+                .join("\n");
+            out.push(format!("{CAPTURE_BRIEF}\nThe original pages that need an address in the prototype:\n{list}"));
+        }
         let owed = crate::rebuild::redesign_journeys::owed(cx.ws);
         if !owed.is_empty() {
             let list = owed.iter().map(|(id, then)| format!("- {id}: {then}")).collect::<Vec<_>>().join("\n");
@@ -119,7 +129,7 @@ impl TargetKind for RedesignKind {
     fn checks(&self, _ws: &Workspace) -> Vec<Box<dyn Check>> {
         // No WebVisualCheck / pixel-similarity gate. Build, the scenarios' journeys run in the
         // built site, then native Ready (fail-closed), which reads what the journeys found.
-        vec![Box::new(BuildCheck), Box::new(JourneysCheck), Box::new(RedesignReadyCheck)]
+        vec![Box::new(BuildCheck), Box::new(JourneysCheck), Box::new(PrototypeCaptureCheck), Box::new(RedesignReadyCheck)]
     }
 }
 
@@ -133,6 +143,94 @@ pub const JOURNEYS_BRIEF: &str = concat!(
     "Each check round runs them and tells you the step that failed. A scenario passes only when its journey does, ",
     "not when its words appear in the code, so write the UI that makes the steps work rather than steps that avoid it."
 );
+
+/// How the builder tells the check round which prototype page stands for each original page.
+pub const CAPTURE_BRIEF: &str = concat!(
+    "Each check round also photographs the built prototype and compares each page with the original's page. ",
+    "Say which prototype address stands for each original page other than the start page in ",
+    "redesign/prototype_capture/pages.json as {\"pages\": [{\"page\": \"<page>\", \"path\": \"/#/<route>\"}]}."
+);
+
+/// Photographs the built prototype the way `redesign_prototype_capture` does (the start page and
+/// each original page at its kept address, at the original's widths), measures how alike each page
+/// is, and turns what the captures show into claims the builder can act on: every page fits its
+/// window, and the basics (names, alt text, language, the original's landmarks) are there. Likeness
+/// is reported, never a claim. An original page without an address is an unknown, said in the note.
+pub struct PrototypeCaptureCheck;
+
+impl PrototypeCaptureCheck {
+    pub const ID: &'static str = "redesign-capture";
+}
+
+impl Check for PrototypeCaptureCheck {
+    fn id(&self) -> &'static str {
+        Self::ID
+    }
+
+    /// Nothing to compare with before the original was captured.
+    fn applies(&self, cx: &CheckCx) -> bool {
+        cx.ws.capture_dir().join("capture.json").is_file()
+    }
+
+    fn run(&self, cx: &mut CheckCx) -> Result<CheckResult, ToolError> {
+        use crate::rebuild::redesign_likeness as likeness;
+        let (ws, round) = (cx.ws, cx.round);
+        let Some(site) = crate::rebuild::site_dir(&ws.app_dir()) else {
+            return Ok(CheckResult::new(self.id(), round, false, "No built site to photograph: build the app first (npm run build in app/)."));
+        };
+        let targets = match likeness::capture_targets(ws, &likeness::kept_pages(ws)) {
+            Ok(t) => t,
+            Err(e) => {
+                return Ok(CheckResult::new(
+                    self.id(),
+                    round,
+                    false,
+                    format!("redesign/prototype_capture/{} can't be used: {}. {CAPTURE_BRIEF}", likeness::PAGES_FILE, e.message),
+                ));
+            }
+        };
+        let base = cx.serve_preview(&site)?;
+        let widths = likeness::original_widths(ws);
+        let mut not_captured = Vec::new();
+        for (page, path) in &targets {
+            let out = likeness::fresh_page_dir(ws, page)?;
+            // A page opened with only its `#…` changed doesn't load again, so each page gets its own browser.
+            let _ = cx.call("web_site_close", json!({}));
+            let done = cx
+                .call("web_site_open", json!({"url": format!("{}{}", base.trim_end_matches('/'), path), "settle_ms": 800, "signed_in": false}))
+                .and_then(|_| cx.call("web_site_capture", json!({"output_directory": out.display().to_string(), "include_html": false, "widths": widths})));
+            if let Err(e) = done {
+                not_captured.push(format!("{page} ({path}): {}", e.message));
+            }
+        }
+        let _ = cx.call("web_site_close", json!({}));
+        let report = likeness::measure(ws)?;
+        let fits = likeness::fits_window_check(ws);
+        let basics = likeness::basics_check(ws);
+        let mut claims = vec![
+            Claim::new("every captured page fits its window", fits.status != "warn", fits.summary.clone()),
+            Claim::new("every captured page has the basics (names, alt text, language, landmarks)", basics.status != "warn", basics.summary.clone()),
+        ];
+        claims.extend(not_captured.iter().map(|why| Claim::new(format!("the prototype page {why} could be photographed"), false, why.clone())));
+        let scores: Vec<String> =
+            report["pages"].as_array().into_iter().flatten().filter_map(|p| Some(format!("{} {:.0}", p["page"].as_str()?, p["overall"].as_f64()?))).collect();
+        let mut note = format!("Photographed {} page(s) of the prototype at {:?} px.", targets.len() - not_captured.len(), widths);
+        if !scores.is_empty() {
+            note.push_str(&format!(" Likeness to the original (0..=100, reported, not judged): {}.", scores.join(", ")));
+        }
+        for c in claims.iter().filter(|c| !c.passed) {
+            note.push_str(&format!(" {}: {}.", c.title, c.detail));
+        }
+        let mut out = CheckResult::new(self.id(), round, not_captured.len() < targets.len(), note);
+        out.claims = claims;
+        out.unknowns = likeness::pages_without_address(ws)
+            .into_iter()
+            .map(|page| format!("{page}: no prototype address in redesign/prototype_capture/{}", likeness::PAGES_FILE))
+            .collect();
+        out.artifacts = vec![std::path::PathBuf::from("redesign/prototype_capture/likeness.json")];
+        Ok(out)
+    }
+}
 
 /// Runs the kept journeys in the built site, one per owed scenario, and writes
 /// redesign/quality/journeys-report.json for [`RedesignReadyCheck`] to read. A scenario without a
@@ -323,7 +421,7 @@ mod tests {
         let d = tempfile::tempdir().unwrap();
         let ws = Workspace::create(d.path(), "R", "kind=redesign", TargetRef::Website { url: "https://example.test".into() }).unwrap();
         let ids: Vec<_> = RedesignKind.checks(&ws).iter().map(|c| c.id()).collect();
-        assert_eq!(ids, [CheckResult::BUILD, JourneysCheck::ID, RedesignReadyCheck::ID]);
+        assert_eq!(ids, [CheckResult::BUILD, JourneysCheck::ID, PrototypeCaptureCheck::ID, RedesignReadyCheck::ID]);
         assert!(!ids.contains(&CheckResult::WEB_VISUAL));
     }
 

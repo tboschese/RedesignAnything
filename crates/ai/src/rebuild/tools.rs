@@ -1608,7 +1608,12 @@ fn redesign_prototype_capture(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOu
         ToolError::new(ErrorCode::FeatureMissing, "Capturing a prototype isn't available in this engine.")
             .with_remediation("Use the app or `craft-anything-cli`.")
     })?;
-    let extra: Vec<(String, String)> = p.pages.into_iter().map(|x| (x.page, x.path)).collect();
+    // Given pages are kept for later captures (the builder's check rounds too); without them, the kept ones are used.
+    let given: Vec<(String, String)> = p.pages.into_iter().map(|x| (x.page, x.path)).collect();
+    if !given.is_empty() {
+        super::redesign_likeness::keep_pages(&ws, &given)?;
+    }
+    let extra = if given.is_empty() { super::redesign_likeness::kept_pages(&ws) } else { given };
     let targets = super::redesign_likeness::capture_targets(&ws, &extra)?;
     let widths = p.widths.unwrap_or_else(|| super::redesign_likeness::original_widths(&ws));
     let server = super::preview(&ws)
