@@ -263,7 +263,7 @@ pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
     checks.push(super::redesign_mode::scope_check(ws));
     // Advisory: does a captured prototype page run off the side of its window?
     checks.push(super::redesign_likeness::fits_window_check(ws));
-    // Advisory: the basics a captured prototype page gets wrong (names, alt text, contrast, language, landmarks).
+    // Advisory: the basics a captured prototype page gets wrong (names, alt text, contrast, keyboard, language, landmarks).
     checks.push(super::redesign_likeness::basics_check(ws));
     // Advisory: does a captured prototype page repeat the original's sentences?
     checks.push(super::redesign_likeness::copied_wording_check(ws));

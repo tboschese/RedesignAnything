@@ -45,7 +45,7 @@ pub fn specs() -> Vec<ToolSpec> {
         spec(
             "web_site_capture",
             "Capture a website for rebuilding",
-            "Record the open website into a new folder: full-page PNG screenshots at each requested width, the rendered HTML, design tokens (fonts, sizes, weights, text and background colours as hex, radii, shadows, spacing, content widths, CSS custom properties), the widths its CSS switches layout at, the layout at each width (page width, heading and text sizes, each section's padding, gap, content column and items per row), a layout outline of visible landmarks, headings, controls and images with positions, asset lists (images, stylesheets, scripts, font files, the requests it made), links and form outlines (never values). Writes capture.json and a README.md summary.",
+            "Record the open website into a new folder: full-page PNG screenshots at each requested width, the rendered HTML, design tokens (fonts, sizes, weights, text and background colours as hex, radii, shadows, spacing, content widths, CSS custom properties), the widths its CSS switches layout at, the layout at each width (page width, heading and text sizes, each section's padding, gap, content column and items per row), a layout outline of visible landmarks, headings, controls and images with positions, asset lists (images, stylesheets, scripts, font files, the requests it made), links and form outlines (never values). Then presses Tab through the page from its top (up to 80 times) and records how many visible controls the focus reached and which showed no focus. Writes capture.json and a README.md summary.",
             "Save pictures and a blueprint of a web page so it can be rebuilt.",
             Toolset::Browser,
             Effects::EVIDENCE.union(Effects::WRITES_FILESYSTEM).union(Effects::ACCESSES_NETWORK),
@@ -1168,8 +1168,13 @@ fn web_site_capture(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, Tool
     if let Some(w) = p.widths.first() {
         let _ = set_viewport(&mut client, *w, 900, &dl);
     }
+    // At that width, walk the page with Tab, as a keyboard user would.
+    let keyboard = if r.is_ok() { keyboard_walk(&mut client, &dl).ok() } else { None };
     cleanup(&mut client, &dl);
     let (mut blueprint, shots, html) = r?;
+    if let (Some(k), Some(Value::Object(a))) = (keyboard, blueprint.get_mut("a11y")) {
+        a.insert("keyboard".into(), k);
+    }
     let html_bytes = html.0;
     if visitor {
         visitor_view(&mut blueprint);
@@ -1338,6 +1343,88 @@ fn photographed_in_bands(shots: &[Value]) -> Option<Limitation> {
     })
 }
 
+/// Most Tab presses a capture makes: a page with more controls is walked through its first ones.
+const KEYBOARD_TABS: usize = 80;
+
+/// Before the Tab walk: take the focus off the page, go to its top, forget earlier marks, and
+/// count the visible controls a keyboard should reach (in open shadow roots too).
+const KEYBOARD_START_JS: &str = r#"(() => {
+  __DEEP__
+  const els = all(document, []);
+  for (const el of els) if (el.hasAttribute('data-craft-tab')) el.removeAttribute('data-craft-tab');
+  let a = document.activeElement; while (a && a.shadowRoot && a.shadowRoot.activeElement) a = a.shadowRoot.activeElement;
+  if (a && a.blur) a.blur();
+  scrollTo(0, 0);
+  const CONTROLS = 'a[href], button, input:not([type="hidden"]), select, textarea, summary, [tabindex]:not([tabindex="-1"]), [contenteditable="true"]';
+  const reachable = el => el.matches(CONTROLS) && !el.disabled && el.getAttribute('tabindex') !== '-1' && !el.closest('[inert]') && shown(el);
+  return {controls: els.filter(reachable).length};
+})()"#;
+
+/// After a Tab press: the element that has the focus (through open shadow roots), whether it was
+/// reached before (`again`), and whether its focus can be seen (an outline or a shadow on it or
+/// on its parent). Marks it with its order.
+const KEYBOARD_FOCUS_JS: &str = r#"(() => {
+  let a = document.activeElement; while (a && a.shadowRoot && a.shadowRoot.activeElement) a = a.shadowRoot.activeElement;
+  if (!a || a === document.body || a === document.documentElement) return {on_page: false};
+  const again = a.hasAttribute('data-craft-tab');
+  if (!again) a.setAttribute('data-craft-tab', '__N__');
+  const ring = el => { if (!el || !el.getBoundingClientRect) return false; const s = getComputedStyle(el); return (s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0) || (s.boxShadow && s.boxShadow !== 'none'); };
+  const up = a.parentElement || (a.getRootNode() && a.getRootNode().host) || null;
+  const cls = typeof a.className === 'string' && a.className.trim() ? '.' + a.className.trim().split(/\s+/)[0] : '';
+  return {on_page: true, again, element: a.tagName.toLowerCase() + cls, visible: ring(a) || ring(up)};
+})()"#;
+
+/// Press Tab through the page from its top and say where the focus went: how many of the page's
+/// visible controls it reached, which ones showed no focus, and why the walk stopped (`wrapped`
+/// back to a control already reached, `left_page` to the browser, or the press `limit`).
+fn keyboard_walk(client: &mut CdpClient, dl: &Deadline) -> Result<Value, ToolError> {
+    let deep = |js: &str| js.replace("__DEEP__", journey::DEEP_JS);
+    let start = eval(client, &deep(KEYBOARD_START_JS), dl)?;
+    let (mut reached, mut not_visible, mut examples) = (0u64, 0u64, Vec::<String>::new());
+    let mut stopped = "limit";
+    for n in 0..KEYBOARD_TABS {
+        if dl.expired() {
+            stopped = "time";
+            break;
+        }
+        for kind in ["keyDown", "keyUp"] {
+            client.call(
+                "Input.dispatchKeyEvent",
+                json!({"type": kind, "key": "Tab", "code": "Tab", "windowsVirtualKeyCode": 9, "nativeVirtualKeyCode": 9}),
+                None,
+                dl,
+            )?;
+        }
+        let f = eval(client, &KEYBOARD_FOCUS_JS.replace("__N__", &n.to_string()), dl)?;
+        if f["on_page"] != true {
+            // The first press can start outside the page; after that, leaving it ends the walk.
+            if reached > 0 {
+                stopped = "left_page";
+                break;
+            }
+            continue;
+        }
+        if f["again"] == true {
+            stopped = "wrapped";
+            break;
+        }
+        reached += 1;
+        if f["visible"] != true {
+            not_visible += 1;
+            if let Some(e) = f["element"].as_str()
+                && examples.len() < 5
+                && !examples.iter().any(|x| x == e)
+            {
+                examples.push(e.to_string());
+            }
+        }
+    }
+    let _ = eval(client, "(() => { let a = document.activeElement; if (a && a.blur) a.blur(); scrollTo(0, 0); })()", dl);
+    Ok(
+        json!({"controls": start["controls"], "reached": reached, "focus_not_visible": not_visible, "not_visible_examples": examples, "stopped": stopped, "max_tabs": KEYBOARD_TABS}),
+    )
+}
+
 fn capture_into(ctx: &Ctx<'_>, client: &mut CdpClient, out: &Path, p: &CaptureParams, dl: &Deadline) -> Result<Captured, ToolError> {
     client.call("Page.enable", json!({}), None, dl)?;
     let mut shots = Vec::new();
@@ -1467,6 +1554,16 @@ fn visitor_view(blueprint: &mut Value) {
                 *e = Value::String(s.split('.').next().unwrap_or_default().to_string());
             }
         }
+    }
+    if let Some(Value::Array(examples)) = b.get_mut("a11y").and_then(|a| a.get_mut("keyboard")).and_then(|k| k.get_mut("not_visible_examples")) {
+        let mut seen = Vec::new();
+        examples.retain_mut(|e| {
+            let tag = e.as_str().unwrap_or_default().split('.').next().unwrap_or_default().to_string();
+            *e = Value::String(tag.clone());
+            let new = !seen.contains(&tag);
+            seen.push(tag);
+            new
+        });
     }
     if let Some(Value::Array(examples)) = b.get_mut("a11y").and_then(|a| a.get_mut("low_contrast_examples")) {
         for e in examples.iter_mut().filter_map(|e| e.get_mut("element")) {
@@ -1599,6 +1696,16 @@ fn health_section(b: &Value) -> String {
             n("unnamed_controls"),
             n("images_without_alt")
         ));
+        if let Some(k) = a.get("keyboard") {
+            let kn = |key: &str| k.get(key).and_then(Value::as_u64).unwrap_or(0);
+            md.push_str(&format!(
+                "Keyboard: Tab reached {} of {} visible controls ({}); {} showed no focus.\n\n",
+                kn("reached"),
+                kn("controls"),
+                k.get("stopped").and_then(Value::as_str).unwrap_or("?"),
+                kn("focus_not_visible")
+            ));
+        }
         if a.get("text_checked").is_some() {
             md.push_str(&format!(
                 "Text with too little contrast: {} of {} checked ({} over a picture, a gradient or a colour not read).\n\n",
@@ -1902,7 +2009,7 @@ mod tests {
             "headings": [{"level": 1, "text": "Plans"}], "text": "Plans Pricing", "layouts": [{"width": 1440, "page_w": 1440}],
             "outline": [{"tag": "img", "class": "w-full rounded-xl", "src": "https://cdn.test/hero.webp?dpl=dpl_abc123#x"}, {"tag": "a", "class": "btn", "href": "https://shop.test/plans?ref=sk-test-123"}],
             "links": [{"text": "Plans", "href": "https://shop.test/plans?session=abc"}],
-            "a11y": {"unnamed_examples": ["button.icon-btn", "a"], "low_contrast_examples": [{"element": "span.muted-note", "ratio": 2.1}]}
+            "a11y": {"unnamed_examples": ["button.icon-btn", "a"], "low_contrast_examples": [{"element": "span.muted-note", "ratio": 2.1}], "keyboard": {"not_visible_examples": ["button.bare", "button.icon", "a.nav"]}}
         });
         visitor_view(&mut b);
         // #156: the page's class names and the query strings on its addresses aren't a visitor's view.
@@ -1912,6 +2019,7 @@ mod tests {
         assert_eq!(b["links"][0]["href"], "https://shop.test/plans");
         assert_eq!(b["a11y"]["unnamed_examples"], json!(["button", "a"]));
         assert_eq!(b["a11y"]["low_contrast_examples"][0]["element"], "span");
+        assert_eq!(b["a11y"]["keyboard"]["not_visible_examples"], json!(["button", "a"]), "each element once");
         assert!(!b.to_string().contains("dpl_") && !b.to_string().contains("sk-test"));
         for gone in [
             "/meta",
@@ -2233,6 +2341,30 @@ for (const t of tabs) t.onclick = () => tabs.forEach(o => o.setAttribute('aria-s
         let out = dir.path().join("capture");
         e.call("web_site_capture", json!({"output_directory": out.display().to_string(), "widths": [1440]}), cli()).unwrap();
         serde_json::from_str(&std::fs::read_to_string(out.join("capture.json")).unwrap()).unwrap()
+    }
+
+    /// The Tab walk reaches each visible control once, in open shadow roots too, skips what is
+    /// taken out of the order, and names a control whose focus can't be seen. Live (`--ignored`).
+    #[test]
+    #[ignore]
+    fn the_keyboard_walk_counts_reached_controls_and_invisible_focus() {
+        const PAGE: &str = r#"<!doctype html><html lang="en"><body><main>
+<a href="/one">One</a>
+<button>Two</button>
+<button class="bare" style="outline:none">Three</button>
+<button tabindex="-1">Skipped</button>
+<div onclick="void 0">Not a control</div>
+<tab-host></tab-host>
+<script>customElements.define('tab-host', class extends HTMLElement { connectedCallback() {
+  this.attachShadow({mode: 'open'}).innerHTML = '<button>Four</button>';
+}});</script>
+</main></body></html>"#;
+        let k = capture_of(PAGE)["a11y"]["keyboard"].clone();
+        assert_eq!(k["controls"], 4, "{k}");
+        assert_eq!(k["reached"], 4, "each control once: {k}");
+        assert_eq!(k["focus_not_visible"], 1, "{k}");
+        assert!(k["not_visible_examples"][0].as_str().unwrap().starts_with("button"), "{k}");
+        assert_ne!(k["stopped"], "limit", "{k}");
     }
 
     /// Text is judged against the colour behind it, through its ancestors: pale grey on white is too

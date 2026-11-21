@@ -1,5 +1,9 @@
 # Changelog — Redesign Anything specification
 
+## Documentation 1.4.12 — 2026-11-21
+
+- `prototype_basics` (advisory) also names controls the keyboard does not reach and controls whose focus cannot be seen, from a Tab walk in `web_site_capture` (`a11y.keyboard`). See `docs/PR16_LIKENESS.md`. No contract or schema change; nothing claims WCAG conformance.
+
 ## Documentation 1.4.11 — 2026-11-21
 
 - `prototype_basics` (advisory) also names text too faint against its background, measured by `web_site_capture` (`a11y.low_contrast`). See `docs/PR16_LIKENESS.md`. No contract or schema change; nothing claims WCAG conformance.

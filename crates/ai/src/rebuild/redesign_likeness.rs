@@ -470,6 +470,7 @@ fn basics_of(original: &Value, prototype: &Value) -> Vec<String> {
     if let Some(note) = contrast_note(original, prototype) {
         out.push(note);
     }
+    out.extend(keyboard_notes(original, prototype));
     let lang = |v: &Value| v.pointer("/a11y/lang").and_then(Value::as_str).unwrap_or_default().trim().to_string();
     if lang(prototype).is_empty() && lang(original).is_empty() {
         out.push("the page language isn't set (nor is the original's)".into());
@@ -507,8 +508,33 @@ fn contrast_note(original: &Value, prototype: &Value) -> Option<String> {
     Some(format!("{low} text(s) with too little contrast: {} ({before})", examples.join(", ")))
 }
 
+/// What the capture's Tab walk found on the prototype page: controls the keyboard doesn't reach
+/// (only when the walk went round the whole page) and controls whose focus can't be seen, with
+/// how the original measured. Nothing when the capture didn't walk the page.
+fn keyboard_notes(original: &Value, prototype: &Value) -> Vec<String> {
+    let Some(k) = prototype.pointer("/a11y/keyboard") else { return Vec::new() };
+    let n = |v: &Value, key: &str| v.get(key).and_then(Value::as_u64).unwrap_or(0);
+    let theirs = original.pointer("/a11y/keyboard");
+    let before = |key: &str| theirs.map_or("the original's capture didn't walk it".to_string(), |t| format!("the original: {}", n(t, key)));
+    let mut out = Vec::new();
+    let whole = matches!(k.get("stopped").and_then(Value::as_str), Some("wrapped" | "left_page"));
+    if whole && n(k, "reached") < n(k, "controls") {
+        let missed = n(k, "controls") - n(k, "reached");
+        let original_missed = theirs.map_or("the original's capture didn't walk it".to_string(), |t| {
+            format!("the original misses {}", n(t, "controls").saturating_sub(n(t, "reached")))
+        });
+        out.push(format!("Tab reaches {} of {} visible controls, {missed} not by keyboard ({original_missed})", n(k, "reached"), n(k, "controls")));
+    }
+    if n(k, "focus_not_visible") > 0 {
+        let examples: Vec<&str> = k["not_visible_examples"].as_array().into_iter().flatten().filter_map(Value::as_str).collect();
+        out.push(format!("{} control(s) show no focus when tabbed to: {} ({})", n(k, "focus_not_visible"), examples.join(", "), before("focus_not_visible")));
+    }
+    out
+}
+
 /// Advisory: the basics each captured prototype page gets wrong (controls without a name, pictures
-/// without alt text, text too faint against its background, no page language, a landmark of the
+/// without alt text, text too faint against its background, controls the keyboard doesn't reach or
+/// whose focus can't be seen, no page language, a landmark of the
 /// original it lacks, and errors or failed
 /// requests when the captures recorded them). As old as the prototype captures; no certification.
 pub fn basics_check(ws: &Workspace) -> CheckResult {
@@ -525,7 +551,7 @@ pub fn basics_check(ws: &Workspace) -> CheckResult {
         (
             "pass",
             format!(
-                "{captured} captured page(s): every control has a name, every picture has alt text, the text measured has enough contrast, the language is set and the original's landmarks are there"
+                "{captured} captured page(s): every control has a name, every picture has alt text, the text measured has enough contrast, the keyboard reaches the controls with a visible focus, the language is set and the original's landmarks are there"
             ),
         )
     } else {
@@ -698,6 +724,33 @@ mod tests {
 
         fs::write(ws.capture_dir().join("capture.json"), measured(5)).unwrap();
         assert!(basics_check(&ws).summary.contains("the original has 5"), "fewer than the original is still told");
+    }
+
+    /// A prototype is told which controls the keyboard misses (only after a whole walk) and which
+    /// show no focus, and nothing when its capture didn't walk the page.
+    #[test]
+    fn a_prototype_is_told_about_controls_the_keyboard_misses_or_shows_no_focus_on() {
+        let d = tempfile::tempdir().unwrap();
+        let ws = Workspace::create(d.path(), "L", "kind=redesign", craft_anything_engine::workspace::TargetRef::None).unwrap();
+        let walked = |controls: u64, reached: u64, hidden: u64, stopped: &str| {
+            json!({"a11y": {"lang": "pt", "keyboard": {"controls": controls, "reached": reached, "focus_not_visible": hidden, "not_visible_examples": ["button"], "stopped": stopped}}}).to_string()
+        };
+        fs::create_dir_all(ws.capture_dir()).unwrap();
+        fs::write(ws.capture_dir().join("capture.json"), walked(12, 12, 0, "wrapped")).unwrap();
+        let prototype = prototype_dir(&ws).join(START_PAGE);
+        fs::create_dir_all(&prototype).unwrap();
+        let summary = |page: String| {
+            fs::write(prototype.join("capture.json"), page).unwrap();
+            basics_check(&ws)
+        };
+
+        assert_eq!(summary(walked(10, 10, 0, "wrapped")).status, "pass");
+        assert_eq!(summary(json!({"a11y": {"lang": "pt"}}).to_string()).status, "pass", "no walk, nothing said");
+        let missed = summary(walked(10, 7, 0, "left_page"));
+        assert!(missed.summary.contains("Tab reaches 7 of 10") && missed.summary.contains("the original misses 0"), "{}", missed.summary);
+        assert_eq!(summary(walked(200, 80, 0, "limit")).status, "pass", "a walk cut by the press limit says nothing about reach");
+        let hidden = summary(walked(10, 10, 3, "wrapped"));
+        assert!(hidden.summary.contains("3 control(s) show no focus") && hidden.summary.contains("button"), "{}", hidden.summary);
     }
 
     /// A prototype is told what it still gets wrong, whether or not the original got it wrong too,
