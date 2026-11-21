@@ -9,7 +9,7 @@
   - The page is loaded again before the first step unless `restart` is false. The run stops at the first failed step.
   - It runs the site's code, so it needs approval, like `web_page_states_capture`.
 - `redesign_journeys_run {project, journeys?, width?}` (`crates/ai/src/rebuild/redesign_journeys.rs`) serves the built prototype and runs one journey per oracle scenario.
-  - A journey names a scenario of `redesign/oracle/scenarios.json` and must end with an `expect`.
+  - A journey names a scenario of `redesign/oracle/scenarios.json` and must end with a check: an `expect` (a text shows), a `check` (a control or field is enabled, disabled, present, absent or unusable), a `value_of` (a field holds a text, compared in the page) or an `alert` (an alert or live region announces a text).
   - `journeys` replaces the ones the project keeps in `redesign/quality/journeys.json`; without it the kept ones run again.
   - It writes `redesign/quality/journeys-report.json` (every step, with what happened) and a picture of where each journey ended in `redesign/quality/journeys/<scenario>/end.png`.
 - `functional_scenarios` judges a scenario by its journey when the report is about the build on disk, and by a word hint otherwise. Each scenario says which (`method`: `journey_run` or `word_hint`), and the summary counts both.
@@ -54,7 +54,7 @@ This is a stopgap the operator asked for. The aim is prototypes complete enough 
 
 - A journey types, clicks, presses Enter and reads what shows; it finds a control inside an open shadow root; a covered control and a text that never shows fail their own step; each run starts from a page loaded again (live browser test).
 - An address on another site is refused by `open`.
-- A journey must name a scenario of the oracle, one per scenario, and end with an `expect`.
+- A journey must name a scenario of the oracle, one per scenario, and end with a check (`expect`, `check`, `value_of` or `alert`).
 - A report is read only while the build it ran in is on disk.
 - A scenario whose journey ran is judged by it in both directions.
 - Running journeys is refused until the person approves it.

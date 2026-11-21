@@ -140,7 +140,8 @@ pub const JOURNEYS_BRIEF: &str = concat!(
     "{\"journeys\": [{\"scenario_id\": \"<id>\", \"steps\": [...]}]}, one journey per scenario below. ",
     "Steps run in order in a real browser from the start page: {\"click\": \"<visible or accessible name>\"}, ",
     "{\"type\": \"<text>\", \"into\": \"<field label or placeholder>\"}, {\"press\": \"Enter\"}, ",
-    "{\"open\": \"/#/<route>\"} and {\"expect\": \"<text that must show>\"}; end each journey with an expect. ",
+    "{\"open\": \"/#/<route>\"}, {\"expect\": \"<text that must show>\"}, {\"check\": \"<name>\", \"is\": \"enabled|disabled|present|absent|unusable\"}, ",
+    "{\"value_of\": \"<field>\", \"equals\": \"<text>\"} and {\"alert\": \"<announced text>\"}; end each journey with one of the last four. ",
     "Each check round runs them and tells you the step that failed. A scenario passes only when its journey does, ",
     "not when its words appear in the code, so write the UI that makes the steps work rather than steps that avoid it."
 );

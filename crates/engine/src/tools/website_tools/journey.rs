@@ -5,7 +5,8 @@
 //! person.
 //!
 //! Data minimisation: the text a step types is the caller's own; nothing a field already held is
-//! read back.
+//! read back. A `value_of` check compares a field with the caller's text inside the page and
+//! returns only whether they match.
 
 use super::*;
 use serde::Serialize;
@@ -28,13 +29,50 @@ pub enum Step {
     Open { open: String },
     /// This text must show on the page (case and spacing ignored); waits a moment for it.
     Expect { expect: String },
+    /// The control or field with this name is in this state; waits a moment for it.
+    Check { check: String, is: ControlState },
+    /// The field with this name holds this text (case and spacing ignored); waits a moment for it.
+    Value { value_of: String, equals: String },
+    /// An alert or live region (role alert, alertdialog or status, aria-live) shows this text;
+    /// an empty text means any text. Waits a moment for it.
+    Alert { alert: String },
+}
+
+/// The state a `check` step expects a control or field to be in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ControlState {
+    /// It shows and can be used.
+    Enabled,
+    /// It shows but can't be used (disabled, aria-disabled or inert).
+    Disabled,
+    /// It shows.
+    Present,
+    /// Nothing with that name shows.
+    Absent,
+    /// It can't be used: disabled, or not shown at all.
+    Unusable,
+}
+
+impl ControlState {
+    fn word(self) -> &'static str {
+        match self {
+            ControlState::Enabled => "enabled",
+            ControlState::Disabled => "disabled",
+            ControlState::Present => "present",
+            ControlState::Absent => "absent",
+            ControlState::Unusable => "unusable",
+        }
+    }
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct JourneyParams {
     /// The steps, in order. Each is one of {"click": name}, {"type": text, "into": field},
-    /// {"press": key}, {"open": path} and {"expect": text}. The run stops at the first that fails.
+    /// {"press": key}, {"open": path}, {"expect": text}, {"check": name, "is": "enabled" |
+    /// "disabled" | "present" | "absent" | "unusable"}, {"value_of": field, "equals": text} and
+    /// {"alert": text}. The run stops at the first that fails.
     pub steps: Vec<Step>,
     /// Page width in CSS pixels (320..=3840, default 1440).
     #[serde(default = "d_state_width")]
@@ -62,7 +100,7 @@ pub(super) fn tool() -> ToolSpec {
     spec(
         "web_site_journey_run",
         "Run a visitor's journey",
-        "On the open website, do a visitor's steps in order and say which one failed: {\"click\": name} clicks the control with that visible or accessible name, {\"type\": text, \"into\": field} types into the field with that label, placeholder or name (or chooses that option of a drop-down), {\"press\": key} presses Enter, Escape, Tab, Space or an arrow key, {\"open\": path} loads that address on the same site from scratch, and {\"expect\": text} waits up to wait_ms for that text to show. Controls inside open shadow roots are found; ones in frames are not. A click is a real pointer click at the control's centre, so a covered control fails the step. The page is loaded again first unless restart is false. With output_directory, a picture of the page at the end is saved as end.png. Clicking and typing run the site's own code, so it needs your approval.",
+        "On the open website, do a visitor's steps in order and say which one failed: {\"click\": name} clicks the control with that visible or accessible name, {\"type\": text, \"into\": field} types into the field with that label, placeholder or name (or chooses that option of a drop-down), {\"press\": key} presses Enter, Escape, Tab, Space or an arrow key, {\"open\": path} loads that address on the same site from scratch, and {\"expect\": text} waits up to wait_ms for that text to show, {\"check\": name, \"is\": state} for that control or field to be enabled, disabled, present, absent or unusable, {\"value_of\": field, \"equals\": text} for that field to hold the text (compared in the page; its content is never read back), and {\"alert\": text} for an alert or live region to announce it (empty: anything). Controls inside open shadow roots are found; ones in frames are not. A click is a real pointer click at the control's centre, so a covered control fails the step. The page is loaded again first unless restart is false. With output_directory, a picture of the page at the end is saved as end.png. Clicking and typing run the site's own code, so it needs your approval.",
         "Click and type through the site the way a visitor would, and check what shows.",
         Toolset::Browser,
         Effects::EVIDENCE.union(Effects::WRITES_FILESYSTEM).union(Effects::EXECUTES_FOREIGN_CODE).union(Effects::ACCESSES_NETWORK),
@@ -135,6 +173,36 @@ const FIND_FIELD_JS: &str = r#"(() => {
   return {found: true, kind: 'text', same_name: hits.length};
 })()"#;
 
+/// The control or field named `__NAME__` (as a click or a type step would find it, without
+/// touching it): whether it shows, whether it can be used, and, when `__COMPARE__` is true,
+/// whether its value (or its text) equals `__TEXT__`. Only the comparison leaves the page.
+const STATE_OF_JS: &str = r#"(() => {
+  __DEEP__
+  const want = norm(__NAME__);
+  const names = el => { const root = el.getRootNode(); const forLabel = el.id && root.querySelector ? root.querySelector('label[for="' + CSS.escape(el.id) + '"]') : null; const wrap = el.closest('label');
+    const field = ['INPUT', 'SELECT', 'TEXTAREA'].includes(el.tagName);
+    return [el.getAttribute('aria-label'), labelled(el), forLabel && forLabel.innerText, wrap && wrap.innerText, el.getAttribute('placeholder'), el.getAttribute('title'), el.getAttribute('name'),
+      field ? '' : el.innerText, el.value && /^(submit|button|reset)$/.test(el.type || '') ? el.value : '', el.querySelector && el.querySelector('img[alt]') ? el.querySelector('img[alt]').alt : ''].map(norm).filter(Boolean); };
+  const SEL = 'a[href], button, summary, select, textarea, input:not([type="hidden"]), [role="button"], [role="link"], [role="tab"], [role="menuitem"], [role="option"], [role="checkbox"], [role="radio"], [role="switch"], [contenteditable=""], [contenteditable="true"]';
+  const els = all(document, []).filter(el => el.matches(SEL) && shown(el));
+  let hits = els.filter(el => names(el).includes(want));
+  if (!hits.length) hits = els.filter(el => names(el).some(n => n.includes(want)));
+  if (!hits.length) return {found: false};
+  const el = hits[0];
+  const out = {found: true, kind: el.getAttribute('role') || el.tagName.toLowerCase(), same_name: hits.length,
+    disabled: !!el.disabled || el.getAttribute('aria-disabled') === 'true' || !!el.closest('[inert]')};
+  if (__COMPARE__) out.equals = norm('value' in el && el.tagName !== 'BUTTON' ? el.value : el.innerText) === norm(__TEXT__);
+  return out;
+})()"#;
+
+/// Whether an alert or live region shows `__TEXT__` (any text when it is empty).
+const ALERT_JS: &str = r#"(() => {
+  __DEEP__
+  const want = norm(__TEXT__);
+  return all(document, []).some(el => el.matches('[role="alert"], [role="alertdialog"], [role="status"], [aria-live="assertive"], [aria-live="polite"], output')
+    && shown(el) && norm(el.innerText) !== '' && norm(el.innerText).includes(want));
+})()"#;
+
 /// Whether `__TEXT__` shows on the page, open shadow roots included.
 const SHOWS_JS: &str = r#"(() => {
   __DEEP__
@@ -178,6 +246,9 @@ fn check_steps(steps: &[Step]) -> Result<(), ToolError> {
             Step::Press { press } => ("press takes Enter, Escape, Tab, Space, ArrowUp, ArrowDown, ArrowLeft or ArrowRight", key_named(press).is_none()),
             Step::Open { open } => ("open needs an address on the site, like \"/#/library\"", open.trim().is_empty()),
             Step::Expect { expect } => ("expect needs the text that must show", expect.trim().is_empty()),
+            Step::Check { check, .. } => ("check needs the control's or field's name", check.trim().is_empty()),
+            Step::Value { value_of, .. } => ("value_of needs the field's name", value_of.trim().is_empty()),
+            Step::Alert { .. } => ("", false),
         };
         if empty {
             return Err(ToolError::invalid(format!("step {}: {what}", n + 1)));
@@ -283,20 +354,71 @@ fn run_step(client: &mut CdpClient, step: &Step, start: &str, p: &JourneyParams,
                 Ok(format!("opened {}", shown_url(&url)))
             }
         },
-        Step::Expect { expect } => {
-            let wait = Deadline::new(Duration::from_millis(p.wait_ms), crate::tool::CancelToken::default());
-            loop {
-                // A page that is still loading has no script context for a moment: ask again.
-                if eval(client, &script(SHOWS_JS, "", expect), dl).is_ok_and(|shows| shows == true) {
-                    break Ok(format!("{expect:?} shows"));
-                }
-                if wait.expired() || dl.expired() {
-                    break Err(format!("{expect:?} did not show within {} ms", p.wait_ms));
-                }
-                settle(client, 100)?;
+        Step::Expect { expect } => match wait_for(client, p, dl, |c| Ok(eval(c, &script(SHOWS_JS, "", expect), dl).is_ok_and(|shows| shows == true)))? {
+            true => Ok(format!("{expect:?} shows")),
+            false => Err(format!("{expect:?} did not show within {} ms", p.wait_ms)),
+        },
+        Step::Check { check, is } => {
+            let holds = |state: &Value| match is {
+                ControlState::Absent => state["found"] != true,
+                ControlState::Present => state["found"] == true,
+                ControlState::Enabled => state["found"] == true && state["disabled"] != true,
+                ControlState::Disabled => state["found"] == true && state["disabled"] == true,
+                ControlState::Unusable => state["found"] != true || state["disabled"] == true,
+            };
+            let js = script(STATE_OF_JS, check, "").replace("__COMPARE__", "false");
+            let mut last = Value::Null;
+            let held = wait_for(client, p, dl, |c| {
+                last = eval(c, &js, dl).unwrap_or(Value::Null);
+                Ok(holds(&last))
+            })?;
+            let now = match (last["found"] == true, last["disabled"] == true) {
+                (false, _) => "no control or field by that name shows",
+                (true, true) => "it shows but can't be used",
+                (true, false) => "it shows and can be used",
+            };
+            if held { Ok(format!("{check:?} is {} ({now})", is.word())) } else { Err(format!("{check:?} is not {} within {} ms: {now}", is.word(), p.wait_ms)) }
+        }
+        Step::Value { value_of, equals } => {
+            let js = script(STATE_OF_JS, value_of, equals).replace("__COMPARE__", "true");
+            let mut found = false;
+            let held = wait_for(client, p, dl, |c| {
+                let v = eval(c, &js, dl).unwrap_or(Value::Null);
+                found = v["found"] == true;
+                Ok(v["equals"] == true)
+            })?;
+            match (held, found) {
+                (true, _) => Ok(format!("{value_of:?} holds {equals:?}")),
+                (false, true) => Err(format!("{value_of:?} does not hold {equals:?} within {} ms", p.wait_ms)),
+                (false, false) => Err(format!("no field named {value_of:?} shows on the page")),
             }
         }
+        Step::Alert { alert } => match wait_for(client, p, dl, |c| Ok(eval(c, &script(ALERT_JS, "", alert), dl).is_ok_and(|shows| shows == true)))? {
+            true if alert.trim().is_empty() => Ok("an alert is announced".to_string()),
+            true => Ok(format!("an alert announces {alert:?}")),
+            false => Err(format!("no alert{} within {} ms", if alert.trim().is_empty() { String::new() } else { format!(" announcing {alert:?}") }, p.wait_ms)),
+        },
     })
+}
+
+/// Ask `holds` until it is true or `p.wait_ms` passes. A page that is still loading has no
+/// script context for a moment, so a failed question is asked again.
+fn wait_for(
+    client: &mut CdpClient,
+    p: &JourneyParams,
+    dl: &Deadline,
+    mut holds: impl FnMut(&mut CdpClient) -> Result<bool, ToolError>,
+) -> Result<bool, ToolError> {
+    let wait = Deadline::new(Duration::from_millis(p.wait_ms), crate::tool::CancelToken::default());
+    loop {
+        if holds(client)? {
+            return Ok(true);
+        }
+        if wait.expired() || dl.expired() {
+            return Ok(false);
+        }
+        settle(client, 100)?;
+    }
 }
 
 /// What a run left: each step that ran, the first that failed (from 0), where the page ended, and
@@ -414,5 +536,10 @@ mod tests {
         assert!(check_steps(&[Step::Press { press: "F13".into() }]).is_err());
         assert!(check_steps(&[Step::Click { click: " ".into() }]).is_err());
         assert!(check_steps(&[Step::Press { press: "enter".into() }, Step::Expect { expect: "Done".into() }]).is_ok());
+        assert!(check_steps(&[Step::Check { check: " ".into(), is: ControlState::Disabled }]).is_err());
+        let parsed: Vec<Step> =
+            serde_json::from_value(json!([{"check": "Submit", "is": "unusable"}, {"value_of": "Name", "equals": "Ada"}, {"alert": ""}])).unwrap();
+        assert_eq!(parsed[0], Step::Check { check: "Submit".into(), is: ControlState::Unusable }, "each new step reads as itself, not as another");
+        assert!(matches!(parsed[1], Step::Value { .. }) && matches!(parsed[2], Step::Alert { .. }));
     }
 }
