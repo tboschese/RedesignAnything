@@ -146,8 +146,12 @@ pub fn run_native_checks(ws: &Workspace) -> Result<ReadyReport, ToolError> {
     checks.push(CheckResult {
         id: "build_scaffold".into(),
         status: build.as_status().into(),
-        summary: if build.is_pass() { "app/package.json present".into() } else { "app scaffold missing package.json".into() },
-        details: json!({}),
+        summary: if build.is_pass() {
+            "app/package.json present; nothing was installed or built by this check".into()
+        } else {
+            "app scaffold missing package.json".into()
+        },
+        details: json!({"method": "file_present", "built": false}),
     });
 
     // DS compliance if registry exists.
